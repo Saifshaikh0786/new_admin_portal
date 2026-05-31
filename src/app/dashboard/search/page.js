@@ -47,7 +47,7 @@ export default function StudentSearchPage() {
             const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
             // 1. Search for student by Reg ID
-            const searchRes = await fetch(`${API_CONFIG.baseUrl.admin}/api/university/admin/search-student-by-reg-id`, {
+            const searchRes = await fetch(`${API_CONFIG.baseUrl.admin}/admin/dashboard/search-student`, {
                 method: "POST",
                 headers,
                 credentials: "include",
@@ -79,11 +79,10 @@ export default function StudentSearchPage() {
 
     const fetchStudentCourses = async (batchId, headers) => {
         try {
-            const cRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getPracticeCoursesByBatch}`, {
-                method: "POST",
+            const cRes = await fetch(`${API_CONFIG.baseUrl.admin}/coursesmetadata/batch/${batchId}`, {
+                method: "GET",
                 headers,
-                credentials: "include",
-                body: JSON.stringify({ batch_id: batchId })
+                credentials: "include"
             });
             const cData = await cRes.json();
             if (cData.success) {

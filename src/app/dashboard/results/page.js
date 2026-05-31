@@ -40,10 +40,10 @@ export default function ExamResultsPage() {
             const token = getAdminToken();
             const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
-            const bRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myBatches}`, { method: "POST", headers, credentials: "include" });
+            const bRes = await fetch(`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, { method: "GET", headers, credentials: "include" });
             const bData = await bRes.json();
-            if (bData.success) {
-                setBatches(bData.data);
+            if (bData.success && bData.data) {
+                setBatches(bData.data.batches || []);
                 if (selectedBatch) {
                     fetchCoursesForBatch(selectedBatch, headers);
                 }
@@ -55,11 +55,10 @@ export default function ExamResultsPage() {
 
     const fetchCoursesForBatch = async (batchId, headers) => {
         try {
-            const cRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getExamCoursesByBatch}`, {
-                method: "POST",
+            const cRes = await fetch(`${API_CONFIG.baseUrl.admin}/coursesmetadata/batch/${batchId}`, {
+                method: "GET",
                 headers,
-                credentials: "include",
-                body: JSON.stringify({ batch_id: batchId })
+                credentials: "include"
             });
             const cData = await cRes.json();
             if (cData.success) {
@@ -94,8 +93,10 @@ export default function ExamResultsPage() {
         try {
             const token = getAdminToken();
             const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructure(courseId)}`, {
-                headers, credentials: "include"
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}/courses/${courseId}`, {
+                method: "GET",
+                headers, 
+                credentials: "include"
             });
             const data = await res.json();
             if (data.success && data.data) {

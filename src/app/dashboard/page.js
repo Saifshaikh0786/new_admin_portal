@@ -33,26 +33,22 @@ export default function OverviewPage() {
                 ...(token ? { Authorization: `Bearer ${token}` } : {})
             };
 
-            // Fetch Batches
-            const batchesRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myBatches}`, {
-                method: "POST",
+            // Fetch Dashboard Overview
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, {
+                method: "GET",
                 headers,
                 credentials: "include"
             });
-            const batchesData = await batchesRes.json();
-            if (batchesData.success && batchesData.data) {
-                setBatches(batchesData.data);
-            }
-
-            // Fetch Teachers
-            const teachersRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myTeachers}`, {
-                method: "POST",
-                headers,
-                credentials: "include"
-            });
-            const teachersData = await teachersRes.json();
-            if (teachersData.success && teachersData.data) {
-                setTeachers(teachersData.data);
+            const data = await res.json();
+            
+            if (data.success && data.data) {
+                setBatches(data.data.batches || []);
+                
+                // We'll simulate the teachers list since the new overview just returns a count
+                // But for the UI we just need the count anyway!
+                // If the UI actually renders the teachers array, we'll fetch them separately.
+                // Looking at the component, it just uses teachers.length
+                setTeachers(new Array(data.data.total_teachers || 0).fill({}));
             }
 
         } catch (error) {

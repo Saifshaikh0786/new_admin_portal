@@ -37,11 +37,11 @@ export default function PracticeTrackingPage() {
             const token = getAdminToken();
             const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
-            // Fetch Batches
-            const bRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myBatches}`, { method: "POST", headers, credentials: "include" });
+            // Fetch Batches from Overview API
+            const bRes = await fetch(`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, { method: "GET", headers, credentials: "include" });
             const bData = await bRes.json();
-            if (bData.success) {
-                setBatches(bData.data);
+            if (bData.success && bData.data) {
+                setBatches(bData.data.batches || []);
                 
                 // If a batch is pre-selected, fetch its courses
                 if (selectedBatch) {
@@ -55,11 +55,10 @@ export default function PracticeTrackingPage() {
 
     const fetchCoursesForBatch = async (batchId, headers) => {
         try {
-            const cRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getPracticeCoursesByBatch}`, {
-                method: "POST",
+            const cRes = await fetch(`${API_CONFIG.baseUrl.admin}/coursesmetadata/batch/${batchId}`, {
+                method: "GET",
                 headers,
-                credentials: "include",
-                body: JSON.stringify({ batch_id: batchId })
+                credentials: "include"
             });
             const cData = await cRes.json();
             if (cData.success) {
