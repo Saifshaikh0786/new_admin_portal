@@ -68,8 +68,8 @@ export const AuthProvider = ({ children }) => {
     const handleLogout = () => {
         setUser(null);
         // Only redirect if we are strictly in a protected route
-        if (pathname.includes("/admin/dashboard")) {
-            router.push("/admin/login");
+        if (pathname.includes("/dashboard")) {
+            router.push("/login");
         }
     };
 
@@ -126,7 +126,7 @@ export const AuthProvider = ({ children }) => {
             await apiCall(url, { method: "POST" }); // Assuming this clears the cookie
             clearAdminToken(); // Clear token from localStorage
             handleLogout();
-            router.push("/admin/login");
+            router.push("/login");
         } catch (error) {
             console.error("Logout failed:", error);
             // Even if API call fails, clear local token
