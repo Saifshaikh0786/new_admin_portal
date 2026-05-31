@@ -8,9 +8,9 @@ export const API_CONFIG = {
 
     // Admin Endpoints
     admin: {
-        login: '/api/university/auth/login',
-        logout: '/api/university/auth/logout',
-        me: '/api/university/auth/me',
+        login: '/universities/login',
+        logout: '/universities/logout',
+        me: '/admin/dashboard/profile',
         myBatches: '/api/university/admin/my-batches',
         myTeachers: '/api/university/admin/my-teachers',
         courseStructure: (courseId) => `/api/university/admin/course-structure/${courseId}`,

@@ -46,12 +46,11 @@ export const AuthProvider = ({ children }) => {
 
             if (res.ok) {
                 const data = await res.json();
-                // API returns: { email, name, universityId, isAuthenticated: true }
-                if (data.isAuthenticated) {
-                    setUser(data);
+                // New Backend returns: { success: true, data: { admin: ..., university: ... } }
+                if (data.success && data.data) {
+                    setUser(data.data.admin || data.data.teacher || data.data);
                 } else {
-                    // API might return success=true but isAuthenticated=false in some designs, 
-                    // or just 401. If we get here and isAuthenticated is explicitly false:
+                    // Invalid session
                     handleLogout();
                 }
             } else {
