@@ -142,7 +142,7 @@ function PracticeTrackingContent() {
     };
 
     return (
-        <div className="space-y-6 animate-fadeIn pb-20">
+        <div className="space-y-4 animate-fadeIn pb-20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Practice Tracking</h1>
@@ -274,7 +274,10 @@ function PracticeTrackingContent() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {studentsData.map((student, i) => (
+                                    {studentsData.map((student, i) => {
+                                        const mcqPercent = student.mcq_total > 0 ? Math.round((student.mcq_marks / student.mcq_total) * 100) : (student.mcq_score_percent || 0);
+                                        const codingPercent = student.coding_total > 0 ? Math.round((student.coding_marks / student.coding_total) * 100) : (student.coding_score_percent || 0);
+                                        return (
                                         <tr 
                                             key={student.student_id || i} 
                                             onClick={() => handleRowClick(student.student_id || student.reg_id)}
@@ -290,17 +293,17 @@ function PracticeTrackingContent() {
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-16 h-2 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
-                                                        <div className="h-full bg-violet-500" style={{ width: `${student.mcq_score_percent || 0}%` }} />
+                                                        <div className="h-full bg-violet-500" style={{ width: `${mcqPercent}%` }} />
                                                     </div>
-                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{student.mcq_score_percent || 0}%</span>
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{mcqPercent}%</span>
                                                 </div>
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-16 h-2 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
-                                                        <div className="h-full bg-blue-500" style={{ width: `${student.coding_score_percent || 0}%` }} />
+                                                        <div className="h-full bg-blue-500" style={{ width: `${codingPercent}%` }} />
                                                     </div>
-                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{student.coding_score_percent || 0}%</span>
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{codingPercent}%</span>
                                                 </div>
                                             </td>
                                             <td className="p-4">
@@ -325,7 +328,7 @@ function PracticeTrackingContent() {
                                                 </button>
                                             </td>
                                         </tr>
-                                    ))}
+                                    )})}
                                     {studentsData.length === 0 && (
                                         <tr>
                                             <td colSpan={6} className="p-8 text-center text-gray-500">No students found for this course.</td>

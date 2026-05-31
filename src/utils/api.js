@@ -24,8 +24,11 @@ export const API_CONFIG = {
         getExamCoursesByBatch: '/api/university/admin/get-exam-courses-by-batch',
         examDetails: '/api/auth/teacher/teacher/analytics/section-exam-progress',
         checkDetails: '/api/university/admin/check-details',
-        updateDetails: '/api/university/admin/update-details',
-        updatePassword: '/api/university/admin/update-password',
+        updateDetails: '/admin/dashboard/profile',
+        updatePassword: '/admin/dashboard/update-password',
+        studentsSummary: '/admin/dashboard/students-summary',
+        teachersSummary: '/admin/dashboard/teachers-summary',
+        studentsBySection: '/admin/dashboard/students-by-section',
         getAllCourses: '/api/university/admin/get-courses-by-email',
         getCourseContent: '/api/university/admin/course/full-content',
 
@@ -36,6 +39,8 @@ export const API_CONFIG = {
             proctoringSummary: '/admin/analytics/proctoring-summary',
             studentDeepDive: '/admin/analytics/student-deep-dive',
             sittingAttendance: '/admin/analytics/sitting-attendance',
+            lectureExamConfig: '/admin/analytics/lecture-exam-config',
+            sectionStudents: '/admin/analytics/section-students',
         }
     },
 

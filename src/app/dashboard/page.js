@@ -1,31 +1,77 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useDashboard } from "@/context/DashboardContext";
 import { API_CONFIG } from "@/utils/api";
 import { getAdminToken } from "@/utils/cookies";
-import { Users, BookOpen, UserCheck, Activity, Award, LayoutGrid, ChevronRight, Loader2 } from "lucide-react";
+import { Users, BookOpen, UserCheck, Activity, Award, LayoutGrid, ChevronRight, Loader2, X, Layers } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function OverviewPage() {
     const { user, loading: authLoading } = useAuth();
+    const { batches, overviewStats, loading: dashboardLoading } = useDashboard();
     const router = useRouter();
-
-    const [batches, setBatches] = useState([]);
-    const [teachers, setTeachers] = useState([]);
-    const [loading, setLoading] = useState(true);
 
     const [selectedBatchForAction, setSelectedBatchForAction] = useState(null);
 
-    useEffect(() => {
-        if (!authLoading && user) {
-            fetchData();
-        }
-    }, [authLoading, user]);
+    // Modal States
+    const [activeModal, setActiveModal] = useState(null); // 'Total Students', 'Total Courses', 'Faculty Members'
+    const [modalData, setModalData] = useState([]);
+    const [modalLoading, setModalLoading] = useState(false);
 
-    const fetchData = async () => {
-        setLoading(true);
+    // Derived Statistics
+    const totalStudents = overviewStats?.total_students || batches.reduce((acc, curr) => acc + (curr.actual_student_count || curr.batch_student_strength || 0), 0);
+    const totalCourses = overviewStats?.total_courses || batches.reduce((acc, curr) => acc + (curr.course_count || curr.registered_courses_id?.length || 0), 0);
+    const totalTeachers = overviewStats?.total_teachers || 0;
+    
+    // Deduplicate sections for Total Sections card
+    const uniqueSectionsSet = new Set();
+    batches.forEach(b => {
+        if (b.sections) b.sections.forEach(s => uniqueSectionsSet.add(s));
+    });
+    const totalSections = uniqueSectionsSet.size;
+
+    const summaryCards = [
+        { title: "Total Students", value: totalStudents, icon: Users, color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30", clickable: true },
+        { title: "Active Batches", value: batches.length, icon: LayoutGrid, color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30", clickable: true },
+        { title: "Total Courses", value: totalCourses, icon: BookOpen, color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30", clickable: true },
+        { title: "Faculty Members", value: totalTeachers, icon: UserCheck, color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30", clickable: true },
+        { title: "Total Sections", value: totalSections, icon: Layers, color: "text-pink-500", bg: "bg-pink-100 dark:bg-pink-900/30", clickable: true },
+    ];
+
+    const handleCardClick = async (title) => {
+        if (title === "Active Batches") {
+            document.getElementById("batches-section")?.scrollIntoView({ behavior: "smooth" });
+            return;
+        }
+
+        setActiveModal(title);
+        setModalData([]);
+        
+        if (title === "Total Courses") {
+            // Deduplicate courses from batches in memory
+            const uniqueCourses = new Set();
+            batches.forEach(b => {
+                if (b.course_names) {
+                    b.course_names.forEach(c => uniqueCourses.add(c));
+                }
+            });
+            setModalData(Array.from(uniqueCourses).map(name => ({ name })));
+            return;
+        }
+
+        if (title === "Total Sections") {
+            const uniqueSections = new Set();
+            batches.forEach(b => {
+                if (b.sections) b.sections.forEach(s => uniqueSections.add(s));
+            });
+            setModalData(Array.from(uniqueSections).map(name => ({ name })));
+            return;
+        }
+
+        setModalLoading(true);
         try {
             const token = getAdminToken();
             const headers = {
@@ -33,43 +79,59 @@ export default function OverviewPage() {
                 ...(token ? { Authorization: `Bearer ${token}` } : {})
             };
 
-            // Fetch Dashboard Overview
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, {
-                method: "GET",
-                headers,
-                credentials: "include"
-            });
-            const data = await res.json();
-            
-            if (data.success && data.data) {
-                setBatches(data.data.batches || []);
-                
-                // We'll simulate the teachers list since the new overview just returns a count
-                // But for the UI we just need the count anyway!
-                // If the UI actually renders the teachers array, we'll fetch them separately.
-                // Looking at the component, it just uses teachers.length
-                setTeachers(new Array(data.data.total_teachers || 0).fill({}));
+            let endpoint = "";
+            if (title === "Total Students") {
+                endpoint = API_CONFIG.admin.studentsSummary;
+            } else if (title === "Faculty Members") {
+                endpoint = API_CONFIG.admin.teachersSummary;
             }
 
+            if (endpoint) {
+                const res = await fetch(`${API_CONFIG.baseUrl.admin}${endpoint}`, {
+                    method: "GET",
+                    headers,
+                    credentials: "include"
+                });
+                const data = await res.json();
+                if (data.success && data.data) {
+                    setModalData(data.data);
+                }
+            }
         } catch (error) {
-            console.error("Failed to fetch dashboard data", error);
+            console.error("Failed to fetch modal data", error);
         } finally {
-            setLoading(false);
+            setModalLoading(false);
         }
     };
 
-    // Derived Statistics
-    const totalStudents = batches.reduce((acc, curr) => acc + (curr.batch_student_strength || 0), 0);
-    const totalCourses = batches.reduce((acc, curr) => acc + (curr.registered_courses_id?.length || 0), 0);
+    const handleSectionClick = async (sectionName) => {
+        setActiveModal(`Total Students - Section ${sectionName}`);
+        setModalData([]);
+        setModalLoading(true);
+        try {
+            const token = getAdminToken();
+            const headers = {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            };
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentsBySection}`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ section: sectionName }),
+                credentials: "include"
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                setModalData(data.data.students || []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch section students", error);
+        } finally {
+            setModalLoading(false);
+        }
+    };
 
-    const summaryCards = [
-        { title: "Total Students", value: totalStudents, icon: Users, color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30" },
-        { title: "Active Batches", value: batches.length, icon: LayoutGrid, color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
-        { title: "Total Courses", value: totalCourses, icon: BookOpen, color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
-        { title: "Faculty Members", value: teachers.length, icon: UserCheck, color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30" },
-    ];
-
-    if (loading || authLoading) {
+    if (dashboardLoading || authLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh]">
                 <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
@@ -79,8 +141,113 @@ export default function OverviewPage() {
     }
 
     return (
-        <div className="space-y-8 animate-fadeIn">
-            {/* Action Modal */}
+        <div className="space-y-4 animate-fadeIn">
+            
+            {/* Modal for Clickable Stat Cards */}
+            {activeModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col border border-gray-100 dark:border-slate-700 animate-slideInRight">
+                        <div className="flex items-center justify-between mb-4 border-b pb-4 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{activeModal}</h3>
+                            <button onClick={() => setActiveModal(null)} className="p-2 text-gray-500 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                            {modalLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+                                    <p className="text-gray-500">Fetching {activeModal}...</p>
+                                </div>
+                            ) : (
+                                <div>
+                                    {activeModal?.startsWith('Total Students') && (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-900/50 dark:text-gray-400">
+                                                    <tr>
+                                                        <th className="px-4 py-3 font-semibold">Name</th>
+                                                        <th className="px-4 py-3 font-semibold">Reg No</th>
+                                                        <th className="px-4 py-3 font-semibold">Section</th>
+                                                        <th className="px-4 py-3 font-semibold">Batch</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {modalData.map((s, idx) => (
+                                                        <tr key={idx} className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-750">
+                                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{s.student_name}</td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{s.uni_reg_id}</td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                                <span className="px-2 py-1 bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 rounded-md text-xs font-semibold">{s.section || 'N/A'}</span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{batches.find(b => b.batch_id === s.batch_id)?.batch_name || '-'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {activeModal === 'Faculty Members' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {modalData.map((t, idx) => (
+                                                <div key={idx} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">
+                                                    <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg shrink-0">
+                                                        {t.teacher_name?.charAt(0)}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-gray-900 dark:text-white truncate">{t.teacher_name}</p>
+                                                        <p className="text-xs text-gray-500 truncate">{t.teacher_email || 'No Email'}</p>
+                                                        {t.teacher_phone && <p className="text-xs text-gray-400 truncate mt-0.5">{t.teacher_phone}</p>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {activeModal === 'Total Courses' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {modalData.map((c, idx) => (
+                                                <div key={idx} className="flex items-center gap-3 p-4 rounded-xl border border-violet-100 dark:border-violet-900/30 bg-violet-50/50 dark:bg-violet-900/10">
+                                                    <BookOpen className="w-5 h-5 text-violet-500 shrink-0" />
+                                                    <p className="font-semibold text-violet-900 dark:text-violet-100">{c.name}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {activeModal === 'Total Sections' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {modalData.map((s, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    onClick={() => handleSectionClick(s.name)}
+                                                    className="flex items-center justify-between p-4 rounded-xl border border-pink-100 dark:border-pink-900/30 bg-pink-50/50 dark:bg-pink-900/10 cursor-pointer hover:bg-pink-100 dark:hover:bg-pink-900/20 transition-colors group"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <Layers className="w-5 h-5 text-pink-500 shrink-0" />
+                                                        <p className="font-semibold text-pink-900 dark:text-pink-100">{s.name}</p>
+                                                    </div>
+                                                    <ChevronRight className="w-5 h-5 text-pink-400 group-hover:text-pink-600 group-hover:translate-x-1 transition-all" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {modalData.length === 0 && !modalLoading && (
+                                        <div className="py-8 text-center text-gray-500">
+                                            No records found.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Action Modal (For Batch Actions) */}
             {selectedBatchForAction && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-gray-100 dark:border-slate-700 animate-slideInRight">
@@ -125,7 +292,12 @@ export default function OverviewPage() {
             {/* Summary Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {summaryCards.map((card, idx) => (
-                    <div key={idx} className="glass-card p-6 border-l-4" style={{ borderLeftColor: card.color.split('-')[1] }}>
+                    <div 
+                        key={idx} 
+                        onClick={() => card.clickable ? handleCardClick(card.title) : null}
+                        className={`glass-card p-6 border-l-4 transition-all duration-200 ${card.clickable ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg' : ''}`} 
+                        style={{ borderLeftColor: card.color.split('-')[1] }}
+                    >
                         <div className="flex items-center gap-4">
                             <div className={`p-3 rounded-xl ${card.bg}`}>
                                 <card.icon className={`w-6 h-6 ${card.color}`} />
@@ -140,7 +312,7 @@ export default function OverviewPage() {
             </div>
 
             {/* Batches Grid */}
-            <div>
+            <div id="batches-section">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                     <LayoutGrid className="w-5 h-5 text-blue-500" />
                     Active Batches
@@ -148,9 +320,6 @@ export default function OverviewPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {batches.map((batch) => {
-                        // Find assigned teacher if applicable
-                        const assignedTeacher = teachers.find(t => t.teacher_id === batch.coordinator_id);
-
                         return (
                             <button
                                 key={batch.batch_id}
@@ -167,26 +336,16 @@ export default function OverviewPage() {
 
                                     <div className="grid grid-cols-2 gap-4 mb-6">
                                         <div className="bg-gray-50 dark:bg-slate-900/50 p-4 rounded-xl border border-gray-100 dark:border-slate-700">
-                                            <div className="text-2xl font-bold text-blue-600">{batch.batch_student_strength || 0}</div>
+                                            <div className="text-2xl font-bold text-blue-600">{batch.actual_student_count || batch.batch_student_strength || 0}</div>
                                             <div className="text-xs text-gray-500 uppercase font-semibold mt-1">Students</div>
                                         </div>
                                         <div className="bg-gray-50 dark:bg-slate-900/50 p-4 rounded-xl border border-gray-100 dark:border-slate-700">
-                                            <div className="text-2xl font-bold text-violet-600">{batch.registered_courses_id?.length || 0}</div>
+                                            <div className="text-2xl font-bold text-violet-600">{batch.registered_courses_id?.length || batch.course_count || 0}</div>
                                             <div className="text-xs text-gray-500 uppercase font-semibold mt-1">Courses</div>
                                         </div>
                                     </div>
-
-                                    {assignedTeacher && (
-                                        <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-slate-700">
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
-                                                {assignedTeacher.teacher_name?.charAt(0) || "T"}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{assignedTeacher.teacher_name}</p>
-                                                <p className="text-xs text-gray-500 truncate">Coordinator</p>
-                                            </div>
-                                        </div>
-                                    )}
+                                    
+                                    {/* The course pills are intentionally removed per user request */}
 
                                     <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 font-medium pt-4 border-t border-gray-100 dark:border-slate-700">
                                         <span>{new Date(batch.starting_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
@@ -198,7 +357,7 @@ export default function OverviewPage() {
                         );
                     })}
 
-                    {batches.length === 0 && !loading && (
+                    {batches.length === 0 && !dashboardLoading && (
                         <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-500">
                             <LayoutGrid className="w-12 h-12 mb-3 opacity-20" />
                             <p>No active batches found</p>

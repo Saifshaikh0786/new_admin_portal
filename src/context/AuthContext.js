@@ -3,7 +3,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { API_CONFIG } from "../utils/api";
-import { setAdminToken, clearAdminToken } from "../utils/cookies";
+import { setAdminToken, clearAdminToken, getAdminToken } from "../utils/cookies";
 
 const AuthContext = createContext();
 
@@ -15,8 +15,10 @@ export const AuthProvider = ({ children }) => {
 
     // Helper for API calls to ensure consistent config
     const apiCall = async (url, options = {}) => {
+        const token = getAdminToken();
         const defaultHeaders = {
             "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
         };
 
         const config = {

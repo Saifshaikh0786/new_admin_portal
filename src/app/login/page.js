@@ -49,7 +49,7 @@ function LoginContent() {
       
       <div className="w-full max-w-md bg-white dark:bg-slate-800 p-10 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 transition-colors">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">EduCode Portal</h1>
+          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">TheEduCode Portal</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Sign in to the {role === 'teacher' ? 'teacher' : 'administration'} panel</p>
         </div>
         

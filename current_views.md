@@ -196,8 +196,20 @@ SELECT
     WHERE s.batch_id = b.batch_id AND s.section IS NOT NULL AND s.account_type = 'student'
   ) AS sections,
 
-  -- Number of courses assigned to this batch
-  (SELECT COUNT(*) FROM batch_courses_v2 bc WHERE bc.batch_id = b.batch_id) AS course_count,
+  -- Array of course IDs assigned to this batch (used by frontend .length)
+  (
+    SELECT COALESCE(array_agg(bc.course_id), '{}')
+    FROM batch_courses_v2 bc 
+    WHERE bc.batch_id = b.batch_id
+  ) AS registered_courses_id,
+
+  -- Array of course names assigned to this batch
+  (
+    SELECT COALESCE(array_agg(c.course_name ORDER BY c.course_name), '{}')
+    FROM batch_courses_v2 bc
+    JOIN courses_v2 c ON c.course_id = bc.course_id
+    WHERE bc.batch_id = b.batch_id
+  ) AS course_names,
 
   -- Average score across all results for students in this batch
   COALESCE(

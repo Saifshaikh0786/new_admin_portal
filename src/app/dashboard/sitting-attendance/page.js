@@ -114,7 +114,7 @@ export default function SittingPlanPage() {
     };
 
     return (
-        <div className="space-y-6 animate-fadeIn pb-20">
+        <div className="space-y-4 animate-fadeIn pb-20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Sitting Plan & Attendance</h1>

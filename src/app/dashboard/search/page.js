@@ -99,7 +99,7 @@ export default function StudentSearchPage() {
     };
 
     return (
-        <div className="space-y-6 animate-fadeIn pb-20">
+        <div className="space-y-4 animate-fadeIn pb-20">
             <div className="max-w-2xl mx-auto text-center mb-10 pt-10">
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Student Search</h1>
                 <p className="text-gray-500 dark:text-gray-400 mb-8">Quickly locate any student to view their comprehensive progress, exam records, and deep analytics.</p>
@@ -130,7 +130,7 @@ export default function StudentSearchPage() {
                         <p className="font-semibold text-lg">{error}</p>
                     </div>
                 ) : studentData ? (
-                    <div className="space-y-6 animate-slideUp">
+                    <div className="space-y-4 animate-slideUp">
                         {/* Student Profile Card */}
                         <div className="glass-card p-6 flex flex-col md:flex-row items-start md:items-center gap-6">
                             <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-blue-500/30">

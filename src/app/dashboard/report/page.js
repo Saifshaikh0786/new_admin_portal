@@ -105,7 +105,7 @@ function StudentReportContent() {
     const examLog = proctoring && proctoring.length > 0 ? proctoring[0] : null;
 
     return (
-        <div className="space-y-6 animate-fadeIn pb-20">
+        <div className="space-y-4 animate-fadeIn pb-20">
             {/* Action Bar */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-20 z-20 bg-slate-50/80 dark:bg-[#0B1120]/80 backdrop-blur-md py-4 -mx-4 px-4 sm:-mx-8 sm:px-8">
                 <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors font-medium">
