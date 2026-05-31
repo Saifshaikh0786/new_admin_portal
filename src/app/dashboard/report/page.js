@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { API_CONFIG } from "@/utils/api";
 import { getAdminToken } from "@/utils/cookies";
 import { Loader2, AlertCircle, ArrowLeft, Download, Clock, Focus, MonitorOff, ShieldAlert, CheckCircle2, XCircle, Terminal, FileCode2, History } from "lucide-react";
-import html2pdf from "html2pdf.js";
 
-export default function DeepDiveReportPage() {
+function StudentReportContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
@@ -59,7 +58,7 @@ export default function DeepDiveReportPage() {
         }
     };
 
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
         const element = document.getElementById("report-content");
         const opt = {
             margin: 10,
@@ -70,6 +69,7 @@ export default function DeepDiveReportPage() {
         };
         // Add a temporary class to hide export buttons during PDF gen
         element.classList.add("print-mode");
+        const html2pdf = (await import("html2pdf.js")).default;
         html2pdf().set(opt).from(element).save().then(() => {
             element.classList.remove("print-mode");
         });
@@ -300,5 +300,13 @@ export default function DeepDiveReportPage() {
 
             </div>
         </div>
+    );
+}
+
+export default function StudentReportPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><Loader2 className="w-8 h-8 text-blue-500 animate-spin" /></div>}>
+            <StudentReportContent />
+        </Suspense>
     );
 }

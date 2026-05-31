@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { API_CONFIG } from "@/utils/api";
@@ -8,7 +8,7 @@ import { getAdminToken } from "@/utils/cookies";
 import { Loader2, Download, Search, AlertCircle, ShieldAlert, MonitorOff, Focus, Clock, Key, Shield, ChevronRight } from "lucide-react";
 import { CircularProgress } from "@/components/CircularProgress";
 
-export default function ExamResultsPage() {
+function ExamResultsContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
@@ -394,5 +394,13 @@ export default function ExamResultsPage() {
                 </>
             )}
         </div>
+    );
+}
+
+export default function ExamResultsPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><Loader2 className="w-8 h-8 text-blue-500 animate-spin" /></div>}>
+            <ExamResultsContent />
+        </Suspense>
     );
 }

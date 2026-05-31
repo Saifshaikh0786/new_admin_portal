@@ -6,7 +6,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import ThemeToggle from '@/components/ui/ThemeToggle';
+
 
 function LoginContent() {
   const router = useRouter();
@@ -46,9 +46,6 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 font-sans px-4 relative transition-colors duration-300">
-      <div className="absolute top-4 right-4 z-50">
-        <ThemeToggle />
-      </div>
       
       <div className="w-full max-w-md bg-white dark:bg-slate-800 p-10 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 transition-colors">
         <div className="text-center mb-8">
