@@ -22,7 +22,7 @@ export async function POST(req) {
         fs.appendFileSync(filePath, logEntry, 'utf8');
         return NextResponse.json({ success: true });
     } catch (e) {
-        console.error('Failed to write admin portal log:', e);
-        return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+        console.warn('[DevLogger] Failed to write admin portal log, skipping:', e.message);
+        return NextResponse.json({ success: true, warning: 'Logging disabled due to file system restrictions' });
     }
 }
