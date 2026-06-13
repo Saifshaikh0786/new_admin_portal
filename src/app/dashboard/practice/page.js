@@ -126,12 +126,21 @@ function PracticeTrackingContent() {
     const metrics = useMemo(() => {
         if (!studentsData.length) return null;
         
-        const completed = studentsData.filter(s => s.course_status === 'completed').length;
-        const inProgress = studentsData.filter(s => s.course_status === 'in_progress').length;
-        const notStarted = studentsData.filter(s => s.course_status === 'not_started').length;
+        const completed = studentsData.filter(s => {
+            const status = (s.course_status || '').toLowerCase();
+            return status === 'completed';
+        }).length;
+        const inProgress = studentsData.filter(s => {
+            const status = (s.course_status || '').toLowerCase();
+            return status === 'in progress' || status === 'in_progress';
+        }).length;
+        const notStarted = studentsData.filter(s => {
+            const status = (s.course_status || '').toLowerCase();
+            return status === 'not started' || status === 'not_started';
+        }).length;
         
         const avgScore = Math.round(
-            studentsData.reduce((acc, curr) => acc + (curr.overall_course_percent || 0), 0) / studentsData.length
+            studentsData.reduce((acc, curr) => acc + (curr.course_score_percent || curr.overall_course_percent || 0), 0) / studentsData.length
         );
 
         return { completed, inProgress, notStarted, avgScore, total: studentsData.length };
@@ -307,9 +316,9 @@ function PracticeTrackingContent() {
                                                 </div>
                                             </td>
                                             <td className="p-4">
-                                                {student.course_status === 'completed' ? (
+                                                {(student.course_status || '').toLowerCase() === 'completed' ? (
                                                     <span className="badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1 inline" /> Completed</span>
-                                                ) : student.course_status === 'in_progress' ? (
+                                                ) : ((student.course_status || '').toLowerCase() === 'in progress' || (student.course_status || '').toLowerCase() === 'in_progress') ? (
                                                     <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800"><Clock className="w-3 h-3 mr-1 inline" /> In Progress</span>
                                                 ) : (
                                                     <span className="badge bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400 border border-gray-200 dark:border-slate-700">Not Started</span>
