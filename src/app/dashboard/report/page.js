@@ -107,7 +107,7 @@ function StudentReportContent() {
     return (
         <div className="space-y-4 animate-fadeIn pb-20">
             {/* Action Bar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-20 z-20 bg-slate-50/80 dark:bg-[#0B1120]/80 backdrop-blur-md py-4 -mx-4 px-4 sm:-mx-8 sm:px-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 print-hide">
                 <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors font-medium">
                     <ArrowLeft className="w-4 h-4" /> Back to Dashboard
                 </button>
@@ -139,7 +139,7 @@ function StudentReportContent() {
                     </div>
                     <div className="text-right">
                         <div className="text-sm text-gray-500 mb-1 uppercase font-semibold">Course Under Review</div>
-                        <div className="text-xl font-bold text-gray-900 dark:text-white">{student?.course_name || courseId}</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{attempts?.[0]?.course_name || courseId}</div>
                     </div>
                 </div>
 
@@ -205,15 +205,15 @@ function StudentReportContent() {
                                             #{idx + 1}
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-gray-900 dark:text-white">{new Date(att.attempt_time || att.created_at).toLocaleString()}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">ID: {att.id || att.attempt_id}</p>
+                                            <p className="font-semibold text-gray-900 dark:text-white">{new Date(att.submitted_at).toLocaleString()}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">ID: {att.result_id}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
                                         <div className="font-bold text-gray-900 dark:text-white text-lg">
-                                            {att.marks || att.score || 0} <span className="text-sm font-normal text-gray-500">Marks</span>
+                                            {att.marks_obtained || 0} <span className="text-sm font-normal text-gray-500">Marks</span>
                                         </div>
-                                        <span className="badge bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 text-[10px]">{att.type || "unknown"}</span>
+                                        <span className="badge bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 text-[10px] uppercase tracking-wider font-bold">{att.result_type || "unknown"}</span>
                                     </div>
                                 </div>
                             ))}
