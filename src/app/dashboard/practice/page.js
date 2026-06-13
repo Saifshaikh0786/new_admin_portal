@@ -99,9 +99,9 @@ function PracticeTrackingContent() {
                 headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                 credentials: "include",
                 body: JSON.stringify({
-                    batchId: selectedBatch,
+                    batch_id: selectedBatch,
                     section: selectedSection === "All" ? null : selectedSection,
-                    courseId: selectedCourse
+                    course_id: selectedCourse
                 })
             });
             
