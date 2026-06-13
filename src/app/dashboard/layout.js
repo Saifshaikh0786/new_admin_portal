@@ -70,7 +70,11 @@ export default function DashboardLayout({ children }) {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] transition-colors duration-300 relative">
+      {/* Dark Theme Purple/Violet Gradients (Only visible in dark mode via opacity/classes if needed, but since it's a global dark theme upgrade we can just render them in dark mode or conditionally. We'll use dark:block hidden) */}
+      <div className="hidden dark:block fixed top-0 right-0 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px] animate-pulse pointer-events-none z-0" />
+      <div className="hidden dark:block fixed bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[120px] animate-pulse delay-75 pointer-events-none z-0" />
+
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -223,7 +227,7 @@ export default function DashboardLayout({ children }) {
       )}
 
       {/* Main Content */}
-      <div className="lg:pl-72 flex flex-col min-h-screen">
+      <div className="lg:pl-72 flex flex-col min-h-screen relative z-10">
         {/* Top Header - Mobile Only */}
         <header className="lg:hidden sticky top-0 z-30 h-16 glass-panel border-b border-gray-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">

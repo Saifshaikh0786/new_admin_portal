@@ -29,6 +29,8 @@ function ExamResultsContent() {
 
     const [studentsData, setStudentsData] = useState([]);
     const [examConfig, setExamConfig] = useState(null);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -157,8 +159,8 @@ function ExamResultsContent() {
         fetchConfig();
     }, [selectedLecture]);
 
-    // Fetch Table Data when Fetch Button is clicked
-    const fetchExamData = async () => {
+    // Fetch Table Data
+    const fetchExamData = async (currentPage = page) => {
         setLoading(true);
         setError(null);
         try {
@@ -173,10 +175,24 @@ function ExamResultsContent() {
                 body: JSON.stringify({
                     batch_id: selectedBatch,
                     section: selectedSection === "All" ? null : selectedSection,
-                    course_id: selectedCourse
+                    course_id: selectedCourse,
+                    lecture_id: selectedLecture,
+                    page: currentPage,
+                    limit: 100
                 })
             });
             const scoresData = await scoresRes.json();
+            
+            let lectureScores = [];
+            let studentIds = [];
+            if (scoresData.success) {
+                // Since backend now filters by lecture_id, all scores are for this lecture
+                lectureScores = scoresData.data || [];
+                studentIds = lectureScores.map(s => s.student_id);
+                if (scoresData.pagination) {
+                    setTotalPages(scoresData.pagination.totalPages || 1);
+                }
+            }
             
             // 2. Fetch Proctoring Summary
             const proctorRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.analytics.proctoringSummary}`, {
@@ -187,15 +203,13 @@ function ExamResultsContent() {
                     batch_id: selectedBatch,
                     section: selectedSection === "All" ? null : selectedSection,
                     course_id: selectedCourse,
-                    lecture_id: selectedLecture
+                    lecture_id: selectedLecture,
+                    student_ids: studentIds
                 })
             });
             const proctorData = await proctorRes.json();
 
             if (scoresData.success && proctorData.success) {
-                // Filter scores for selected lecture
-                const lectureScores = (scoresData.data || []).filter(s => s.lecture_id === selectedLecture);
-
                 // Merge
                 const merged = lectureScores.map(score => {
                     const proc = (proctorData.data || []).find(p => p.student_id === score.student_id) || {};
@@ -229,7 +243,7 @@ function ExamResultsContent() {
                 const uniqueSections = [...new Set(finalData.map(s => s.section))].filter(Boolean);
                 if (sections.length === 0) setSections([...uniqueSections, "All"]);
             } else {
-                setError(data.message || "Failed to fetch exam data");
+                setError(scoresData.message || "Failed to fetch exam data");
             }
 
         } catch (e) {
@@ -335,7 +349,10 @@ function ExamResultsContent() {
                 <div className="flex-none flex-shrink-0 ml-auto self-end">
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Fetch</label>
                     <button 
-                        onClick={fetchExamData}
+                        onClick={() => {
+                            setPage(1);
+                            fetchExamData(1);
+                        }}
                         disabled={!selectedBatch || !selectedCourse || !selectedLecture || loading}
                         className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap min-w-[120px]"
                     >
@@ -481,6 +498,38 @@ function ExamResultsContent() {
                                 </tbody>
                             </table>
                         </div>
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">
+                                    Page <span className="font-semibold text-gray-900 dark:text-white">{page}</span> of <span className="font-semibold text-gray-900 dark:text-white">{totalPages}</span>
+                                </span>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            const newPage = Math.max(1, page - 1);
+                                            setPage(newPage);
+                                            fetchExamData(newPage);
+                                        }}
+                                        disabled={page === 1}
+                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                    >
+                                        Previous
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            const newPage = Math.min(totalPages, page + 1);
+                                            setPage(newPage);
+                                            fetchExamData(newPage);
+                                        }}
+                                        disabled={page === totalPages}
+                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </>
             )}

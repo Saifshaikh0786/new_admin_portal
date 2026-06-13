@@ -32,7 +32,7 @@ function LoginContent() {
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
+      await login({ email, password }, role);
       router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
@@ -55,7 +55,9 @@ function LoginContent() {
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address / Username</label>
+            <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              {role === 'teacher' ? 'Registration ID' : 'Email Address / Username'}
+            </label>
             <input
               id="email"
               type="text"
@@ -63,12 +65,14 @@ function LoginContent() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
-              placeholder={role === 'teacher' ? "teacher@university.edu" : "admin@university.edu"}
+              placeholder={role === 'teacher' ? "e.g. 12345678" : "admin@university.edu"}
               className="block w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
+            <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              {role === 'teacher' ? 'Joining ID' : 'Password'}
+            </label>
             <input
               id="password"
               type="password"
@@ -76,7 +80,7 @@ function LoginContent() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              placeholder="••••••••"
+              placeholder={role === 'teacher' ? "e.g. JID-12345" : "••••••••"}
               className="block w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>

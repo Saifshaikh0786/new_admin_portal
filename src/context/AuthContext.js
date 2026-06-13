@@ -87,13 +87,19 @@ export const AuthProvider = ({ children }) => {
     }, []); // Run once on mount
 
     // 2. Login Function
-    const login = async (email, password) => {
+    const login = async (credentials, role = 'admin') => {
         try {
             setLoading(true);
-            const url = `${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.login}`;
+            const isTeacher = role === 'teacher';
+            const url = `${API_CONFIG.baseUrl.admin}${isTeacher ? '/teachers/login' : API_CONFIG.admin.login}`;
+            
+            const bodyPayload = isTeacher 
+              ? { regId: credentials.email, joiningId: credentials.password } 
+              : { email: credentials.email, password: credentials.password };
+
             const res = await apiCall(url, {
                 method: "POST",
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify(bodyPayload),
             });
 
             const data = await res.json();

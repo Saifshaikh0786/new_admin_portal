@@ -22,6 +22,8 @@ function PracticeTrackingContent() {
     const [selectedCourse, setSelectedCourse] = useState("");
 
     const [studentsData, setStudentsData] = useState([]);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -63,9 +65,14 @@ function PracticeTrackingContent() {
             const cData = await cRes.json();
             if (cData.success) {
                 const list = Array.isArray(cData.data) ? cData.data : cData.data.courses || [];
-                setCourses(list);
-                if (list.length > 0 && !selectedCourse) {
-                    setSelectedCourse(list[0].course_id);
+                const practiceCourses = list.filter(c => (c.course_type || c.type || '').toLowerCase() === 'practice');
+                setCourses(practiceCourses);
+                if (practiceCourses.length > 0) {
+                    if (!selectedCourse || !practiceCourses.find(c => c.course_id === selectedCourse)) {
+                        setSelectedCourse(practiceCourses[0].course_id);
+                    }
+                } else {
+                    setSelectedCourse("");
                 }
             }
         } catch (e) {
@@ -79,17 +86,37 @@ function PracticeTrackingContent() {
             const token = getAdminToken();
             const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
             fetchCoursesForBatch(selectedBatch, headers);
-        }
-    }, [selectedBatch]);
 
-    // Fetch Table Data when Course changes
-    useEffect(() => {
-        if (selectedBatch && selectedCourse) {
-            fetchTableData();
+            // Populate sections directly from the batch overview data
+            const batchObj = batches.find(b => b.batch_id === selectedBatch);
+            if (batchObj && batchObj.sections && batchObj.sections.length > 0) {
+                const uniqueSections = batchObj.sections;
+                setSections([...uniqueSections, "All"]);
+                
+                // Default to the first specific section to avoid pulling all data at once
+                if (selectedSection === "All" || !uniqueSections.includes(selectedSection)) {
+                    setSelectedSection(uniqueSections[0]);
+                }
+            } else {
+                setSections(["All"]);
+                setSelectedSection("All");
+            }
         }
+    }, [selectedBatch, batches]);
+
+    // Reset page to 1 when filters change
+    useEffect(() => {
+        setPage(1);
     }, [selectedBatch, selectedCourse, selectedSection]);
 
-    const fetchTableData = async () => {
+    // Fetch Table Data
+    useEffect(() => {
+        if (selectedBatch && selectedCourse && selectedSection) {
+            fetchTableData(page);
+        }
+    }, [selectedBatch, selectedCourse, selectedSection, page]);
+
+    const fetchTableData = async (currentPage = page) => {
         setLoading(true);
         setError(null);
         try {
@@ -101,17 +128,18 @@ function PracticeTrackingContent() {
                 body: JSON.stringify({
                     batch_id: selectedBatch,
                     section: selectedSection === "All" ? null : selectedSection,
-                    course_id: selectedCourse
+                    course_id: selectedCourse,
+                    page: currentPage,
+                    limit: 100
                 })
             });
             
             const data = await res.json();
             if (data.success) {
                 setStudentsData(data.data);
-                
-                // Extract unique sections
-                const uniqueSections = [...new Set(data.data.map(s => s.section))].filter(Boolean);
-                if (sections.length === 0) setSections(["All", ...uniqueSections]);
+                if (data.pagination) {
+                    setTotalPages(data.pagination.totalPages || 1);
+                }
             } else {
                 setError(data.message || "Failed to fetch data");
             }
@@ -346,6 +374,30 @@ function PracticeTrackingContent() {
                                 </tbody>
                             </table>
                         </div>
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">
+                                    Page <span className="font-semibold text-gray-900 dark:text-white">{page}</span> of <span className="font-semibold text-gray-900 dark:text-white">{totalPages}</span>
+                                </span>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        disabled={page === 1}
+                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                    >
+                                        Previous
+                                    </button>
+                                    <button 
+                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={page === totalPages}
+                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </>
             )}
