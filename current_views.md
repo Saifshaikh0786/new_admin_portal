@@ -1,19 +1,430 @@
--- ═══════════════════════════════════════════════════════════════════════════
--- ADMIN DASHBOARD VIEWS — Run in Supabase SQL Editor
--- Replaces: APIs/src/routes/university_admin.js (1474 lines)
---           APIs/src/routes/student_dashboard.js (587 lines)
--- ═══════════════════════════════════════════════════════════════════════════
 
--- ─────────────────────────────────────────────────────────────────────────
--- VIEW 1: view_section_student_scores
--- Purpose: Section analytics matrix — per-student, per-course scores
--- Replaces: /admin/section-analytics/:sectionName (lines 343-513)
--- Usage:    SELECT * FROM view_section_student_scores
---           WHERE university_id = '<uid>' AND section = 'A';
--- ─────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE VIEW public.view_section_student_scores AS
+-- ═══════════════════════════════════════════════════════════════════════════
+-- GRANT READ ACCESS (Supabase anon/service role needs SELECT on views)
+-- ═══════════════════════════════════════════════════════════════════════════
+GRANT SELECT ON public.view_section_student_scores TO anon, authenticated, service_role;
+GRANT SELECT ON public.view_lecture_completion_stats TO anon, authenticated, service_role;
+GRANT SELECT ON public.view_student_attempt_history TO anon, authenticated, service_role;
+GRANT SELECT ON public.view_batch_overview TO anon, authenticated, service_role;
+GRANT SELECT ON public.view_student_course_completion TO anon, authenticated, service_role;
+GRANT SELECT ON public.view_exam_proctoring_summary TO anon, authenticated, service_role;
+GRANT SELECT ON public.view_course_score_distribution TO anon, authenticated, service_role;
+
+
+
+
+
+
+
+
+localStorage.setItem('key', '3c6876390ecc3c010aa44fba1300dd67db632aff9bba01880213b8012419f9cd');
+localStorage.setItem('main_checksum', 'ebcf230bf4f1a2417f3c0f0caa4effc82de6ac57db88733d6f50b1ff094f7841');
+localStorage.setItem('is_macos', 'false');
+localStorage.setItem('browser_hash', 'ebcf230bf4f1a2417f3c0f0caa4effc82de6ac57db88733d6f50b1ff094f7841');
+
+
+
+
+
+
+
+
+
+
+
+
+
+CREATE OR REPLACE VIEW public.view_live_exams AS
 SELECT
-  s.uni_id            AS university_id,
+  t.sync_id,
+  t.university_id,
+  t.student_id,
+  t.course_id,
+  t.lecture_id,
+  t.test_type,
+  t.start_time,
+  t.total_duration,
+  t.time_left as initial_time_left,
+  t.updated_at as last_ping,
+  s.student_name,
+  s.uni_reg_id,
+  c.course_name,
+  l.lecture_name,
+  COALESCE(
+    CASE 
+      WHEN t.test_type = 'coding' THEN a.coding_exam_allowed_attempts
+      ELSE a.mcq_exam_allowed_attempts
+    END, 1
+  ) as allowed_attempts,
+  COALESCE(r.attempt_count, 1) as current_attempt
+FROM test_time_sync_v2 t
+JOIN students_v2 s ON s.student_id = t.student_id
+JOIN courses_v2 c ON c.course_id = t.course_id
+JOIN lectures_v2 l ON l.lecture_id = t.lecture_id
+LEFT JOIN student_exam_attempts_v2 a ON a.student_id = t.student_id AND a.course_id = t.course_id AND a.lecture_id = t.lecture_id
+LEFT JOIN results_v2 r ON r.student_id = t.student_id AND r.course_id = t.course_id AND r.lecture_id = t.lecture_id AND r.result_type = t.test_type;
+
+-- GRANT READ ACCESS (Supabase anon/service role needs SELECT on views)
+GRANT SELECT ON public.view_live_exams TO anon, authenticated, service_role;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+create view public.view_batch_overview as
+select
+  batch_id,
+  university_id,
+  batch_name,
+  starting_date,
+  ending_date,
+  batch_student_strength,
+  (
+    select
+      count(*) as count
+    from
+      students_v2 s
+    where
+      s.batch_id = b.batch_id
+      and s.account_type::text = 'student'::text
+  ) as actual_student_count,
+  (
+    select
+      COALESCE(
+        array_agg(
+          distinct s.section
+          order by
+            s.section
+        ),
+        '{}'::text[]
+      ) as "coalesce"
+    from
+      students_v2 s
+    where
+      s.batch_id = b.batch_id
+      and s.section is not null
+      and s.account_type::text = 'student'::text
+  ) as sections,
+  (
+    select
+      COALESCE(array_agg(bc.course_id), '{}'::uuid[]) as "coalesce"
+    from
+      batch_courses_v2 bc
+    where
+      bc.batch_id = b.batch_id
+  ) as registered_courses_id,
+  (
+    select
+      COALESCE(
+        array_agg(
+          c.course_name
+          order by
+            c.course_name
+        ),
+        '{}'::text[]
+      ) as "coalesce"
+    from
+      batch_courses_v2 bc
+      join courses_v2 c on c.course_id = bc.course_id
+    where
+      bc.batch_id = b.batch_id
+  ) as course_names,
+  COALESCE(
+    (
+      select
+        round(
+          avg(
+            case
+              when r.total_marks > 0 then r.marks_obtained::numeric / r.total_marks::numeric * 100::numeric
+              else null::numeric
+            end
+          ),
+          1
+        ) as round
+      from
+        results_v2 r
+        join students_v2 s on s.student_id = r.student_id
+      where
+        s.batch_id = b.batch_id
+        and s.account_type::text = 'student'::text
+    ),
+    0::numeric
+  ) as avg_performance
+from
+  batches_v2 b;
+
+
+create view public.view_course_score_distribution as
+with
+  student_scores as (
+    select
+      view_student_course_completion.student_id,
+      view_student_course_completion.student_name,
+      view_student_course_completion.uni_reg_id,
+      view_student_course_completion.section,
+      view_student_course_completion.batch_id,
+      view_student_course_completion.university_id,
+      view_student_course_completion.course_id,
+      view_student_course_completion.course_name,
+      view_student_course_completion.course_type,
+      view_student_course_completion.total_marks_obtained,
+      view_student_course_completion.total_possible_marks,
+      view_student_course_completion.course_score_percent,
+      view_student_course_completion.mcq_marks,
+      view_student_course_completion.mcq_total,
+      view_student_course_completion.coding_marks,
+      view_student_course_completion.coding_total,
+      view_student_course_completion.lectures_attempted,
+      view_student_course_completion.course_status,
+      view_student_course_completion.last_activity
+    from
+      view_student_course_completion
+  )
+select
+  course_id,
+  course_name,
+  university_id,
+  course_type,
+  count(*) as total_students,
+  count(*) filter (
+    where
+      course_score_percent >= 90::numeric
+  ) as bracket_90_100,
+  count(*) filter (
+    where
+      course_score_percent >= 75::numeric
+      and course_score_percent < 90::numeric
+  ) as bracket_75_89,
+  count(*) filter (
+    where
+      course_score_percent >= 50::numeric
+      and course_score_percent < 75::numeric
+  ) as bracket_50_74,
+  count(*) filter (
+    where
+      course_score_percent > 0::numeric
+      and course_score_percent < 50::numeric
+  ) as bracket_below_50,
+  count(*) filter (
+    where
+      course_score_percent = 0::numeric
+  ) as not_started,
+  round(avg(course_score_percent), 1) as avg_course_score
+from
+  student_scores
+group by
+  course_id,
+  course_name,
+  university_id,
+  course_type;
+
+
+
+create view public.view_exam_proctoring_summary as
+select
+  e.university_id,
+  e.student_id,
+  e.course_id,
+  e.lecture_id,
+  s.student_name,
+  s.uni_reg_id,
+  s.section,
+  count(*) filter (
+    where
+      e.event_type::text = 'focus_loss'::text
+  ) as focus_lost_count,
+  count(*) filter (
+    where
+      e.event_type::text = 'tab_switch'::text
+  ) as tab_switch_count,
+  count(*) filter (
+    where
+      e.event_type::text = 'disconnect'::text
+  ) as disconnect_count,
+  count(*) filter (
+    where
+      e.event_type::text = 'compile_click'::text
+  ) as compile_count,
+  count(*) filter (
+    where
+      e.event_type::text = 'submit'::text
+  ) as submit_count,
+  count(*) as total_events,
+  COALESCE(
+    (
+      select
+        jsonb_agg(
+          jsonb_build_object(
+            'question_id',
+            x.k,
+            'submits',
+            (x.v ->> 'submitClicks'::text)::integer,
+            'compiles',
+            (x.v ->> 'compileClicks'::text)::integer
+          )
+        ) as jsonb_agg
+      from
+        exam_events_v2 e2,
+        lateral jsonb_each(e2.metadata -> 'perQuestion'::text) x (k, v)
+      where
+        e2.student_id = e.student_id
+        and e2.course_id = e.course_id
+        and e2.lecture_id = e.lecture_id
+        and e2.event_type::text = 'submit'::text
+      limit
+        1
+    ),
+    '[]'::jsonb
+  ) as per_question_behavior
+from
+  exam_events_v2 e
+  join students_v2 s on s.student_id = e.student_id
+group by
+  e.university_id,
+  e.student_id,
+  e.course_id,
+  e.lecture_id,
+  s.student_name,
+  s.uni_reg_id,
+  s.section;
+
+
+
+create view public.view_lecture_completion_stats as
+select
+  l.lecture_id,
+  l.lecture_name,
+  l.unit_id,
+  u.unit_name,
+  l.course_id,
+  c.course_name,
+  uni.university_id,
+  l.sub_type,
+  (
+    select
+      count(distinct s2.student_id) as count
+    from
+      students_v2 s2
+      join batch_courses_v2 bc2 on bc2.batch_id = s2.batch_id
+      join batches_v2 b2 on b2.batch_id = bc2.batch_id
+    where
+      bc2.course_id = l.course_id
+      and b2.university_id = uni.university_id
+      and s2.account_type::text = 'student'::text
+  ) as total_enrolled,
+  count(
+    distinct case
+      when r.result_type::text = 'coding'::text then r.student_id
+      else null::uuid
+    end
+  ) as coding_submitted_count,
+  count(
+    distinct case
+      when r.result_type::text = 'mcq'::text then r.student_id
+      else null::uuid
+    end
+  ) as mcq_submitted_count,
+  COALESCE(
+    round(
+      avg(
+        case
+          when r.result_type::text = 'coding'::text
+          and r.total_marks > 0 then r.marks_obtained::numeric / r.total_marks::numeric * 100::numeric
+          else null::numeric
+        end
+      ),
+      1
+    ),
+    0::numeric
+  ) as avg_coding_score,
+  COALESCE(
+    round(
+      avg(
+        case
+          when r.result_type::text = 'mcq'::text
+          and r.total_marks > 0 then r.marks_obtained::numeric / r.total_marks::numeric * 100::numeric
+          else null::numeric
+        end
+      ),
+      1
+    ),
+    0::numeric
+  ) as avg_mcq_score,
+  (
+    select
+      count(*) as count
+    from
+      questions_v2 q
+    where
+      q.lecture_id = l.lecture_id
+      and q.question_type::text = 'coding'::text
+  ) as total_coding_questions,
+  (
+    select
+      count(*) as count
+    from
+      questions_v2 q
+    where
+      q.lecture_id = l.lecture_id
+      and q.question_type::text = 'mcq'::text
+  ) as total_mcq_questions,
+  l."position" as lecture_position,
+  u."position" as unit_position
+from
+  lectures_v2 l
+  join units_v2 u on u.unit_id = l.unit_id
+  join courses_v2 c on c.course_id = l.course_id
+  join (
+    select distinct
+      bc.course_id,
+      b.university_id
+    from
+      batch_courses_v2 bc
+      join batches_v2 b on b.batch_id = bc.batch_id
+  ) uni on uni.course_id = l.course_id
+  left join results_v2 r on r.lecture_id = l.lecture_id
+  left join students_v2 stu on stu.student_id = r.student_id
+  and stu.uni_id = uni.university_id
+where
+  r.result_id is null
+  or stu.student_id is not null
+group by
+  l.lecture_id,
+  l.lecture_name,
+  l.unit_id,
+  u.unit_name,
+  l.course_id,
+  c.course_name,
+  uni.university_id,
+  l.sub_type,
+  l."position",
+  u."position";
+
+
+
+
+create view public.view_section_student_scores as
+select
+  s.uni_id as university_id,
   s.student_id,
   s.student_name,
   s.uni_reg_id,
@@ -29,114 +440,37 @@ SELECT
   r.attempt_count,
   r.submitted_at,
   r.submit_reason,
-  -- Pre-computed percentage (avoids JS-side Math.round loops)
-  CASE
-    WHEN r.total_marks > 0
-    THEN ROUND((r.marks_obtained::numeric / r.total_marks::numeric) * 100, 1)
-    ELSE 0
-  END AS score_percent,
-  -- Pass/fail at 50% threshold (matches old API logic)
-  CASE
-    WHEN r.total_marks > 0 AND (r.marks_obtained::numeric / r.total_marks::numeric) >= 0.5
-    THEN 'Pass'
-    ELSE 'Fail'
-  END AS status
-FROM students_v2 s
-JOIN results_v2 r ON r.student_id = s.student_id
-JOIN courses_v2 c ON c.course_id = r.course_id
-JOIN lectures_v2 l ON l.lecture_id = r.lecture_id
-WHERE s.account_type = 'student';
-
-
--- ─────────────────────────────────────────────────────────────────────────
--- VIEW 2: view_lecture_completion_stats
--- Purpose: Per-lecture completion rates + average scores
--- Replaces: hardcoded 75% / 82 / 65 analytics in old API
--- Usage:    SELECT * FROM view_lecture_completion_stats
---           WHERE course_id = '<course_uuid>';
--- ─────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE VIEW public.view_lecture_completion_stats AS
-SELECT
-  l.lecture_id,
-  l.lecture_name,
-  l.unit_id,
-  u.unit_name,
-  l.course_id,
-  c.course_name,
-  uni.university_id,
-  l.sub_type,
-  
-  -- Total students enrolled in this university for this course
-  (
-    SELECT COUNT(DISTINCT s2.student_id)
-    FROM students_v2 s2
-    JOIN batch_courses_v2 bc2 ON bc2.batch_id = s2.batch_id
-    JOIN batches_v2 b2 ON b2.batch_id = bc2.batch_id
-    WHERE bc2.course_id = l.course_id
-      AND b2.university_id = uni.university_id
-      AND s2.account_type = 'student'
-  ) AS total_enrolled,
-
-  -- Students who submitted coding
-  COUNT(DISTINCT CASE WHEN r.result_type = 'coding' THEN r.student_id END) AS coding_submitted_count,
-  -- Students who submitted MCQ
-  COUNT(DISTINCT CASE WHEN r.result_type = 'mcq' THEN r.student_id END) AS mcq_submitted_count,
-
-  -- Average coding score %
-  COALESCE(
-    ROUND(
-      AVG(CASE WHEN r.result_type = 'coding' AND r.total_marks > 0
-        THEN (r.marks_obtained::numeric / r.total_marks::numeric) * 100
-      END), 1
-    ), 0
-  ) AS avg_coding_score,
-
-  -- Average MCQ score %
-  COALESCE(
-    ROUND(
-      AVG(CASE WHEN r.result_type = 'mcq' AND r.total_marks > 0
-        THEN (r.marks_obtained::numeric / r.total_marks::numeric) * 100
-      END), 1
-    ), 0
-  ) AS avg_mcq_score,
-
-  -- Total questions available
-  (SELECT COUNT(*) FROM questions_v2 q WHERE q.lecture_id = l.lecture_id AND q.question_type = 'coding') AS total_coding_questions,
-  (SELECT COUNT(*) FROM questions_v2 q WHERE q.lecture_id = l.lecture_id AND q.question_type = 'mcq') AS total_mcq_questions,
-  
-  -- Sorting positions (appended at the end to satisfy Postgres REPLACE rules)
-  l.position AS lecture_position,
-  u.position AS unit_position
-
-FROM lectures_v2 l
-JOIN units_v2 u ON u.unit_id = l.unit_id
-JOIN courses_v2 c ON c.course_id = l.course_id
--- Get all universities that have this course assigned
-JOIN (
-  SELECT DISTINCT bc.course_id, b.university_id 
-  FROM batch_courses_v2 bc 
-  JOIN batches_v2 b ON b.batch_id = bc.batch_id
-) uni ON uni.course_id = l.course_id
--- Join results for this lecture filtering by students belonging to this university
-LEFT JOIN results_v2 r ON r.lecture_id = l.lecture_id 
-LEFT JOIN students_v2 stu ON stu.student_id = r.student_id AND stu.uni_id = uni.university_id
-WHERE (r.result_id IS NULL OR stu.student_id IS NOT NULL) -- ensures we only count results for this uni, or keep the row if no results
-GROUP BY l.lecture_id, l.lecture_name, l.unit_id, u.unit_name, l.course_id, c.course_name, uni.university_id, l.sub_type, l.position, u.position;
+  case
+    when r.total_marks > 0 then round(
+      r.marks_obtained::numeric / r.total_marks::numeric * 100::numeric,
+      1
+    )
+    else 0::numeric
+  end as score_percent,
+  case
+    when r.total_marks > 0
+    and (
+      r.marks_obtained::numeric / r.total_marks::numeric
+    ) >= 0.5 then 'Pass'::text
+    else 'Fail'::text
+  end as status
+from
+  students_v2 s
+  join results_v2 r on r.student_id = s.student_id
+  join courses_v2 c on c.course_id = r.course_id
+  join lectures_v2 l on l.lecture_id = r.lecture_id
+where
+  s.account_type::text = 'student'::text;
 
 
 
--- ─────────────────────────────────────────────────────────────────────────
--- VIEW 3: view_student_attempt_history
--- Purpose: Individual student deep-dive — all attempts + per-question scores
--- Replaces: /admin/analytics/sub-unit-details (lines 526-791)
--- Usage:    SELECT * FROM view_student_attempt_history
---           WHERE student_id = '<uuid>' AND course_id = '<uuid>';
--- ─────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE VIEW public.view_student_attempt_history AS
-SELECT
+
+
+create view public.view_student_attempt_history as
+select
   r.result_id,
   r.student_id,
-  s.uni_id AS university_id,
+  s.uni_id as university_id,
   r.course_id,
   r.lecture_id,
   r.result_type,
@@ -145,197 +479,137 @@ SELECT
   r.attempt_count,
   r.submitted_at,
   r.submit_reason,
-  CASE
-    WHEN r.total_marks > 0
-    THEN ROUND((r.marks_obtained::numeric / r.total_marks::numeric) * 100, 1)
-    ELSE 0
-  END AS score_percent,
-  CASE
-    WHEN r.total_marks > 0 AND (r.marks_obtained::numeric / r.total_marks::numeric) >= 0.5
-    THEN 'Passed'
-    ELSE 'Failed'
-  END AS status,
-  -- Student info
+  case
+    when r.total_marks > 0 then round(
+      r.marks_obtained::numeric / r.total_marks::numeric * 100::numeric,
+      1
+    )
+    else 0::numeric
+  end as score_percent,
+  case
+    when r.total_marks > 0
+    and (
+      r.marks_obtained::numeric / r.total_marks::numeric
+    ) >= 0.5 then 'Passed'::text
+    else 'Failed'::text
+  end as status,
   s.student_name,
   s.uni_reg_id,
   s.section,
-  -- Course + lecture info
   c.course_name,
   l.lecture_name,
-  l.sub_type AS lecture_type
-FROM results_v2 r
-JOIN students_v2 s ON s.student_id = r.student_id
-JOIN courses_v2 c ON c.course_id = r.course_id
-JOIN lectures_v2 l ON l.lecture_id = r.lecture_id;
+  l.sub_type as lecture_type
+from
+  results_v2 r
+  join students_v2 s on s.student_id = r.student_id
+  join courses_v2 c on c.course_id = r.course_id
+  join lectures_v2 l on l.lecture_id = r.lecture_id;
 
 
--- ─────────────────────────────────────────────────────────────────────────
--- VIEW 4: view_batch_overview
--- Purpose: Batch-level dashboard summary
--- Replaces: /admin/my-batches + sections logic + student counts
--- Usage:    SELECT * FROM view_batch_overview
---           WHERE university_id = '<uid>';
--- ─────────────────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE VIEW public.view_batch_overview AS
-SELECT
-  b.batch_id,
-  b.university_id,
-  b.batch_name,
-  b.starting_date,
-  b.ending_date,
-  b.batch_student_strength,
-
-  -- Actual enrolled student count
-  (SELECT COUNT(*) FROM students_v2 s WHERE s.batch_id = b.batch_id AND s.account_type = 'student') AS actual_student_count,
-
-  -- Distinct sections in this batch
-  (
-    SELECT COALESCE(array_agg(DISTINCT s.section ORDER BY s.section), '{}')
-    FROM students_v2 s
-    WHERE s.batch_id = b.batch_id AND s.section IS NOT NULL AND s.account_type = 'student'
-  ) AS sections,
-
-  -- Array of course IDs assigned to this batch (used by frontend .length)
-  (
-    SELECT COALESCE(array_agg(bc.course_id), '{}')
-    FROM batch_courses_v2 bc 
-    WHERE bc.batch_id = b.batch_id
-  ) AS registered_courses_id,
-
-  -- Array of course names assigned to this batch
-  (
-    SELECT COALESCE(array_agg(c.course_name ORDER BY c.course_name), '{}')
-    FROM batch_courses_v2 bc
-    JOIN courses_v2 c ON c.course_id = bc.course_id
-    WHERE bc.batch_id = b.batch_id
-  ) AS course_names,
-
-  -- Average score across all results for students in this batch
+create view public.view_student_course_completion as
+select
+  s.student_id,
+  s.student_name,
+  s.uni_reg_id,
+  s.section,
+  s.batch_id,
+  s.uni_id as university_id,
+  c.course_id,
+  c.course_name,
+  c.course_type,
+  COALESCE(sum(r.marks_obtained), 0::bigint) as total_marks_obtained,
+  COALESCE(sum(r.total_marks), 0::bigint) as total_possible_marks,
+  case
+    when COALESCE(sum(r.total_marks), 0::bigint) > 0 then round(
+      sum(r.marks_obtained)::numeric / sum(r.total_marks)::numeric * 100::numeric,
+      1
+    )
+    else 0::numeric
+  end as course_score_percent,
   COALESCE(
-    (
-      SELECT ROUND(AVG(
-        CASE WHEN r.total_marks > 0
-          THEN (r.marks_obtained::numeric / r.total_marks::numeric) * 100
-        END
-      ), 1)
-      FROM results_v2 r
-      JOIN students_v2 s ON s.student_id = r.student_id
-      WHERE s.batch_id = b.batch_id AND s.account_type = 'student'
-    ), 0
-  ) AS avg_performance
-
-FROM batches_v2 b;
-
-
--- ─────────────────────────────────────────────────────────────────────────
--- VIEW 5: view_student_course_completion (NEW)
--- Purpose: TRUE score-based course completion per student
--- Usage:    SELECT * FROM view_student_course_completion WHERE course_id = '...'
--- ─────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE VIEW public.view_student_course_completion AS
-SELECT 
-    s.student_id,
-    s.student_name,
-    s.uni_reg_id,
-    s.section,
-    s.batch_id,
-    s.uni_id AS university_id,
-    c.course_id,
-    c.course_name,
-    c.course_type,
-    -- Raw marks
-    COALESCE(SUM(r.marks_obtained), 0) AS total_marks_obtained,
-    COALESCE(SUM(r.total_marks), 0) AS total_possible_marks,
-    -- True Course Score %
-    CASE 
-        WHEN COALESCE(SUM(r.total_marks), 0) > 0 
-        THEN ROUND((SUM(r.marks_obtained)::numeric / SUM(r.total_marks)::numeric) * 100, 1)
-        ELSE 0 
-    END AS course_score_percent,
-    -- MCQ-specific
-    COALESCE(SUM(CASE WHEN r.result_type = 'mcq' THEN r.marks_obtained END), 0) AS mcq_marks,
-    COALESCE(SUM(CASE WHEN r.result_type = 'mcq' THEN r.total_marks END), 0) AS mcq_total,
-    -- Coding-specific
-    COALESCE(SUM(CASE WHEN r.result_type = 'coding' THEN r.marks_obtained END), 0) AS coding_marks,
-    COALESCE(SUM(CASE WHEN r.result_type = 'coding' THEN r.total_marks END), 0) AS coding_total,
-    -- Number of lectures attempted
-    COUNT(DISTINCT r.lecture_id) AS lectures_attempted,
-    -- Status
-    CASE 
-        WHEN COALESCE(SUM(r.total_marks), 0) = 0 THEN 'Not Started'
-        WHEN (SUM(r.marks_obtained)::numeric / NULLIF(SUM(r.total_marks), 0)::numeric) >= 0.5 THEN 'Completed'
-        ELSE 'At Risk'
-    END AS course_status,
-    -- Latest submission timestamp
-    MAX(r.submitted_at) AS last_activity
-FROM students_v2 s
-JOIN batch_courses_v2 bc ON bc.batch_id = s.batch_id
-JOIN courses_v2 c ON c.course_id = bc.course_id
-LEFT JOIN results_v2 r ON r.student_id = s.student_id AND r.course_id = c.course_id
-WHERE s.account_type = 'student'
-GROUP BY s.student_id, s.student_name, s.uni_reg_id, s.section, s.batch_id, s.uni_id,
-         c.course_id, c.course_name, c.course_type;
-
-
--- ─────────────────────────────────────────────────────────────────────────
--- VIEW 6: view_exam_proctoring_summary (NEW)
--- Purpose: Proctoring + Behavioral tracking (Compile vs Submit) per lecture
--- ─────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE VIEW public.view_exam_proctoring_summary AS
-SELECT
-    e.university_id,
-    e.student_id,
-    e.course_id,
-    e.lecture_id,
-    s.student_name,
-    s.uni_reg_id,
-    s.section,
-    -- Proctoring violations
-    COUNT(*) FILTER (WHERE e.event_type = 'focus_loss') AS focus_lost_count,
-    COUNT(*) FILTER (WHERE e.event_type = 'tab_switch') AS tab_switch_count,
-    COUNT(*) FILTER (WHERE e.event_type = 'disconnect') AS disconnect_count,
-    -- Behavioral: Compile vs Submit counts
-    COUNT(*) FILTER (WHERE e.event_type = 'compile_click') AS compile_count,
-    COUNT(*) FILTER (WHERE e.event_type = 'submit') AS submit_count,
-    COUNT(*) AS total_events
-FROM exam_events_v2 e
-JOIN students_v2 s ON s.student_id = e.student_id
-GROUP BY e.university_id, e.student_id, e.course_id, e.lecture_id,
-         s.student_name, s.uni_reg_id, s.section;
+    sum(
+      case
+        when r.result_type::text = 'mcq'::text then r.marks_obtained
+        else null::integer
+      end
+    ),
+    0::bigint
+  ) as mcq_marks,
+  COALESCE(
+    sum(
+      case
+        when r.result_type::text = 'mcq'::text then r.total_marks
+        else null::integer
+      end
+    ),
+    0::bigint
+  ) as mcq_total,
+  COALESCE(
+    sum(
+      case
+        when r.result_type::text = 'coding'::text then r.marks_obtained
+        else null::integer
+      end
+    ),
+    0::bigint
+  ) as coding_marks,
+  COALESCE(
+    sum(
+      case
+        when r.result_type::text = 'coding'::text then r.total_marks
+        else null::integer
+      end
+    ),
+    0::bigint
+  ) as coding_total,
+  count(distinct r.lecture_id) as lectures_attempted,
+  case
+    when COALESCE(sum(r.total_marks), 0::bigint) = 0 then 'Not Started'::text
+    when (
+      sum(r.marks_obtained)::numeric / NULLIF(sum(r.total_marks), 0)::numeric
+    ) >= 0.5 then 'Completed'::text
+    else 'At Risk'::text
+  end as course_status,
+  max(r.submitted_at) as last_activity
+from
+  students_v2 s
+  join batch_courses_v2 bc on bc.batch_id = s.batch_id
+  join courses_v2 c on c.course_id = bc.course_id
+  left join results_v2 r on r.student_id = s.student_id
+  and r.course_id = c.course_id
+where
+  s.account_type::text = 'student'::text
+group by
+  s.student_id,
+  s.student_name,
+  s.uni_reg_id,
+  s.section,
+  s.batch_id,
+  s.uni_id,
+  c.course_id,
+  c.course_name,
+  c.course_type;
 
 
--- ─────────────────────────────────────────────────────────────────────────
--- VIEW 7: view_course_score_distribution (NEW)
--- Purpose: Pre-calculated brackets for the Score Distribution charts
--- ─────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE VIEW public.view_course_score_distribution AS
-WITH student_scores AS (
-    SELECT * FROM view_student_course_completion
-)
-SELECT 
-    course_id,
-    course_name,
-    university_id,
-    course_type,
-    COUNT(*) AS total_students,
-    COUNT(*) FILTER (WHERE course_score_percent >= 90) AS bracket_90_100,
-    COUNT(*) FILTER (WHERE course_score_percent >= 75 AND course_score_percent < 90) AS bracket_75_89,
-    COUNT(*) FILTER (WHERE course_score_percent >= 50 AND course_score_percent < 75) AS bracket_50_74,
-    COUNT(*) FILTER (WHERE course_score_percent > 0 AND course_score_percent < 50) AS bracket_below_50,
-    COUNT(*) FILTER (WHERE course_score_percent = 0) AS not_started,
-    ROUND(AVG(course_score_percent), 1) AS avg_course_score
-FROM student_scores
-GROUP BY course_id, course_name, university_id, course_type;
 
-
--- ═══════════════════════════════════════════════════════════════════════════
--- GRANT READ ACCESS (Supabase anon/service role needs SELECT on views)
--- ═══════════════════════════════════════════════════════════════════════════
-GRANT SELECT ON public.view_section_student_scores TO anon, authenticated, service_role;
-GRANT SELECT ON public.view_lecture_completion_stats TO anon, authenticated, service_role;
-GRANT SELECT ON public.view_student_attempt_history TO anon, authenticated, service_role;
-GRANT SELECT ON public.view_batch_overview TO anon, authenticated, service_role;
-GRANT SELECT ON public.view_student_course_completion TO anon, authenticated, service_role;
-GRANT SELECT ON public.view_exam_proctoring_summary TO anon, authenticated, service_role;
-GRANT SELECT ON public.view_course_score_distribution TO anon, authenticated, service_role;
+create view public.view_student_time_tracking as
+select
+  t.student_id,
+  t.course_id,
+  t.lecture_id,
+  l.lecture_name,
+  t.test_type,
+  t.time_spent,
+  t.time_left,
+  t.total_duration,
+  case
+    when t.total_duration > 0 then round(
+      t.time_spent::numeric / t.total_duration::numeric * 100::numeric,
+      1
+    )
+    else 0::numeric
+  end as time_utilization_percent,
+  t.university_id
+from
+  test_time_sync_v2 t
+  join lectures_v2 l on l.lecture_id = t.lecture_id;

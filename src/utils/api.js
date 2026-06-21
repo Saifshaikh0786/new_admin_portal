@@ -41,7 +41,12 @@ export const API_CONFIG = {
             sittingAttendance: '/admin/analytics/sitting-attendance',
             lectureExamConfig: '/admin/analytics/lecture-exam-config',
             sectionStudents: '/admin/analytics/section-students',
-        }
+        },
+        
+        // Live Exams
+        liveExams: '/admin/live-exams',
+        extendAttempt: '/admin/extend-attempt',
+        extendTime: '/admin/extend-time',
     },
 
     // Master Data
