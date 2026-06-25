@@ -39,6 +39,7 @@ export const API_CONFIG = {
             proctoringSummary: '/admin/analytics/proctoring-summary',
             studentDeepDive: '/admin/analytics/student-deep-dive',
             sittingAttendance: '/admin/analytics/sitting-attendance',
+            liveRoster: '/admin/analytics/live-roster',
             lectureExamConfig: '/admin/analytics/lecture-exam-config',
             sectionStudents: '/admin/analytics/section-students',
         },

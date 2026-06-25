@@ -15,8 +15,10 @@ export const AuthProvider = ({ children }) => {
 
     // Helper for API calls to ensure consistent config
     const apiCall = async (url, options = {}) => {
+        const token = getAdminToken();
         const defaultHeaders = {
             "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
         };
 
         const config = {

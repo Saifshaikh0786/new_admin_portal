@@ -8,7 +8,7 @@ import {
   Code2, 
   GraduationCap, 
   Search, 
-  MapPin, 
+  Users, 
   LogOut, 
   Menu, 
   X,
@@ -66,7 +66,7 @@ export default function DashboardLayout({ children }) {
     { name: "Practice Tracking", href: "/dashboard/practice", icon: Code2 },
     { name: "Exam Results", href: "/dashboard/results", icon: GraduationCap },
     { name: "Student Search", href: "/dashboard/search", icon: Search },
-    { name: "Sitting Plan", href: "/dashboard/sitting-attendance", icon: MapPin },
+    { name: "Live Roster", href: "/dashboard/live-roster", icon: Users },
   ];
 
   return (
