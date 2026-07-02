@@ -221,7 +221,9 @@ function ExamResultsContent() {
                         compile_count: proc.compile_count || 0,
                         submit_count: proc.submit_count || 0,
                         mcq_marks: score.result_type === 'mcq' ? score.marks_obtained : 0,
-                        coding_marks: score.result_type === 'coding' ? score.marks_obtained : 0
+                        coding_marks: score.result_type === 'coding' ? score.marks_obtained : 0,
+                        mcq_max: score.result_type === 'mcq' ? (Number(score.total_possible_marks) || Number(score.total_marks)) : 0,
+                        coding_max: score.result_type === 'coding' ? (Number(score.total_possible_marks) || Number(score.total_marks)) : 0
                     };
                 });
                 
@@ -230,10 +232,17 @@ function ExamResultsContent() {
                 merged.forEach(row => {
                     if (!studentMap[row.student_id]) {
                         studentMap[row.student_id] = { ...row };
+                        // Ensure total_marks is treated as a number
+                        studentMap[row.student_id].total_marks = Number(row.total_marks || 0);
+                        studentMap[row.student_id].mcq_max = Number(row.mcq_max || 0);
+                        studentMap[row.student_id].coding_max = Number(row.coding_max || 0);
                     } else {
                         studentMap[row.student_id].mcq_marks += row.mcq_marks;
                         studentMap[row.student_id].coding_marks += row.coding_marks;
-                        studentMap[row.student_id].marks_obtained += row.marks_obtained;
+                        studentMap[row.student_id].marks_obtained += Number(row.marks_obtained || 0);
+                        studentMap[row.student_id].total_marks += Number(row.total_marks || 0);
+                        studentMap[row.student_id].mcq_max = Math.max(studentMap[row.student_id].mcq_max || 0, Number(row.mcq_max || 0));
+                        studentMap[row.student_id].coding_max = Math.max(studentMap[row.student_id].coding_max || 0, Number(row.coding_max || 0));
                     }
                 });
 
@@ -257,25 +266,75 @@ function ExamResultsContent() {
     const metrics = useMemo(() => {
         if (!studentsData.length) return null;
         
-        let avgFocusLost = 0, avgTabSwitches = 0, avgDisconnects = 0, passCount = 0;
+        let presentCount = 0;
+        let passCount = 0;
+        let totalMcq = 0;
+        let totalCoding = 0;
+        let sumTotalMarks = 0;
         
+        let examMcqMax = 0;
+        let examCodingMax = 0;
+        
+        // Use passing percentage from exam config if available, default 50
+        const passPercentStr = examConfig?.config?.passing_percentage || examConfig?.config?.['passing-percentage'] || 50;
+        const passPercent = parseFloat(passPercentStr);
+
         studentsData.forEach(s => {
-            avgFocusLost += parseInt(s.focus_lost_count || 0);
-            avgTabSwitches += parseInt(s.tab_switches_count || 0);
-            avgDisconnects += parseInt(s.disconnects_count || 0);
-            // Assume passing is >= 50% average
-            const avgScore = ((s.mcq_marks || 0) + (s.coding_marks || 0)) / 2;
-            if (avgScore >= 50) passCount++;
+            const mcq = Number(s.mcq_marks) || 0;
+            const coding = Number(s.coding_marks) || 0;
+            
+            // Total score OBTAINED is the sum of MCQ and Coding
+            const scoreObtained = (s.marks_obtained !== undefined && s.marks_obtained !== null) 
+                ? Number(s.marks_obtained) 
+                : (mcq + coding);
+
+            examMcqMax = Math.max(examMcqMax, s.mcq_max || 0);
+            examCodingMax = Math.max(examCodingMax, s.coding_max || 0);
+
+            // A student is considered present ONLY if they have a submit reason
+            const isPresent = !!s.submit_reason;
+            
+            if (isPresent) {
+                presentCount++;
+                totalMcq += mcq;
+                totalCoding += coding;
+                sumTotalMarks += scoreObtained;
+
+                // Pass calculation
+                let scorePercent = 0;
+                
+                if (s.score_percent !== undefined && s.score_percent !== null) {
+                    scorePercent = Number(s.score_percent);
+                } else if (s.course_score_percent !== undefined && s.course_score_percent !== null) {
+                    scorePercent = Number(s.course_score_percent);
+                } else {
+                    // We don't have a direct percentage. Try to use total_marks if it exists as the max possible marks.
+                    const maxMarks = Number(s.total_possible_marks) || Number(s.total_marks) || 100; 
+                    scorePercent = (scoreObtained / maxMarks) * 100;
+                }
+
+                if (scorePercent >= passPercent) {
+                    passCount++;
+                }
+            }
         });
 
-        const len = studentsData.length;
+        const totalStudents = studentsData.length;
+        const examTotalMax = examMcqMax + examCodingMax;
+        
         return {
-            passRate: Math.round((passCount / len) * 100),
-            focusLost: (avgFocusLost / len).toFixed(1),
-            tabSwitches: (avgTabSwitches / len).toFixed(1),
-            disconnects: (avgDisconnects / len).toFixed(1)
+            totalStudents,
+            presentCount,
+            passCount,
+            passRate: presentCount > 0 ? Math.round((passCount / presentCount) * 100) : 0,
+            avgMcq: presentCount > 0 ? (totalMcq / presentCount).toFixed(1) : "0.0",
+            avgCoding: presentCount > 0 ? (totalCoding / presentCount).toFixed(1) : "0.0",
+            avgTotal: presentCount > 0 ? (sumTotalMarks / presentCount).toFixed(1) : "0.0",
+            examMcqMax,
+            examCodingMax,
+            examTotalMax
         };
-    }, [studentsData]);
+    }, [studentsData, examConfig]);
 
     const handleRowClick = (studentId) => {
         router.push(`/dashboard/report?student_id=${studentId}&course_id=${selectedCourse}`);
@@ -406,27 +465,38 @@ function ExamResultsContent() {
 
                     {/* Top Stats Grid */}
                     {metrics && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <div className="card p-5 border-l-4 border-l-emerald-500 flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-bold text-gray-500 uppercase">Class Pass Rate</p>
-                                    <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{metrics.passRate}%</p>
-                                </div>
-                                <CircularProgress percentage={metrics.passRate} size={70} strokeWidth={6} color="emerald" />
-                            </div>
-                            <div className="card p-5 border-l-4 border-l-amber-500">
-                                <p className="text-xs font-bold text-gray-500 uppercase">Avg Tab Switches</p>
-                                <div className="flex items-center gap-3 mt-2">
-                                    <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg text-amber-600"><MonitorOff className="w-6 h-6" /></div>
-                                    <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.tabSwitches}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                            <div className="card p-5 border-l-4 border-l-blue-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                                <p className="text-xs font-bold text-gray-500 uppercase">Attendance</p>
+                                <div className="flex items-baseline gap-2 mt-2">
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.presentCount}</p>
+                                    <p className="text-sm font-semibold text-gray-500">/ {metrics.totalStudents}</p>
                                 </div>
                             </div>
-                            <div className="card p-5 border-l-4 border-l-red-500">
-                                <p className="text-xs font-bold text-gray-500 uppercase">Avg Focus Lost</p>
-                                <div className="flex items-center gap-3 mt-2">
-                                    <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-600"><Focus className="w-6 h-6" /></div>
-                                    <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.focusLost}</p>
+                            <div className="card p-5 border-l-4 border-l-indigo-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                                <p className="text-xs font-bold text-gray-500 uppercase">Avg Total Marks</p>
+                                <div className="flex items-baseline gap-2 mt-2">
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.avgTotal}</p>
+                                    {metrics.examTotalMax > 0 && <p className="text-sm font-semibold text-gray-500">/ {metrics.examTotalMax}</p>}
                                 </div>
+                            </div>
+                            <div className="card p-5 border-l-4 border-l-amber-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                                <p className="text-xs font-bold text-gray-500 uppercase">Avg MCQ Score</p>
+                                <div className="flex items-baseline gap-2 mt-2">
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.avgMcq}</p>
+                                    {metrics.examMcqMax > 0 && <p className="text-sm font-semibold text-gray-500">/ {metrics.examMcqMax}</p>}
+                                </div>
+                            </div>
+                            <div className="card p-5 border-l-4 border-l-purple-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                                <p className="text-xs font-bold text-gray-500 uppercase">Avg Coding Score</p>
+                                <div className="flex items-baseline gap-2 mt-2">
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.avgCoding}</p>
+                                    {metrics.examCodingMax > 0 && <p className="text-sm font-semibold text-gray-500">/ {metrics.examCodingMax}</p>}
+                                </div>
+                            </div>
+                            <div className="card p-5 border-l-4 border-l-emerald-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                                <p className="text-xs font-bold text-gray-500 uppercase">Class Pass Rate</p>
+                                <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{metrics.passRate}%</p>
                             </div>
                         </div>
                     )}
@@ -455,8 +525,16 @@ function ExamResultsContent() {
                                 </thead>
                                 <tbody>
                                     {studentsData.map(student => {
-                                        const totalScore = student.total_marks || (Number(student.mcq_marks || 0) + Number(student.coding_marks || 0));
-                                        const allowedAttempts = Number(student.extra_attempts || 0) + 1;
+                                        const mcq = Number(student.mcq_marks) || 0;
+                                        const coding = Number(student.coding_marks) || 0;
+                                        const totalScore = (student.marks_obtained !== undefined && student.marks_obtained !== null) 
+                                            ? Number(student.marks_obtained) 
+                                            : (mcq + coding);
+                                        const allowedAttempts = Number(student.allowed_attempts || 1);
+                                        const mcqMax = student.mcq_max || 0;
+                                        const codingMax = student.coding_max || 0;
+                                        const totalMax = mcqMax + codingMax || student.total_marks || 0;
+                                        const isPresent = !!(student.submit_reason || student.submission_reason);
                                         
                                         return (
                                             <tr 
@@ -471,16 +549,18 @@ function ExamResultsContent() {
                                                     {student.reg_id}
                                                 </td>
                                                 <td className="p-4 text-center font-medium">
-                                                    {student.mcq_marks || 0}
+                                                    {!isPresent ? <span className="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded">ABS</span> : <>{student.mcq_marks || 0} {mcqMax > 0 && <span className="text-xs text-gray-400">/ {mcqMax}</span>}</>}
                                                 </td>
                                                 <td className="p-4 text-center font-medium">
-                                                    {student.coding_marks || 0}
+                                                    {!isPresent ? <span className="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded">ABS</span> : <>{student.coding_marks || 0} {codingMax > 0 && <span className="text-xs text-gray-400">/ {codingMax}</span>}</>}
                                                 </td>
                                                 <td className="p-4 text-center font-bold text-gray-900 dark:text-white">
-                                                    {totalScore.toFixed(1)}
+                                                    {!isPresent ? <span className="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded">ABS</span> : <>{totalScore.toFixed(1)} {totalMax > 0 && <span className="text-xs text-gray-400 font-normal">/ {totalMax}</span>}</>}
                                                 </td>
                                                 <td className="p-4 text-center">
-                                                    <span className="text-xs text-gray-500 uppercase font-medium">{student.submit_reason || student.submission_reason || "Auto Submitted"}</span>
+                                                    <span className={`text-xs uppercase font-medium ${!isPresent ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
+                                                        {!isPresent ? "Absent" : (student.submit_reason || student.submission_reason || "Auto Submitted")}
+                                                    </span>
                                                 </td>
                                                 <td className="p-4 text-center">
                                                     <span className="badge bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300">

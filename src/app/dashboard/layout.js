@@ -135,14 +135,14 @@ export default function DashboardLayout({ children }) {
           {/* User Section */}
           <div className="p-4 border-t border-gray-200 dark:border-slate-800 flex flex-col gap-2">
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700/50 mb-2">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold shadow-md">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold shadow-md" suppressHydrationWarning>
                 {user?.name?.charAt(0) || "A"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" suppressHydrationWarning>
                   {user?.name || "Admin User"}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate" suppressHydrationWarning>
                   {user?.email || "admin@educode.com"}
                 </p>
               </div>

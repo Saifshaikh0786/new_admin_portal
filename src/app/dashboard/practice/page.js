@@ -3,17 +3,18 @@
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useDashboard } from "@/context/DashboardContext";
 import { API_CONFIG } from "@/utils/api";
 import { getAdminToken } from "@/utils/cookies";
-import { Loader2, Download, Search, ChevronRight, AlertCircle, FileText, CheckCircle2, Clock } from "lucide-react";
+import { Loader2, Download, Search, ChevronRight, AlertCircle, FileText, CheckCircle2, Clock, RefreshCw } from "lucide-react";
 import { CircularProgress } from "@/components/CircularProgress";
 
 function PracticeTrackingContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
+    const { batches, loading: dashboardLoading } = useDashboard();
     
-    const [batches, setBatches] = useState([]);
     const [courses, setCourses] = useState([]);
     const [sections, setSections] = useState([]);
     
@@ -27,33 +28,12 @@ function PracticeTrackingContent() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Initial Fetch for Filters
+    // Auto-select batch if only 1 exists
     useEffect(() => {
-        if (!authLoading && user) {
-            fetchFilters();
+        if (!dashboardLoading && batches.length === 1 && !selectedBatch) {
+            setSelectedBatch(batches[0].batch_id);
         }
-    }, [authLoading, user]);
-
-    const fetchFilters = async () => {
-        try {
-            const token = getAdminToken();
-            const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-
-            // Fetch Batches from Overview API
-            const bRes = await fetch(`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, { method: "GET", headers, credentials: "include" });
-            const bData = await bRes.json();
-            if (bData.success && bData.data) {
-                setBatches(bData.data.batches || []);
-                
-                // If a batch is pre-selected, fetch its courses
-                if (selectedBatch) {
-                    fetchCoursesForBatch(selectedBatch, headers);
-                }
-            }
-        } catch (e) {
-            console.error("Failed to load filters", e);
-        }
-    };
+    }, [batches, dashboardLoading, selectedBatch]);
 
     const fetchCoursesForBatch = async (batchId, headers) => {
         try {
@@ -104,17 +84,17 @@ function PracticeTrackingContent() {
         }
     }, [selectedBatch, batches]);
 
-    // Reset page to 1 when filters change
+    // Reset page to 1 when filters change (we DO NOT auto-fetch data here anymore)
     useEffect(() => {
         setPage(1);
     }, [selectedBatch, selectedCourse, selectedSection]);
 
-    // Fetch Table Data
+    // Only fetch automatically when page changes (and we already have some data fetched)
     useEffect(() => {
-        if (selectedBatch && selectedCourse && selectedSection) {
+        if (studentsData.length > 0 && selectedBatch && selectedCourse && selectedSection) {
             fetchTableData(page);
         }
-    }, [selectedBatch, selectedCourse, selectedSection, page]);
+    }, [page]);
 
     const fetchTableData = async (currentPage = page) => {
         setLoading(true);
@@ -241,6 +221,17 @@ function PracticeTrackingContent() {
                             <option key={s} value={s}>{s}</option>
                         ))}
                     </select>
+                </div>
+
+                <div className="flex items-end self-stretch md:self-auto ml-auto">
+                    <button 
+                        onClick={() => fetchTableData(1)}
+                        disabled={loading || !selectedBatch || !selectedCourse}
+                        className="w-full md:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2"
+                    >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        Fetch Data
+                    </button>
                 </div>
             </div>
 

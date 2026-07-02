@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useDashboard } from "@/context/DashboardContext";
 import { API_CONFIG } from "@/utils/api";
 import { getAdminToken } from "@/utils/cookies";
 import { Search, Loader2, AlertCircle, GraduationCap, ChevronRight, BookOpen, Activity, Users } from "lucide-react";
@@ -10,6 +11,7 @@ import { Search, Loader2, AlertCircle, GraduationCap, ChevronRight, BookOpen, Ac
 export default function StudentSearchPage() {
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
+    const { batches, loading: dashboardLoading } = useDashboard();
     
     // View Mode Toggle
     const [viewMode, setViewMode] = useState("search"); // "search" | "directory"
@@ -23,7 +25,6 @@ export default function StudentSearchPage() {
     const [courses, setCourses] = useState([]);
 
     // Directory Mode States
-    const [batches, setBatches] = useState([]);
     const [selectedBatch, setSelectedBatch] = useState("");
     const [sections, setSections] = useState([]);
     const [selectedSection, setSelectedSection] = useState("");
@@ -120,27 +121,12 @@ export default function StudentSearchPage() {
     // ==========================================
     // DIRECTORY MODE LOGIC
     // ==========================================
+    // Auto-select batch if only 1 exists
     useEffect(() => {
-        if (!authLoading && user && viewMode === 'directory' && batches.length === 0) {
-            fetchBatches();
+        if (!dashboardLoading && batches.length === 1 && !selectedBatch) {
+            setSelectedBatch(batches[0].batch_id);
         }
-    }, [authLoading, user, viewMode]);
-
-    const fetchBatches = async () => {
-        try {
-            const token = getAdminToken();
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, { 
-                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                credentials: "include" 
-            });
-            const data = await res.json();
-            if (data.success && data.data) {
-                setBatches(data.data.batches || []);
-            }
-        } catch (e) {
-            console.error("Failed to load batches", e);
-        }
-    };
+    }, [batches, dashboardLoading, selectedBatch]);
 
     useEffect(() => {
         if (selectedBatch) {

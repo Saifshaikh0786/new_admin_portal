@@ -104,6 +104,35 @@ function LoginContent() {
             ) : null}
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
+
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                setError('');
+                setIsSubmitting(true);
+                try {
+                  const devEmail = process.env.NEXT_PUBLIC_DEV_LOGIN_EMAIL || 'admin@example.com';
+                  const devPassword = process.env.NEXT_PUBLIC_DEV_LOGIN_PASSWORD || 'password123';
+                  const res = await login({ email: devEmail, password: devPassword }, role);
+                  
+                  if (res && res.success === false) {
+                     throw new Error(res.error || 'Dev Login failed.');
+                  }
+                  
+                  router.push('/dashboard');
+                } catch (err) {
+                  setError(err.message || 'Dev Login failed.');
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              className="w-full mt-4 flex justify-center items-center py-2 px-4 border border-blue-500 rounded-xl text-sm font-semibold text-blue-600 dark:text-blue-400 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:outline-none transition-all"
+            >
+              Fast Dev Login
+            </button>
+          )}
         </form>
       </div>
     </div>

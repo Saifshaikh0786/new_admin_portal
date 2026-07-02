@@ -43,7 +43,16 @@ export function DashboardProvider({ children }) {
                     credentials: "include"
                 });
                 
-                const data = await res.json();
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error("Non-JSON response from overview API:", text);
+                    setError("Failed to fetch dashboard data");
+                    setLoading(false);
+                    return;
+                }
                 
                 if (res.ok && data.success && data.data) {
                     setBatches(data.data.batches || []);

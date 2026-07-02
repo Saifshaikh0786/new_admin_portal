@@ -8,10 +8,31 @@ import { setAdminToken, clearAdminToken, getAdminToken } from "../utils/cookies"
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    // Initialize user from localStorage to survive Fast Refresh
+    const [user, setUserState] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem('admin_user');
+            if (cached) {
+                try { return JSON.parse(cached); } catch (e) {}
+            }
+        }
+        return null;
+    });
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
+
+    // Wrapper to keep localStorage in sync
+    const setUser = (userData) => {
+        setUserState(userData);
+        if (typeof window !== 'undefined') {
+            if (userData) {
+                localStorage.setItem('admin_user', JSON.stringify(userData));
+            } else {
+                localStorage.removeItem('admin_user');
+            }
+        }
+    };
 
     // Helper for API calls to ensure consistent config
     const apiCall = async (url, options = {}) => {
@@ -56,12 +77,17 @@ export const AuthProvider = ({ children }) => {
                     handleLogout();
                 }
             } else {
-                // 401 or other error indicates invalid session
-                handleLogout();
+                // 401 or 403 indicates invalid session (Token expired/invalid)
+                if (res.status === 401 || res.status === 403) {
+                    handleLogout();
+                } else {
+                    console.error("Backend error during session check:", res.status);
+                    // Do not logout on 500s or 502s, as they might be temporary backend restarts
+                }
             }
         } catch (error) {
-            console.error("Session check failed:", error);
-            if (!isBackground) setUser(null); // Only clear on explicit check, retries handled by interval
+            console.error("Session check failed (Network Error / Fast Refresh):", error);
+            // DO NOT clear user on network error. This is what causes logouts during Fast Refresh!
         } finally {
             if (!isBackground) setLoading(false);
         }
