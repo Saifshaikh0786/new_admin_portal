@@ -6,8 +6,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContext";
 import { API_CONFIG } from "@/utils/api";
 import { getAdminToken } from "@/utils/cookies";
-import { Loader2, Download, Search, ChevronRight, AlertCircle, FileText, CheckCircle2, Clock, RefreshCw } from "lucide-react";
+import { Loader2, Download, Search, ChevronRight, AlertCircle, FileText, CheckCircle2, Clock, RefreshCw, FileSpreadsheet } from "lucide-react";
 import { CircularProgress } from "@/components/CircularProgress";
+import * as XLSX from "xlsx";
 
 function PracticeTrackingContent() {
     const searchParams = useSearchParams();
@@ -19,14 +20,15 @@ function PracticeTrackingContent() {
     const [sections, setSections] = useState([]);
     
     const [selectedBatch, setSelectedBatch] = useState(searchParams.get("batchId") || "");
-    const [selectedSection, setSelectedSection] = useState("All");
-    const [selectedCourse, setSelectedCourse] = useState("");
+    const [selectedSection, setSelectedSection] = useState(searchParams.get("section") || "All");
+    const [selectedCourse, setSelectedCourse] = useState(searchParams.get("courseId") || "");
 
     const [studentsData, setStudentsData] = useState([]);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isExporting, setIsExporting] = useState(false);
 
     // Auto-select batch if only 1 exists
     useEffect(() => {
@@ -84,10 +86,69 @@ function PracticeTrackingContent() {
         }
     }, [selectedBatch, batches]);
 
-    // Reset page to 1 when filters change (we DO NOT auto-fetch data here anymore)
+    // URL Syncing and Page Reset
     useEffect(() => {
         setPage(1);
-    }, [selectedBatch, selectedCourse, selectedSection]);
+        const params = new URLSearchParams(searchParams.toString());
+        let changed = false;
+        
+        if (selectedBatch && selectedBatch !== params.get("batchId")) { params.set("batchId", selectedBatch); changed = true; }
+        if (selectedCourse && selectedCourse !== params.get("courseId")) { params.set("courseId", selectedCourse); changed = true; }
+        if (selectedSection && selectedSection !== params.get("section")) { params.set("section", selectedSection); changed = true; }
+        
+        if (changed) {
+            router.replace(`?${params.toString()}`, { scroll: false });
+        }
+    }, [selectedBatch, selectedCourse, selectedSection, searchParams, router]);
+
+    const handleExport = async (format) => {
+        if (!selectedBatch || !selectedCourse) return;
+        setIsExporting(true);
+        try {
+            const token = getAdminToken();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.analytics.courseStudents}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                credentials: "include",
+                body: JSON.stringify({
+                    batch_id: selectedBatch,
+                    section: selectedSection === "All" ? null : selectedSection,
+                    course_id: selectedCourse,
+                    page: 1,
+                    limit: 10000 // Fetch all for export
+                })
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                const exportData = data.data.map(s => ({
+                    "Student Name": s.student_name || "N/A",
+                    "Reg ID": s.reg_id || "N/A",
+                    "Section": s.section || "N/A",
+                    "MCQ Score": s.mcq_score_percent ? `${s.mcq_score_percent}%` : "0%",
+                    "Coding Score": s.coding_score_percent ? `${s.coding_score_percent}%` : "0%",
+                    "Overall Progress": (s.course_score_percent || s.overall_course_percent) ? `${s.course_score_percent || s.overall_course_percent}%` : "0%",
+                    "Status": s.course_status || "Not Started"
+                }));
+
+                const worksheet = XLSX.utils.json_to_sheet(exportData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "PracticeData");
+                
+                if (format === 'csv') {
+                    XLSX.writeFile(workbook, `Practice_Data_${selectedBatch}_${selectedCourse}.csv`);
+                } else {
+                    XLSX.writeFile(workbook, `Practice_Data_${selectedBatch}_${selectedCourse}.xlsx`);
+                }
+            } else {
+                alert("Failed to fetch data for export.");
+            }
+        } catch (e) {
+            console.error("Export error", e);
+            alert("Error exporting data.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     // Only fetch automatically when page changes (and we already have some data fetched)
     useEffect(() => {
@@ -167,11 +228,21 @@ function PracticeTrackingContent() {
                 </div>
                 
                 <div className="flex gap-2">
-                    <button className="btn-secondary flex items-center gap-2">
-                        <FileText className="w-4 h-4" /> Export CSV
+                    <button 
+                        onClick={() => handleExport('csv')}
+                        disabled={isExporting || !selectedBatch || !selectedCourse}
+                        className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                        Export CSV
                     </button>
-                    <button className="btn-primary flex items-center gap-2">
-                        <Download className="w-4 h-4" /> Export PDF
+                    <button 
+                        onClick={() => handleExport('excel')}
+                        disabled={isExporting || !selectedBatch || !selectedCourse}
+                        className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+                        Export Excel
                     </button>
                 </div>
             </div>

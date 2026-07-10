@@ -6,8 +6,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContext";
 import { API_CONFIG } from "@/utils/api";
 import { getAdminToken } from "@/utils/cookies";
-import { Loader2, Download, Search, AlertCircle, ShieldAlert, MonitorOff, Focus, Clock, Key, Shield, ChevronRight } from "lucide-react";
+import { Loader2, Download, Search, AlertCircle, ShieldAlert, MonitorOff, Focus, Clock, Key, Shield, ChevronRight, FileText, FileSpreadsheet } from "lucide-react";
 import { CircularProgress } from "@/components/CircularProgress";
+import * as XLSX from "xlsx";
 
 function ExamResultsContent() {
     const searchParams = useSearchParams();
@@ -22,10 +23,10 @@ function ExamResultsContent() {
     const [lectures, setLectures] = useState([]);
     
     const [selectedBatch, setSelectedBatch] = useState(searchParams.get("batchId") || "");
-    const [selectedSection, setSelectedSection] = useState("All");
-    const [selectedCourse, setSelectedCourse] = useState("");
-    const [selectedUnit, setSelectedUnit] = useState("");
-    const [selectedLecture, setSelectedLecture] = useState("");
+    const [selectedSection, setSelectedSection] = useState(searchParams.get("section") || "All");
+    const [selectedCourse, setSelectedCourse] = useState(searchParams.get("courseId") || "");
+    const [selectedUnit, setSelectedUnit] = useState(searchParams.get("unitId") || "");
+    const [selectedLecture, setSelectedLecture] = useState(searchParams.get("lectureId") || "");
 
     const [studentsData, setStudentsData] = useState([]);
     const [examConfig, setExamConfig] = useState(null);
@@ -33,6 +34,7 @@ function ExamResultsContent() {
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isExporting, setIsExporting] = useState(false);
 
     // Populate Dropdowns from Cached Batches
     useEffect(() => {
@@ -146,10 +148,7 @@ function ExamResultsContent() {
                     headers, credentials: "include"
                 });
                 const configData = await configRes.json();
-                console.log("=== RAW EXAM CONFIG RESPONSE ===", JSON.stringify(configData, null, 2));
                 if (configData.success) {
-                    console.log("=== CONFIG DATA ===", JSON.stringify(configData.data, null, 2));
-                    console.log("=== CONFIG.CONFIG ===", JSON.stringify(configData.data?.config, null, 2));
                     setExamConfig(configData.data);
                 }
             } catch (e) {
@@ -158,6 +157,119 @@ function ExamResultsContent() {
         };
         fetchConfig();
     }, [selectedLecture]);
+
+    // URL Syncing
+    useEffect(() => {
+        setPage(1);
+        const params = new URLSearchParams(searchParams.toString());
+        let changed = false;
+        
+        if (selectedBatch && selectedBatch !== params.get("batchId")) { params.set("batchId", selectedBatch); changed = true; }
+        if (selectedCourse && selectedCourse !== params.get("courseId")) { params.set("courseId", selectedCourse); changed = true; }
+        if (selectedUnit && selectedUnit !== params.get("unitId")) { params.set("unitId", selectedUnit); changed = true; }
+        if (selectedLecture && selectedLecture !== params.get("lectureId")) { params.set("lectureId", selectedLecture); changed = true; }
+        if (selectedSection && selectedSection !== params.get("section")) { params.set("section", selectedSection); changed = true; }
+        
+        if (changed) {
+            router.replace(`?${params.toString()}`, { scroll: false });
+        }
+    }, [selectedBatch, selectedCourse, selectedUnit, selectedLecture, selectedSection, searchParams, router]);
+
+    const handleExport = async (format) => {
+        if (!selectedBatch || !selectedCourse || !selectedLecture) return;
+        setIsExporting(true);
+        try {
+            const token = getAdminToken();
+            const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+            
+            const scoresRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.analytics.sectionStudents}`, {
+                method: "POST",
+                headers,
+                credentials: "include",
+                body: JSON.stringify({
+                    batch_id: selectedBatch,
+                    section: selectedSection === "All" ? null : selectedSection,
+                    course_id: selectedCourse,
+                    lecture_id: selectedLecture,
+                    page: 1,
+                    limit: 10000 // Fetch all for export
+                })
+            });
+            const scoresData = await scoresRes.json();
+            if (!scoresData.success) throw new Error("Failed to fetch scores");
+            
+            const lectureScores = scoresData.data || [];
+            const studentIds = lectureScores.map(s => s.student_id);
+
+            const proctorRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.analytics.proctoringSummary}`, {
+                method: "POST",
+                headers,
+                credentials: "include",
+                body: JSON.stringify({
+                    batch_id: selectedBatch,
+                    section: selectedSection === "All" ? null : selectedSection,
+                    course_id: selectedCourse,
+                    lecture_id: selectedLecture,
+                    student_ids: studentIds
+                })
+            });
+            const proctorData = await proctorRes.json();
+            
+            const merged = lectureScores.map(score => {
+                const proc = (proctorData.data || []).find(p => p.student_id === score.student_id) || {};
+                return {
+                    ...score,
+                    focus_lost_count: proc.focus_lost_count || 0,
+                    tab_switches_count: proc.tab_switch_count || 0,
+                    disconnects_count: proc.disconnect_count || 0,
+                    mcq_marks: score.result_type === 'mcq' ? score.marks_obtained : 0,
+                    coding_marks: score.result_type === 'coding' ? score.marks_obtained : 0
+                };
+            });
+            
+            const studentMap = {};
+            merged.forEach(row => {
+                if (!studentMap[row.student_id]) {
+                    studentMap[row.student_id] = { ...row };
+                } else {
+                    studentMap[row.student_id].mcq_marks += row.mcq_marks;
+                    studentMap[row.student_id].coding_marks += row.coding_marks;
+                    studentMap[row.student_id].marks_obtained += Number(row.marks_obtained || 0);
+                }
+            });
+
+            const finalData = Object.values(studentMap);
+            
+            const exportData = finalData.map(s => ({
+                "Student Name": s.student_name || "N/A",
+                "Reg ID": s.reg_id || "N/A",
+                "Section": s.section || "N/A",
+                "MCQ Score": s.mcq_marks || 0,
+                "Coding Score": s.coding_marks || 0,
+                "Total Score": s.marks_obtained || 0,
+                "Tab Switches": s.tab_switches_count || 0,
+                "Focus Lost": s.focus_lost_count || 0,
+                "Disconnects": s.disconnects_count || 0,
+                "Submitted": s.is_submitted ? "Yes" : "No",
+                "Submitted At": s.submitted_at ? new Date(s.submitted_at).toLocaleString() : "N/A"
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "ResultsData");
+            
+            if (format === 'csv') {
+                XLSX.writeFile(workbook, `Exam_Results_${selectedBatch}_${selectedCourse}.csv`);
+            } else {
+                XLSX.writeFile(workbook, `Exam_Results_${selectedBatch}_${selectedCourse}.xlsx`);
+            }
+        } catch (e) {
+            console.error("Export error", e);
+            alert("Error exporting data.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     // Fetch Table Data
     const fetchExamData = async (currentPage = page) => {
@@ -358,8 +470,21 @@ function ExamResultsContent() {
                 </div>
                 
                 <div className="flex gap-2">
-                    <button className="btn-secondary flex items-center gap-2">
-                        <Download className="w-4 h-4" /> Export CSV
+                    <button 
+                        onClick={() => handleExport('csv')}
+                        disabled={isExporting || !selectedBatch || !selectedCourse || !selectedLecture}
+                        className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                        Export CSV
+                    </button>
+                    <button 
+                        onClick={() => handleExport('excel')}
+                        disabled={isExporting || !selectedBatch || !selectedCourse || !selectedLecture}
+                        className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+                        Export Excel
                     </button>
                 </div>
             </div>

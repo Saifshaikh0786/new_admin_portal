@@ -1,15 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { API_CONFIG } from "@/utils/api";
 import { getAdminToken } from "@/utils/cookies";
-import { Loader2, AlertCircle, Calendar, Users, CheckCircle2, PlayCircle, Clock, Download, RefreshCw, ChevronDown } from "lucide-react";
+import { Loader2, AlertCircle, Calendar, Users, CheckCircle2, PlayCircle, Clock, Download, RefreshCw, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 
 export default function LiveDashboardRosterPage() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
     const { user, loading: authLoading } = useAuth();
     
-    const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+    const [dateFilter, setDateFilter] = useState(searchParams.get("date") || new Date().toISOString().split('T')[0]);
     const [metrics, setMetrics] = useState({ total_scheduled: 0, completed: 0, ongoing: 0, not_started: 0 });
     const [students, setStudents] = useState([]);
     
@@ -19,6 +23,16 @@ export default function LiveDashboardRosterPage() {
     const [loading, setLoading] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState(null);
+    const [isExporting, setIsExporting] = useState(false);
+
+    // URL Sync
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (dateFilter && dateFilter !== params.get("date")) {
+            params.set("date", dateFilter);
+            router.replace(`?${params.toString()}`, { scroll: false });
+        }
+    }, [dateFilter, searchParams, router]);
 
     // Initial load and date change
     useEffect(() => {
@@ -26,6 +40,56 @@ export default function LiveDashboardRosterPage() {
             fetchRoster(1, true);
         }
     }, [authLoading, user, dateFilter]);
+
+    const handleExport = async (format) => {
+        setIsExporting(true);
+        try {
+            const token = getAdminToken();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.analytics.liveRoster}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                credentials: "include",
+                body: JSON.stringify({ date: dateFilter, page: 1, limit: 10000 })
+            });
+            const data = await res.json();
+            
+            if (data.success && data.data && data.data.rows) {
+                const exportData = data.data.rows.map(s => {
+                    let status = "Not Started";
+                    if (s.submitted_at) status = "Submitted";
+                    else if (s.coding_status !== 'not_started' || s.mcq_status !== 'not_started') status = "Ongoing";
+
+                    return {
+                        "Student Name": s.student_name || "N/A",
+                        "Reg ID": s.reg_id || "N/A",
+                        "Section": s.section || "N/A",
+                        "Batch": s.batch_name || "N/A",
+                        "Course": s.course_name || "N/A",
+                        "Lecture": s.lecture_name || "N/A",
+                        "Status": status,
+                        "Submitted At": s.submitted_at ? new Date(s.submitted_at).toLocaleString() : "N/A"
+                    };
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(exportData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "LiveRoster");
+                
+                if (format === 'csv') {
+                    XLSX.writeFile(workbook, `Live_Roster_${dateFilter}.csv`);
+                } else {
+                    XLSX.writeFile(workbook, `Live_Roster_${dateFilter}.xlsx`);
+                }
+            } else {
+                alert("Failed to fetch data for export.");
+            }
+        } catch (e) {
+            console.error("Export error", e);
+            alert("Error exporting data.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     const fetchRoster = async (pageNumber = 1, isNewDate = false) => {
         if (isNewDate) {
@@ -109,7 +173,7 @@ export default function LiveDashboardRosterPage() {
                     <p className="text-gray-500 dark:text-gray-400 mt-2">Monitor all scheduled exams, active participants, and final results in real-time.</p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
                     <div className="relative group">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                         <input
@@ -126,6 +190,25 @@ export default function LiveDashboardRosterPage() {
                     >
                         <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                     </button>
+
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => handleExport('csv')}
+                            disabled={isExporting}
+                            className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                            Export CSV
+                        </button>
+                        <button 
+                            onClick={() => handleExport('excel')}
+                            disabled={isExporting}
+                            className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+                            Export Excel
+                        </button>
+                    </div>
                 </div>
             </div>
 
