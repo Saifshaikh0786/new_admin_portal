@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { API_CONFIG } from "@/utils/api";
@@ -8,7 +8,7 @@ import { getAdminToken } from "@/utils/cookies";
 import { Loader2, AlertCircle, Calendar, Users, CheckCircle2, PlayCircle, Clock, Download, RefreshCw, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
 import * as XLSX from "xlsx";
 
-export default function LiveDashboardRosterPage() {
+function LiveDashboardRosterContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
@@ -336,5 +336,17 @@ export default function LiveDashboardRosterPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function LiveDashboardRosterPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+        }>
+            <LiveDashboardRosterContent />
+        </Suspense>
     );
 }
