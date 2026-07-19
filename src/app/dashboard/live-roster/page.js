@@ -147,14 +147,14 @@ function LiveDashboardRosterContent() {
         }
         if (student.coding_status !== 'not_started' || student.mcq_status !== 'not_started') {
             return (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full text-xs font-semibold border border-blue-200 dark:border-blue-800">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--neu-achieve-soft)] text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full text-xs font-semibold border border-blue-200 dark:border-blue-800">
                     <PlayCircle className="w-3.5 h-3.5 animate-pulse" />
                     Ongoing
                 </span>
             );
         }
         return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-gray-300 rounded-full text-xs font-semibold border border-gray-200 dark:border-slate-600">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-gray-300 rounded-full text-xs font-semibold border border-[var(--neu-divider)]">
                 <Clock className="w-3.5 h-3.5" />
                 Not Started
             </span>
@@ -167,7 +167,7 @@ function LiveDashboardRosterContent() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                        <Users className="w-8 h-8 text-blue-500" />
+                        <span className="w-12 h-12 rounded-2xl neu-chip neu-chip-info flex items-center justify-center shrink-0"><Users className="w-6 h-6" /></span>
                         Live Dashboard Roster
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-2">Monitor all scheduled exams, active participants, and final results in real-time.</p>
@@ -180,12 +180,12 @@ function LiveDashboardRosterContent() {
                             type="date"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
-                            className="pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-xl font-medium focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-all shadow-sm text-gray-700 dark:text-gray-200"
+                            className="pl-10 pr-4 py-2.5 neu-inset rounded-xl font-medium focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-all shadow-sm text-gray-700 dark:text-gray-200"
                         />
                     </div>
                     <button 
                         onClick={() => fetchRoster(1, true)}
-                        className="p-2.5 bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-xl hover:border-blue-500 hover:text-blue-500 transition-all shadow-sm"
+                        className="p-2.5 neu-raised rounded-xl hover:border-blue-500 hover:text-blue-500 transition-all shadow-sm"
                         title="Refresh Data"
                     >
                         <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -213,7 +213,7 @@ function LiveDashboardRosterContent() {
             </div>
 
             {error && (
-                <div className="p-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/50 rounded-2xl text-red-600 dark:text-red-400 flex items-center gap-3 animate-slideInRight">
+                <div className="p-6 bg-[var(--neu-danger-soft)] rounded-2xl text-[var(--neu-danger)] dark:text-[var(--neu-danger)] flex items-center gap-3 animate-slideInRight">
                     <AlertCircle className="w-6 h-6 shrink-0" />
                     <p className="font-medium">{error}</p>
                 </div>
@@ -221,28 +221,28 @@ function LiveDashboardRosterContent() {
 
             {/* Metrics Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="neu-raised neu-hover p-6 rounded-2xl relative overflow-hidden group transition-all border-t-4 border-t-[#4A9BD9]">
                     <div className="absolute -right-4 -top-4 w-24 h-24 bg-gray-50 dark:bg-slate-700/50 rounded-full group-hover:scale-110 transition-transform duration-500 ease-out" />
                     <Users className="w-8 h-8 text-gray-400 dark:text-gray-500 mb-4 relative z-10" />
                     <div className="text-3xl font-bold text-gray-900 dark:text-white relative z-10 mb-1">{metrics.total_scheduled}</div>
                     <div className="text-sm font-medium text-gray-500 dark:text-gray-400 relative z-10">Total Scheduled</div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="neu-raised neu-hover p-6 rounded-2xl relative overflow-hidden group transition-all border-t-4 border-t-[var(--neu-success)]">
                     <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-50 dark:bg-green-900/10 rounded-full group-hover:scale-110 transition-transform duration-500 ease-out" />
                     <CheckCircle2 className="w-8 h-8 text-green-500 mb-4 relative z-10" />
                     <div className="text-3xl font-bold text-gray-900 dark:text-white relative z-10 mb-1">{metrics.completed}</div>
                     <div className="text-sm font-medium text-gray-500 dark:text-gray-400 relative z-10">Completed</div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 dark:bg-blue-900/10 rounded-full group-hover:scale-110 transition-transform duration-500 ease-out" />
+                <div className="neu-raised neu-hover p-6 rounded-2xl relative overflow-hidden group transition-all border-t-4 border-t-[var(--neu-warn)]">
+                    <div className="absolute -right-4 -top-4 w-24 h-24 bg-[var(--neu-achieve-soft)] dark:bg-blue-900/10 rounded-full group-hover:scale-110 transition-transform duration-500 ease-out" />
                     <PlayCircle className="w-8 h-8 text-blue-500 mb-4 relative z-10" />
                     <div className="text-3xl font-bold text-gray-900 dark:text-white relative z-10 mb-1">{metrics.ongoing}</div>
                     <div className="text-sm font-medium text-gray-500 dark:text-gray-400 relative z-10">Ongoing</div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="neu-raised neu-hover p-6 rounded-2xl relative overflow-hidden group transition-all border-t-4 border-t-[var(--neu-danger)]">
                     <div className="absolute -right-4 -top-4 w-24 h-24 bg-orange-50 dark:bg-orange-900/10 rounded-full group-hover:scale-110 transition-transform duration-500 ease-out" />
                     <Clock className="w-8 h-8 text-orange-400 mb-4 relative z-10" />
                     <div className="text-3xl font-bold text-gray-900 dark:text-white relative z-10 mb-1">{metrics.not_started}</div>
@@ -251,10 +251,10 @@ function LiveDashboardRosterContent() {
             </div>
 
             {/* Main Data Table */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+            <div className="neu-raised rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50 dark:bg-slate-900/50 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-slate-700 uppercase tracking-wider text-xs">
+                        <thead className="bg-gray-50 dark:bg-slate-900/50 text-gray-600 dark:text-gray-300 font-semibold border-b border-[var(--neu-divider)] uppercase tracking-wider text-xs">
                             <tr>
                                 <th className="px-6 py-4">Student Details</th>
                                 <th className="px-6 py-4">Room & Section</th>
@@ -323,11 +323,11 @@ function LiveDashboardRosterContent() {
                 
                 {/* Lazy Loading Trigger */}
                 {hasMore && (
-                    <div className="p-4 bg-gray-50 dark:bg-slate-900/30 border-t border-gray-200 dark:border-slate-700 flex justify-center">
+                    <div className="p-4 bg-gray-50 dark:bg-slate-900/30 border-t border-[var(--neu-divider)] flex justify-center">
                         <button 
                             onClick={loadMore}
                             disabled={loadingMore}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-full font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-blue-600 transition-all shadow-sm disabled:opacity-50"
+                            className="flex items-center gap-2 px-6 py-2.5 neu-inset border border-gray-300 dark:border-slate-600 rounded-full font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-blue-600 transition-all shadow-sm disabled:opacity-50"
                         >
                             {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
                             {loadingMore ? "Loading more..." : "Load More Students"}

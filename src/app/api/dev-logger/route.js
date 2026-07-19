@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
-const logDir = 'e:/MOHIT/EducodeCode/new-testing-chnges/logs';
+const logDir = path.join(process.cwd(), 'logs');
 
 export async function POST(req) {
     if (process.env.NODE_ENV !== 'development') {

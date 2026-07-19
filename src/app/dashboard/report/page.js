@@ -156,7 +156,7 @@ function StudentReportContent() {
                 <button onClick={() => router.back()} className="mb-6 flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
                     <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <div className="glass-panel p-12 text-center text-red-500 border-red-200">
+                <div className="neu-raised p-12 text-center text-red-500 border-red-200">
                     <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p className="font-semibold text-lg">{error || "Data not found"}</p>
                 </div>
@@ -187,12 +187,12 @@ function StudentReportContent() {
             </div>
 
             {/* Main Report Container */}
-            <div id="report-content" className="max-w-6xl mx-auto space-y-8 bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-slate-800">
+            <div id="report-content" className="max-w-6xl mx-auto space-y-8 neu-raised rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-slate-800">
                 
                 {/* 1. Header Section */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-b border-gray-200 dark:border-slate-800 pb-8">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-b border-[var(--neu-divider)] pb-8">
                     <div className="flex items-center gap-6">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+                        <div className="w-20 h-20 rounded-2xl neu-chip neu-chip-accent flex items-center justify-center text-3xl font-bold shadow-lg">
                             {student?.student_name?.charAt(0) || "S"}
                         </div>
                         <div>
@@ -213,36 +213,36 @@ function StudentReportContent() {
                 {/* 2. Overview Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Course Progress */}
-                    <div className="bg-gray-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-gray-100 dark:border-slate-700">
+                    <div className="bg-gray-50 dark:bg-slate-800/50 p-5 rounded-2xl">
                         <p className="text-xs text-gray-500 font-bold uppercase mb-2">Overall Progress</p>
                         <div className="flex items-end gap-2">
                             <span className="text-4xl font-black text-gray-900 dark:text-white">{student?.overall_course_percent || 0}%</span>
                         </div>
                         <div className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full mt-4 overflow-hidden">
-                            <div className="h-full bg-blue-500" style={{ width: `${student?.overall_course_percent || 0}%` }}/>
+                            <div className="h-full bg-[var(--neu-achieve-soft)]" style={{ width: `${student?.overall_course_percent || 0}%` }}/>
                         </div>
                     </div>
 
                     {/* Time Tracking */}
-                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase mb-2 flex items-center gap-1"><Clock className="w-4 h-4"/> Time Utilization</p>
+                    <div className="bg-[var(--neu-success-soft)] dark:bg-emerald-900/10 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
+                        <p className="text-xs text-[var(--neu-success)] dark:text-[var(--neu-success)] font-bold uppercase mb-2 flex items-center gap-1"><Clock className="w-4 h-4"/> Time Utilization</p>
                         <div className="text-3xl font-black text-emerald-700 dark:text-emerald-300">{student?.time_utilization_percent || 0}%</div>
-                        <p className="text-sm text-emerald-600/80 mt-2 font-medium">
+                        <p className="text-sm text-[var(--neu-success)] mt-2 font-medium">
                             {Math.round((student?.time_spent || 0)/60)}m spent / {Math.round((student?.total_duration || 0)/60)}m allowed
                         </p>
                     </div>
 
                     {/* Exam Attempts */}
                     <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/30">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 font-bold uppercase mb-2 flex items-center gap-1"><History className="w-4 h-4"/> Attempts Used</p>
+                        <p className="text-xs text-[var(--neu-warn)] dark:text-[var(--neu-warn)] font-bold uppercase mb-2 flex items-center gap-1"><History className="w-4 h-4"/> Attempts Used</p>
                         <div className="text-3xl font-black text-amber-700 dark:text-amber-300">
-                            {attempts?.length || 0} <span className="text-lg font-medium text-amber-600/60">/ {student?.allowed_attempts || 1}</span>
+                            {attempts?.length || 0} <span className="text-lg font-medium text-[var(--neu-warn)]">/ {student?.allowed_attempts || 1}</span>
                         </div>
                     </div>
 
                     {/* Proctoring Flags */}
                     <div className={`p-5 rounded-2xl border ${examLog && (examLog.tab_switches_count > 3 || examLog.focus_lost_count > 5) ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30' : 'bg-gray-50 dark:bg-slate-800/50 border-gray-100 dark:border-slate-700'}`}>
-                        <p className={`text-xs font-bold uppercase mb-2 flex items-center gap-1 ${examLog && (examLog.tab_switches_count > 3 || examLog.focus_lost_count > 5) ? 'text-red-600' : 'text-gray-500'}`}>
+                        <p className={`text-xs font-bold uppercase mb-2 flex items-center gap-1 ${examLog && (examLog.tab_switches_count > 3 || examLog.focus_lost_count > 5) ? 'text-[var(--neu-danger)]' : 'text-gray-500'}`}>
                             <ShieldAlert className="w-4 h-4"/> Security Flags
                         </p>
                         <div className="grid grid-cols-2 gap-2 mt-3">
@@ -258,7 +258,7 @@ function StudentReportContent() {
                     </div>
                 </div>
 
-                <hr className="border-gray-200 dark:border-slate-800" />
+                <hr className="border-[var(--neu-divider)]" />
 
                 {/* 3. Attempt History */}
                 <div>
@@ -269,10 +269,10 @@ function StudentReportContent() {
                                 const isExpanded = expandedAttempt === idx;
                                 const metaDataList = attemptMetadataCache[idx];
                                 return (
-                                <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden mb-3 bg-gray-50 dark:bg-slate-800/50">
+                                <div key={idx} className="border border-[var(--neu-divider)] rounded-xl overflow-hidden mb-3 bg-gray-50 dark:bg-slate-800/50">
                                     <button onClick={() => handleExpandAttempt(idx, att.result_ids)} className="w-full flex items-center justify-between p-4 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-left">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center font-bold">
+                                            <div className="w-10 h-10 rounded-full bg-[var(--neu-achieve-soft)] dark:bg-blue-900/30 text-blue-600 flex items-center justify-center font-bold">
                                                 #{idx + 1}
                                             </div>
                                             <div>
@@ -285,13 +285,13 @@ function StudentReportContent() {
                                                 {att.marks_obtained || 0} <span className="text-sm font-normal text-gray-500">Marks</span>
                                             </div>
                                             <div className="flex justify-end gap-2 mt-1">
-                                                {att.submit_reason && <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] uppercase tracking-wider font-bold">{att.submit_reason}</span>}
+                                                {att.submit_reason && <span className="badge bg-[var(--neu-warn-soft)] text-amber-700 dark:bg-amber-900/30 dark:text-[var(--neu-warn)] text-[10px] uppercase tracking-wider font-bold">{att.submit_reason}</span>}
                                                 <span className="text-xs text-blue-500 font-medium">{isExpanded ? "Hide Metadata" : "View Metadata"}</span>
                                             </div>
                                         </div>
                                     </button>
                                     {isExpanded && (
-                                        <div className="p-4 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800">
+                                        <div className="p-4 neu-raised border-t border-gray-100 dark:border-slate-800">
                                             {metaDataList ? (
                                                 <div className="space-y-4">
                                                     {metaDataList.map((meta, mIdx) => (
@@ -300,11 +300,11 @@ function StudentReportContent() {
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                 <div className="overflow-hidden">
                                                                     <p className="font-bold text-[10px] text-gray-500 uppercase mb-1">Start Config</p>
-                                                                    <pre className="text-xs p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg overflow-x-auto custom-scrollbar font-mono">{JSON.stringify(meta.start_config, null, 2)}</pre>
+                                                                    <pre className="text-xs p-3 neu-raised rounded-lg overflow-x-auto custom-scrollbar font-mono">{JSON.stringify(meta.start_config, null, 2)}</pre>
                                                                 </div>
                                                                 <div className="overflow-hidden">
                                                                     <p className="font-bold text-[10px] text-gray-500 uppercase mb-1">End Config / Analytics</p>
-                                                                    <pre className="text-xs p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg overflow-x-auto custom-scrollbar font-mono">{JSON.stringify(meta.analytics || meta.end_config, null, 2)}</pre>
+                                                                    <pre className="text-xs p-3 neu-raised rounded-lg overflow-x-auto custom-scrollbar font-mono">{JSON.stringify(meta.analytics || meta.end_config, null, 2)}</pre>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -326,7 +326,7 @@ function StudentReportContent() {
                     )}
                 </div>
 
-                <hr className="border-gray-200 dark:border-slate-800" />
+                <hr className="border-[var(--neu-divider)]" />
 
                 {/* 4. Submissions Details */}
                 <div>
@@ -341,15 +341,15 @@ function StudentReportContent() {
                                 const isPassed = sub.compile_status === "passed" || sub.compile_status === "accepted";
                                 
                                 return (
-                                    <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                                    <div key={idx} className="border border-[var(--neu-divider)] rounded-xl overflow-hidden">
                                         {/* Accordion Header */}
                                         <button 
                                             onClick={() => handleExpandSubmission(idx, sub.question_id)}
-                                            className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/80 transition-colors"
+                                            className="w-full flex items-center justify-between p-4 neu-raised hover:bg-gray-50 dark:hover:bg-slate-800/80 transition-colors"
                                         >
                                             <div className="flex items-center gap-4">
                                                 {isPassed ? (
-                                                    <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                                                    <CheckCircle2 className="w-6 h-6 text-[var(--neu-success)]" />
                                                 ) : (
                                                     <XCircle className="w-6 h-6 text-red-500" />
                                                 )}
@@ -365,7 +365,7 @@ function StudentReportContent() {
 
                                         {/* Accordion Body */}
                                         {isExpanded && (
-                                            <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 relative">
+                                            <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-[var(--neu-divider)] relative">
                                                 {loadingDetails[sub.question_id] && (
                                                     <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 flex items-center justify-center z-10">
                                                         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -379,7 +379,7 @@ function StudentReportContent() {
                                                             {/* Question Complete Details */}
                                                             <div className="mb-6 space-y-4 text-sm text-gray-800 dark:text-gray-200">
                                                                 {qDetails.description && (
-                                                                    <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+                                                                    <div className="p-4 neu-raised rounded-xl">
                                                                         <h4 className="font-bold uppercase tracking-wider text-xs text-gray-500 mb-2">Description</h4>
                                                                         <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: qDetails.description }} />
                                                                     </div>
@@ -387,13 +387,13 @@ function StudentReportContent() {
                                                     
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                     {qDetails.input_format && (
-                                                                        <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+                                                                        <div className="p-4 neu-raised rounded-xl">
                                                                             <h4 className="font-bold uppercase tracking-wider text-xs text-gray-500 mb-2">Input Format</h4>
                                                                             <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: qDetails.input_format }} />
                                                                         </div>
                                                                     )}
                                                                     {qDetails.output_format && (
-                                                                        <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+                                                                        <div className="p-4 neu-raised rounded-xl">
                                                                             <h4 className="font-bold uppercase tracking-wider text-xs text-gray-500 mb-2">Output Format</h4>
                                                                             <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: qDetails.output_format }} />
                                                                         </div>
@@ -401,7 +401,7 @@ function StudentReportContent() {
                                                                 </div>
 
                                                                 {qDetails.code_constraint && (
-                                                                    <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+                                                                    <div className="p-4 neu-raised rounded-xl">
                                                                         <h4 className="font-bold uppercase tracking-wider text-xs text-gray-500 mb-2">Constraints</h4>
                                                                         <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: qDetails.code_constraint }} />
                                                                     </div>
@@ -410,18 +410,18 @@ function StudentReportContent() {
                                                                 {(qDetails.has_whitelist || qDetails.has_blacklist) && (
                                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                         {qDetails.has_whitelist && (
-                                                                            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
-                                                                                <h4 className="font-bold uppercase tracking-wider text-xs text-emerald-600 dark:text-emerald-400 mb-2">Whitelist</h4>
+                                                                            <div className="p-4 bg-[var(--neu-success-soft)] dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+                                                                                <h4 className="font-bold uppercase tracking-wider text-xs text-[var(--neu-success)] dark:text-[var(--neu-success)] mb-2">Whitelist</h4>
                                                                                 <div className="flex flex-wrap gap-2">
-                                                                                    {qDetails.whitelist?.map((w, i) => <span key={i} className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded text-xs font-mono">{w}</span>)}
+                                                                                    {qDetails.whitelist?.map((w, i) => <span key={i} className="px-2 py-1 bg-[var(--neu-success-soft)] dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded text-xs font-mono">{w}</span>)}
                                                                                 </div>
                                                                             </div>
                                                                         )}
                                                                         {qDetails.has_blacklist && (
                                                                             <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-200 dark:border-red-800/50">
-                                                                                <h4 className="font-bold uppercase tracking-wider text-xs text-red-600 dark:text-red-400 mb-2">Blacklist</h4>
+                                                                                <h4 className="font-bold uppercase tracking-wider text-xs text-[var(--neu-danger)] dark:text-[var(--neu-danger)] mb-2">Blacklist</h4>
                                                                                 <div className="flex flex-wrap gap-2">
-                                                                                    {qDetails.blacklist?.map((b, i) => <span key={i} className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-xs font-mono">{b}</span>)}
+                                                                                    {qDetails.blacklist?.map((b, i) => <span key={i} className="px-2 py-1 bg-[var(--neu-danger-soft)] dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-xs font-mono">{b}</span>)}
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -432,10 +432,10 @@ function StudentReportContent() {
                                                 {/* Test Cases summary if available */}
                                                 {(sub.passed_test_cases !== null && sub.passed_test_cases !== undefined) && (
                                                     <div className="mb-4 flex gap-4">
-                                                        <span className="badge bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold">
+                                                        <span className="badge bg-[var(--neu-success-soft)] text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold">
                                                             {sub.passed_test_cases} Passed
                                                         </span>
-                                                        <span className="badge bg-red-100 text-red-700 border border-red-200 px-3 py-1 rounded-full text-xs font-bold">
+                                                        <span className="badge bg-[var(--neu-danger-soft)] text-red-700 border border-red-200 px-3 py-1 rounded-full text-xs font-bold">
                                                             {(sub.total_test_cases || 0) - (sub.passed_test_cases || 0)} Failed
                                                         </span>
                                                     </div>
@@ -444,7 +444,7 @@ function StudentReportContent() {
                                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                                                 {/* Student Code */}
                                                                 <div className="relative border border-blue-200 dark:border-blue-900/50 rounded-xl overflow-hidden shadow-sm">
-                                                                    <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-900/30 flex justify-between items-center">
+                                                                    <div className="px-4 py-2 bg-[var(--neu-achieve-soft)] dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-900/30 flex justify-between items-center">
                                                                         <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Student Written Code</span>
                                                                         <span className="text-xs font-mono text-blue-800 dark:text-blue-300 bg-blue-200/50 dark:bg-blue-900/60 px-2 py-1 rounded">{sub.language || 'Code'}</span>
                                                                     </div>
@@ -455,8 +455,8 @@ function StudentReportContent() {
 
                                                                 {/* Reference Code */}
                                                                 <div className="relative border border-emerald-200 dark:border-emerald-900/50 rounded-xl overflow-hidden shadow-sm">
-                                                                    <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center">
-                                                                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Reference Code (Compiler Code)</span>
+                                                                    <div className="px-4 py-2 bg-[var(--neu-success-soft)] dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center">
+                                                                        <span className="text-xs font-bold text-emerald-700 dark:text-[var(--neu-success)] uppercase tracking-wider">Reference Code (Compiler Code)</span>
                                                                         {qDetails.compiler_code?.language && <span className="text-xs font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-200/50 dark:bg-emerald-900/60 px-2 py-1 rounded">{qDetails.compiler_code.language}</span>}
                                                                     </div>
                                                                     <pre className="p-4 bg-emerald-900/5 text-emerald-900 dark:text-emerald-100 font-mono text-sm overflow-x-auto custom-scrollbar h-full min-h-[300px]">
@@ -477,33 +477,33 @@ function StudentReportContent() {
                                                                 if (!res) return null;
                                                                 const isPassed = res.testCasePassed;
                                                                 return (
-                                                                    <div key={tcIdx} className={`p-4 rounded-xl border ${isPassed ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-900/10' : 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/10'}`}>
+                                                                    <div key={tcIdx} className={`p-4 rounded-xl border ${isPassed ? 'border-emerald-200 bg-[var(--neu-success-soft)] dark:border-emerald-900 dark:bg-emerald-900/10' : 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/10'}`}>
                                                                         <div className="flex justify-between items-center mb-2">
-                                                                            <span className={`font-semibold text-sm ${isPassed ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                                                                            <span className={`font-semibold text-sm ${isPassed ? 'text-emerald-700 dark:text-[var(--neu-success)]' : 'text-red-700 dark:text-[var(--neu-danger)]'}`}>
                                                                                 {key.replace(/([A-Z])/g, ' $1').trim().toUpperCase()}
                                                                             </span>
-                                                                            {isPassed ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-red-500" />}
+                                                                            {isPassed ? <CheckCircle2 className="w-4 h-4 text-[var(--neu-success)]" /> : <XCircle className="w-4 h-4 text-red-500" />}
                                                                         </div>
                                                                         {res.input !== undefined && (
                                                                             <div className="mb-2">
                                                                                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Input</span>
-                                                                                <pre className="mt-1 p-2 bg-white dark:bg-slate-800 rounded text-xs font-mono overflow-x-auto text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-slate-700">{res.input || 'Hidden'}</pre>
+                                                                                <pre className="mt-1 p-2 neu-raised rounded text-xs font-mono overflow-x-auto text-gray-700 dark:text-gray-300">{res.input || 'Hidden'}</pre>
                                                                             </div>
                                                                         )}
                                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                             <div>
                                                                                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Expected Output</span>
-                                                                                <pre className="mt-1 p-2 bg-white dark:bg-slate-800 rounded text-xs font-mono overflow-x-auto text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-slate-700">{res.expectedOutput || 'Hidden'}</pre>
+                                                                                <pre className="mt-1 p-2 neu-raised rounded text-xs font-mono overflow-x-auto text-gray-700 dark:text-gray-300">{res.expectedOutput || 'Hidden'}</pre>
                                                                             </div>
                                                                             <div>
                                                                                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actual Output</span>
-                                                                                <pre className="mt-1 p-2 bg-white dark:bg-slate-800 rounded text-xs font-mono overflow-x-auto text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-slate-700">{res.userOutput || (res.compilerMessage ? 'Compilation Error' : 'No Output')}</pre>
+                                                                                <pre className="mt-1 p-2 neu-raised rounded text-xs font-mono overflow-x-auto text-gray-700 dark:text-gray-300">{res.userOutput || (res.compilerMessage ? 'Compilation Error' : 'No Output')}</pre>
                                                                             </div>
                                                                         </div>
                                                                         {res.compilerMessage && (
                                                                             <div className="mt-3">
                                                                                 <span className="text-xs font-semibold text-red-500 uppercase tracking-wider">Error / Compiler Message</span>
-                                                                                <pre className="mt-1 p-2 bg-red-100 dark:bg-red-900/30 rounded text-xs font-mono text-red-700 dark:text-red-300 overflow-x-auto border border-red-200 dark:border-red-800/50 whitespace-pre-wrap">{res.compilerMessage}</pre>
+                                                                                <pre className="mt-1 p-2 bg-[var(--neu-danger-soft)] dark:bg-red-900/30 rounded text-xs font-mono text-red-700 dark:text-red-300 overflow-x-auto border border-red-200 dark:border-red-800/50 whitespace-pre-wrap">{res.compilerMessage}</pre>
                                                                             </div>
                                                                         )}
                                                                         </div>
@@ -522,7 +522,7 @@ function StudentReportContent() {
                     })}
                         </div>
                     ) : (
-                        <div className="p-8 text-center border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-2xl text-gray-500">
+                        <div className="p-8 text-center border-2 border-dashed border-[var(--neu-divider)] rounded-2xl text-gray-500">
                             <FileCode2 className="w-8 h-8 mx-auto mb-2 opacity-20" />
                             <p>No coding submissions found for this course.</p>
                         </div>
@@ -532,10 +532,10 @@ function StudentReportContent() {
                 {/* 5. MCQ Submissions Details */}
                 {mcqSubmissions && mcqSubmissions.length > 0 && (
                     <>
-                        <hr className="border-gray-200 dark:border-slate-800" />
+                        <hr className="border-[var(--neu-divider)]" />
                         <div>
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                <FileCode2 className="w-5 h-5 text-violet-500" /> MCQ Submissions Deep Dive
+                                <FileCode2 className="w-5 h-5 text-[var(--neu-achieve)]" /> MCQ Submissions Deep Dive
                             </h3>
                             
                             <div className="space-y-4">
@@ -546,15 +546,15 @@ function StudentReportContent() {
                                     const selectedOptionText = sub.submitted_code;
                                     
                                     return (
-                                        <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                                        <div key={idx} className="border border-[var(--neu-divider)] rounded-xl overflow-hidden">
                                             {/* Accordion Header */}
                                             <button 
                                                 onClick={() => setExpandedMcq(isExpanded ? null : idx)}
-                                                className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/80 transition-colors"
+                                                className="w-full flex items-center justify-between p-4 neu-raised hover:bg-gray-50 dark:hover:bg-slate-800/80 transition-colors"
                                             >
                                                 <div className="flex items-center gap-4">
                                                     {isPassed ? (
-                                                        <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                                                        <CheckCircle2 className="w-6 h-6 text-[var(--neu-success)]" />
                                                     ) : (
                                                         <XCircle className="w-6 h-6 text-red-500" />
                                                     )}
@@ -570,7 +570,7 @@ function StudentReportContent() {
 
                                             {/* Accordion Body */}
                                             {isExpanded && (
-                                                <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700">
+                                                <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-[var(--neu-divider)]">
                                                     <div className="mb-4 text-gray-800 dark:text-gray-200 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: sub.question?.question_body }} />
                                                     
                                                     <div className="space-y-2 mt-4">
@@ -580,11 +580,11 @@ function StudentReportContent() {
                                                             
                                                             let optClass = "p-3 rounded-xl border ";
                                                             if (isSelected && isCorrect) {
-                                                                optClass += "bg-emerald-50 border-emerald-500 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200";
+                                                                optClass += "bg-[var(--neu-success-soft)] border-emerald-500 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200";
                                                             } else if (isSelected && !isCorrect) {
                                                                 optClass += "bg-red-50 border-red-500 text-red-800 dark:bg-red-900/20 dark:text-red-200";
                                                             } else if (isCorrect) {
-                                                                optClass += "bg-emerald-50/50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-300";
+                                                                optClass += "bg-[var(--neu-success-soft)] border-emerald-300 text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-300";
                                                             } else {
                                                                 optClass += "bg-white border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-700 dark:text-gray-400";
                                                             }
@@ -594,7 +594,7 @@ function StudentReportContent() {
                                                                     <div className="flex justify-between items-center">
                                                                         <span className="font-medium" dangerouslySetInnerHTML={{ __html: opt.option }} />
                                                                         {isSelected && <span className="text-xs uppercase font-bold tracking-wider">Your Answer</span>}
-                                                                        {(!isSelected && isCorrect) && <span className="text-xs uppercase font-bold tracking-wider text-emerald-500">Correct Answer</span>}
+                                                                        {(!isSelected && isCorrect) && <span className="text-xs uppercase font-bold tracking-wider text-[var(--neu-success)]">Correct Answer</span>}
                                                                     </div>
                                                                 </div>
                                                             );

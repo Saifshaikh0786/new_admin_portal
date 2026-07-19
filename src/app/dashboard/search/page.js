@@ -197,20 +197,20 @@ export default function StudentSearchPage() {
     return (
         <div className="space-y-4 animate-fadeIn pb-20">
             <div className="max-w-2xl mx-auto text-center mb-10 pt-10">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Student Search</h1>
+                <div className="flex items-center justify-center gap-4 mb-4"><div className="w-14 h-14 rounded-2xl neu-chip neu-chip-info flex items-center justify-center shrink-0"><GraduationCap className="w-7 h-7" /></div><h1 className="text-4xl font-bold text-gray-900 dark:text-white">Student Search</h1></div>
                 <p className="text-gray-500 dark:text-gray-400 mb-8">Quickly locate any student to view their comprehensive progress, exam records, and deep analytics.</p>
                 
                 <div className="flex justify-center gap-4 mb-8">
                     <button 
                         onClick={() => setViewMode('search')}
-                        className={`px-6 py-2 rounded-full font-semibold transition-all ${viewMode === 'search' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
+                        className={`px-6 py-2 rounded-full font-semibold transition-all ${viewMode === 'search' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'neu-inset text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
                     >
                         <Search className="w-4 h-4 inline mr-2" />
                         Search by ID
                     </button>
                     <button 
                         onClick={() => setViewMode('directory')}
-                        className={`px-6 py-2 rounded-full font-semibold transition-all ${viewMode === 'directory' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
+                        className={`px-6 py-2 rounded-full font-semibold transition-all ${viewMode === 'directory' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'neu-inset text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
                     >
                         <Users className="w-4 h-4 inline mr-2" />
                         Browse Directory
@@ -227,7 +227,7 @@ export default function StudentSearchPage() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search by University Reg ID..."
-                            className="w-full bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-2xl pl-14 pr-12 py-4 text-lg font-medium focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-all duration-300 shadow-lg focus:shadow-blue-500/20 text-gray-900 dark:text-white"
+                            className="w-full neu-inset rounded-2xl pl-14 pr-12 py-4 text-lg font-medium focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-all duration-300 shadow-lg focus:shadow-blue-500/20 text-gray-900 dark:text-white"
                         />
                         {isSearching && (
                             <div className="absolute right-5 top-1/2 -translate-y-1/2">
@@ -238,14 +238,14 @@ export default function StudentSearchPage() {
 
                     <div className="max-w-5xl mx-auto">
                         {searchError ? (
-                            <div className="glass-panel p-8 text-center text-red-500 border-red-200 animate-fadeIn">
+                            <div className="neu-raised p-8 text-center text-red-500 border-red-200 animate-fadeIn">
                                 <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p className="font-semibold text-lg">{searchError}</p>
                             </div>
                         ) : studentData ? (
                             <div className="space-y-4 animate-slideUp">
                                 <div className="glass-card p-6 flex flex-col md:flex-row items-start md:items-center gap-6">
-                                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-blue-500/30">
+                                    <div className="w-24 h-24 rounded-2xl neu-chip neu-chip-accent flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-blue-500/30">
                                         {studentData.name?.charAt(0) || "S"}
                                     </div>
                                     <div className="flex-1">
@@ -267,12 +267,12 @@ export default function StudentSearchPage() {
                                             <button
                                                 key={course.course_id}
                                                 onClick={() => handleCourseClick(course.course_id)}
-                                                className="group text-left p-5 rounded-xl bg-white dark:bg-slate-800 border-2 border-gray-100 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
+                                                className="group text-left p-5 rounded-xl neu-raised hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
                                             >
                                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-violet-500/0 group-hover:from-blue-500/5 group-hover:to-violet-500/5 transition-all" />
                                                 <div className="relative">
                                                     <div className="flex items-start justify-between mb-2">
-                                                        <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-slate-700 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                                        <div className="w-10 h-10 rounded-lg bg-[var(--neu-achieve-soft)] dark:bg-slate-700 flex items-center justify-center text-blue-600 dark:text-blue-400">
                                                             <BookOpen className="w-5 h-5" />
                                                         </div>
                                                         <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
@@ -284,14 +284,14 @@ export default function StudentSearchPage() {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-center p-8 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700 text-gray-500">
+                                    <div className="text-center p-8 neu-inset rounded-xl text-gray-500">
                                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 opacity-50" />
                                         <p>Loading assigned courses...</p>
                                     </div>
                                 )}
                             </div>
                         ) : hasSearched && !isSearching ? (
-                            <div className="glass-panel p-12 text-center text-gray-500 border-dashed">
+                            <div className="neu-raised p-12 text-center text-gray-500 border-dashed">
                                 <p className="font-medium">No student data found.</p>
                             </div>
                         ) : null}
@@ -299,7 +299,7 @@ export default function StudentSearchPage() {
                 </>
             ) : (
                 <div className="max-w-5xl mx-auto">
-                    <div className="glass-panel p-4 flex flex-wrap gap-4 border border-gray-200 dark:border-slate-800 mb-8">
+                    <div className="neu-raised p-4 flex flex-wrap gap-4 border border-[var(--neu-divider)] mb-8">
                         <div className="flex-1 min-w-[200px]">
                             <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Select Batch</label>
                             <select 
@@ -335,7 +335,7 @@ export default function StudentSearchPage() {
                             <p className="text-gray-500 font-medium">Fetching directory...</p>
                         </div>
                     ) : directoryError ? (
-                        <div className="glass-panel p-8 text-center text-red-500 border-red-200 animate-fadeIn">
+                        <div className="neu-raised p-8 text-center text-red-500 border-red-200 animate-fadeIn">
                             <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                             <p className="font-semibold text-lg">{directoryError}</p>
                         </div>
@@ -345,10 +345,10 @@ export default function StudentSearchPage() {
                                 <button 
                                     key={student.student_id}
                                     onClick={() => handleDirectoryStudentClick(student)}
-                                    className="group text-left p-5 rounded-xl bg-white dark:bg-slate-800 border-2 border-gray-100 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
+                                    className="group text-left p-5 rounded-xl neu-raised hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
                                 >
                                     <div className="flex items-center gap-3 mb-3">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm">
+                                        <div className="w-10 h-10 rounded-full neu-chip neu-chip-accent flex items-center justify-center text-white font-bold text-sm">
                                             {student.student_name?.charAt(0) || "S"}
                                         </div>
                                         <div>
@@ -363,11 +363,11 @@ export default function StudentSearchPage() {
                             ))}
                         </div>
                     ) : selectedBatch && selectedSection ? (
-                        <div className="glass-panel p-12 text-center text-gray-500 border-dashed">
+                        <div className="neu-raised p-12 text-center text-gray-500 border-dashed">
                             <p className="font-medium">No students found in this section.</p>
                         </div>
                     ) : (
-                        <div className="glass-panel p-12 text-center text-gray-500 border-dashed">
+                        <div className="neu-raised p-12 text-center text-gray-500 border-dashed">
                             <p className="font-medium">Select a batch and section to view directory.</p>
                         </div>
                     )}

@@ -11,25 +11,33 @@ export const API_CONFIG = {
         login: '/universities/login',
         logout: '/universities/logout',
         me: '/admin/dashboard/profile',
-        myBatches: '/api/university/admin/my-batches',
-        myTeachers: '/api/university/admin/my-teachers',
-        courseStructure: (courseId) => `/api/university/admin/course-structure/${courseId}`,
-        sectionAnalytics: (sectionName) => `/api/university/admin/section-analytics/${sectionName}`,
-        subUnitDetails: '/api/university/admin/analytics/sub-unit-details',
-        unitCompletion: '/api/auth/teacher/teacher/analytics/unit-completion',
-        sectionCompletion: '/api/auth/teacher/teacher/analytics/section-completion',
-        getSectionsByBatch: '/api/university/admin/get-sections-by-batch',
+        myBatches: '/admin/dashboard/overview',
+        myTeachers: '/admin/dashboard/teachers-summary',
+        courseStructure: (courseId) => `/admin/analytics/course-structure/${courseId}`,
+        courseStructureAnalytics: '/admin/analytics/course-structure-analytics',
+        sectionAnalytics: (sectionName) => `/admin/analytics/section-matrix`, // This will be used as POST
+        subUnitDetails: '/admin/analytics/sub-unit-details',
+        unitCompletion: '/admin/analytics/unit-completion',
+        bulkExportUnits: '/admin/analytics/bulk-export-units',
+        sectionCompletion: '/admin/analytics/section-completion',
+        getSectionsByBatch: '/admin/dashboard/get-sections-by-batch',
+        needsAttention: '/admin/dashboard/attention',
+        liveSummary: '/admin/dashboard/live-summary',
+        examsOverview: '/admin/analytics/exams-overview',
+        examAttemptedStudents: '/admin/analytics/exam-attempted-students',
 
-        getPracticeCoursesByBatch: '/api/university/admin/get-practice-courses-by-batch',
-        getExamCoursesByBatch: '/api/university/admin/get-exam-courses-by-batch',
-        examDetails: '/api/auth/teacher/teacher/analytics/section-exam-progress',
+        getPracticeCoursesByBatch: '/admin/dashboard/get-practice-courses-by-batch',
+        getExamCoursesByBatch: '/admin/courses/get-exam-courses-by-batch', // Assuming you'll add this if needed
+        examDetails: '/admin/analytics/section-exam-progress',
         checkDetails: '/api/university/admin/check-details',
         updateDetails: '/admin/dashboard/profile',
         updatePassword: '/admin/dashboard/update-password',
         studentsSummary: '/admin/dashboard/students-summary',
         teachersSummary: '/admin/dashboard/teachers-summary',
         studentsBySection: '/admin/dashboard/students-by-section',
-        getAllCourses: '/api/university/admin/get-courses-by-email',
+        studentDeepDive: '/admin/analytics/student-deep-dive',
+        studentOverview: '/admin/analytics/student-overview',
+        getAllCourses: '/admin/courses/getAllCourses',
         getCourseContent: '/api/university/admin/course/full-content',
 
         // Phase 2 New Analytics Endpoints (Mapped via local proxy)
@@ -52,7 +60,7 @@ export const API_CONFIG = {
 
     // Master Data
     masters: {
-        sections: '/api/masters/sections',
+        sections: '/admin/dashboard/sections',
         batches: '/api/masters/batches',
     },
 

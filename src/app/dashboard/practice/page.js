@@ -30,9 +30,9 @@ function PracticeTrackingContent() {
     const [error, setError] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
 
-    // Auto-select batch if only 1 exists
+    // Auto-select first batch so the page never opens empty
     useEffect(() => {
-        if (!dashboardLoading && batches.length === 1 && !selectedBatch) {
+        if (!dashboardLoading && batches.length > 0 && !selectedBatch) {
             setSelectedBatch(batches[0].batch_id);
         }
     }, [batches, dashboardLoading, selectedBatch]);
@@ -223,8 +223,13 @@ function PracticeTrackingContent() {
         <div className="space-y-4 animate-fadeIn pb-20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Practice Tracking</h1>
-                    <p className="text-gray-500 dark:text-gray-400">Monitor student progress and scores across practice modules.</p>
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl neu-chip neu-chip-success flex items-center justify-center shrink-0"><CheckCircle2 className="w-6 h-6" /></div>
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Practice Tracking</h1>
+                            <p className="text-gray-500 dark:text-gray-400">Monitor student progress and scores across practice modules.</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <div className="flex gap-2">
@@ -248,7 +253,7 @@ function PracticeTrackingContent() {
             </div>
 
             {/* Filters */}
-            <div className="glass-panel p-4 flex flex-wrap items-center gap-4 border border-gray-200 dark:border-slate-800">
+            <div className="neu-raised p-4 flex flex-wrap items-center gap-4 border border-[var(--neu-divider)]">
                 <div className="flex-1 min-w-[200px]">
                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Select Batch</label>
                     <select 
@@ -312,12 +317,12 @@ function PracticeTrackingContent() {
                     <p className="text-gray-500 font-medium">Fetching analytics data...</p>
                 </div>
             ) : error ? (
-                <div className="glass-panel p-8 text-center text-red-500 border-red-200">
+                <div className="neu-raised p-8 text-center text-red-500 border-red-200">
                     <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p className="font-semibold">{error}</p>
                 </div>
             ) : !selectedCourse ? (
-                <div className="glass-panel p-12 text-center text-gray-500 border-dashed">
+                <div className="neu-raised p-12 text-center text-gray-500 border-dashed">
                     <p className="font-medium">Please select a Batch and Course to view analytics.</p>
                 </div>
             ) : (
@@ -349,21 +354,21 @@ function PracticeTrackingContent() {
 
                     {/* Table */}
                     <div className="card overflow-hidden">
-                        <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 flex justify-between items-center">
+                        <div className="p-4 border-b border-[var(--neu-divider)] bg-gray-50/50 dark:bg-slate-800/50 flex justify-between items-center">
                             <h3 className="font-bold text-gray-900 dark:text-white">Student Roster</h3>
                             <div className="relative">
                                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                 <input 
                                     type="text" 
                                     placeholder="Search student..." 
-                                    className="pl-9 pr-4 py-1.5 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-full focus:ring-2 focus:ring-blue-500"
+                                    className="pl-9 pr-4 py-1.5 text-sm neu-inset rounded-full focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-gray-50 dark:bg-slate-900/80 border-b border-gray-200 dark:border-slate-700">
+                                    <tr className="bg-gray-50 dark:bg-slate-900/80 border-b border-[var(--neu-divider)]">
                                         <th className="p-4 text-xs font-semibold text-gray-500 uppercase">Student Info</th>
                                         <th className="p-4 text-xs font-semibold text-gray-500 uppercase">Section</th>
                                         <th className="p-4 text-xs font-semibold text-gray-500 uppercase">MCQ Score</th>
@@ -380,7 +385,7 @@ function PracticeTrackingContent() {
                                         <tr 
                                             key={student.student_id || i} 
                                             onClick={() => handleRowClick(student.student_id || student.reg_id)}
-                                            className="border-b border-gray-100 dark:border-slate-800 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+                                            className="border-b border-gray-100 dark:border-slate-800 hover:bg-[var(--neu-achieve-soft)] dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
                                         >
                                             <td className="p-4">
                                                 <div className="font-semibold text-gray-900 dark:text-white">{student.student_name}</div>
@@ -392,7 +397,7 @@ function PracticeTrackingContent() {
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-16 h-2 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
-                                                        <div className="h-full bg-violet-500" style={{ width: `${mcqPercent}%` }} />
+                                                        <div className="h-full bg-[var(--neu-achieve-soft)]" style={{ width: `${mcqPercent}%` }} />
                                                     </div>
                                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{mcqPercent}%</span>
                                                 </div>
@@ -400,29 +405,29 @@ function PracticeTrackingContent() {
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-16 h-2 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
-                                                        <div className="h-full bg-blue-500" style={{ width: `${codingPercent}%` }} />
+                                                        <div className="h-full bg-[var(--neu-achieve-soft)]" style={{ width: `${codingPercent}%` }} />
                                                     </div>
                                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{codingPercent}%</span>
                                                 </div>
                                             </td>
                                             <td className="p-4">
                                                 {(student.course_status || '').toLowerCase() === 'completed' ? (
-                                                    <span className="badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1 inline" /> Completed</span>
+                                                    <span className="badge bg-[var(--neu-success-soft)] text-emerald-700 dark:bg-emerald-900/30 dark:text-[var(--neu-success)] border border-emerald-200 dark:border-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1 inline" /> Completed</span>
                                                 ) : ((student.course_status || '').toLowerCase() === 'in progress' || (student.course_status || '').toLowerCase() === 'in_progress') ? (
-                                                    <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800"><Clock className="w-3 h-3 mr-1 inline" /> In Progress</span>
+                                                    <span className="badge bg-[var(--neu-warn-soft)] text-amber-700 dark:bg-amber-900/30 dark:text-[var(--neu-warn)] border border-amber-200 dark:border-amber-800"><Clock className="w-3 h-3 mr-1 inline" /> In Progress</span>
                                                 ) : (
-                                                    <span className="badge bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400 border border-gray-200 dark:border-slate-700">Not Started</span>
+                                                    <span className="badge bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400">Not Started</span>
                                                 )}
                                                 
                                                 {/* Resume Info if applicable */}
                                                 {(student.subunit_coding_status === 'resumed' || student.subunit_mcq_status === 'resumed') && (
-                                                    <div className="mt-2 text-[10px] text-blue-500 flex items-center gap-1 font-medium bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded w-fit">
+                                                    <div className="mt-2 text-[10px] text-blue-500 flex items-center gap-1 font-medium bg-[var(--neu-achieve-soft)] dark:bg-blue-900/20 px-2 py-0.5 rounded w-fit">
                                                         Active in lecture right now
                                                     </div>
                                                 )}
                                             </td>
                                             <td className="p-4 text-center">
-                                                <button className="p-2 text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 rounded-lg transition-colors">
+                                                <button className="p-2 text-gray-400 group-hover:text-blue-500 group-hover:bg-[var(--neu-achieve-soft)] dark:group-hover:bg-blue-900/30 rounded-lg transition-colors">
                                                     <ChevronRight className="w-5 h-5" />
                                                 </button>
                                             </td>
@@ -438,7 +443,7 @@ function PracticeTrackingContent() {
                         </div>
                         {/* Pagination Controls */}
                         {totalPages > 1 && (
-                            <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between">
+                            <div className="p-4 border-t border-[var(--neu-divider)] neu-raised flex items-center justify-between">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
                                     Page <span className="font-semibold text-gray-900 dark:text-white">{page}</span> of <span className="font-semibold text-gray-900 dark:text-white">{totalPages}</span>
                                 </span>
@@ -446,14 +451,14 @@ function PracticeTrackingContent() {
                                     <button 
                                         onClick={() => setPage(p => Math.max(1, p - 1))}
                                         disabled={page === 1}
-                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                        className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
                                     >
                                         Previous
                                     </button>
                                     <button 
                                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                         disabled={page === totalPages}
-                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                        className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
                                     >
                                         Next
                                     </button>

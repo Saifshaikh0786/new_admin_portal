@@ -465,7 +465,7 @@ function ExamResultsContent() {
         <div className="space-y-4 animate-fadeIn pb-20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Exam & Proctoring Results</h1>
+                    <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-2xl neu-chip neu-chip-accent flex items-center justify-center shrink-0"><Shield className="w-6 h-6" /></div><h1 className="text-3xl font-bold text-gray-900 dark:text-white">Exam & Proctoring Results</h1></div>
                     <p className="text-gray-500 dark:text-gray-400">Deep behavioral analytics and secure exam proctoring logs.</p>
                 </div>
                 
@@ -490,7 +490,7 @@ function ExamResultsContent() {
             </div>
 
             {/* Filters */}
-            <div className="glass-panel p-4 flex flex-nowrap items-center gap-4 border border-gray-200 dark:border-slate-800 overflow-x-auto custom-scrollbar">
+            <div className="neu-raised p-4 flex flex-nowrap items-center gap-4 border border-[var(--neu-divider)] overflow-x-auto custom-scrollbar">
                 <div className="flex-shrink-0 w-40">
                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Batch</label>
                     <select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 truncate">
@@ -538,7 +538,7 @@ function ExamResultsContent() {
                             fetchExamData(1);
                         }}
                         disabled={!selectedBatch || !selectedCourse || !selectedLecture || loading}
-                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap min-w-[120px]"
+                        className="px-6 py-2.5 neu-btn-primary text-sm font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap min-w-[120px]"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         Fetch Data
@@ -552,12 +552,12 @@ function ExamResultsContent() {
                     <p className="text-gray-500 font-medium">Analyzing proctoring logs...</p>
                 </div>
             ) : error ? (
-                <div className="glass-panel p-8 text-center text-red-500 border-red-200">
+                <div className="neu-raised p-8 text-center text-red-500 border-red-200">
                     <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p className="font-semibold">{error}</p>
                 </div>
             ) : !selectedLecture ? (
-                <div className="glass-panel p-12 text-center text-gray-500 border-dashed">
+                <div className="neu-raised p-12 text-center text-gray-500 border-dashed">
                     <p className="font-medium">Please select an Exam/Lecture to view results.</p>
                 </div>
             ) : (
@@ -591,35 +591,35 @@ function ExamResultsContent() {
                     {/* Top Stats Grid */}
                     {metrics && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                            <div className="card p-5 border-l-4 border-l-blue-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                            <div className="p-5 rounded-2xl neu-raised neu-hover flex flex-col justify-center border-t-4 border-t-[#4A9BD9]">
                                 <p className="text-xs font-bold text-gray-500 uppercase">Attendance</p>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.presentCount}</p>
                                     <p className="text-sm font-semibold text-gray-500">/ {metrics.totalStudents}</p>
                                 </div>
                             </div>
-                            <div className="card p-5 border-l-4 border-l-indigo-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                            <div className="p-5 rounded-2xl neu-raised neu-hover flex flex-col justify-center border-t-4 border-t-[var(--neu-accent)]">
                                 <p className="text-xs font-bold text-gray-500 uppercase">Avg Total Marks</p>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.avgTotal}</p>
                                     {metrics.examTotalMax > 0 && <p className="text-sm font-semibold text-gray-500">/ {metrics.examTotalMax}</p>}
                                 </div>
                             </div>
-                            <div className="card p-5 border-l-4 border-l-amber-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                            <div className="p-5 rounded-2xl neu-raised neu-hover flex flex-col justify-center border-t-4 border-t-[var(--neu-warn)]">
                                 <p className="text-xs font-bold text-gray-500 uppercase">Avg MCQ Score</p>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.avgMcq}</p>
                                     {metrics.examMcqMax > 0 && <p className="text-sm font-semibold text-gray-500">/ {metrics.examMcqMax}</p>}
                                 </div>
                             </div>
-                            <div className="card p-5 border-l-4 border-l-purple-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                            <div className="p-5 rounded-2xl neu-raised neu-hover flex flex-col justify-center border-t-4 border-t-[var(--neu-achieve)]">
                                 <p className="text-xs font-bold text-gray-500 uppercase">Avg Coding Score</p>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <p className="text-3xl font-black text-gray-900 dark:text-white">{metrics.avgCoding}</p>
                                     {metrics.examCodingMax > 0 && <p className="text-sm font-semibold text-gray-500">/ {metrics.examCodingMax}</p>}
                                 </div>
                             </div>
-                            <div className="card p-5 border-l-4 border-l-emerald-500 flex flex-col justify-center bg-white dark:bg-slate-800">
+                            <div className="p-5 rounded-2xl neu-raised neu-hover flex flex-col justify-center border-t-4 border-t-[var(--neu-success)]">
                                 <p className="text-xs font-bold text-gray-500 uppercase">Class Pass Rate</p>
                                 <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{metrics.passRate}%</p>
                             </div>
@@ -628,11 +628,11 @@ function ExamResultsContent() {
 
                     {/* Table */}
                     <div className="card overflow-hidden">
-                        <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 flex justify-between items-center">
+                        <div className="p-4 border-b border-[var(--neu-divider)] bg-gray-50/50 dark:bg-slate-800/50 flex justify-between items-center">
                             <h3 className="font-bold text-gray-900 dark:text-white">Proctoring & Result Logs</h3>
                             <div className="relative">
                                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input type="text" placeholder="Search Reg ID..." className="pl-9 pr-4 py-1.5 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-full focus:ring-2 focus:ring-blue-500" />
+                                <input type="text" placeholder="Search Reg ID..." className="pl-9 pr-4 py-1.5 text-sm neu-inset rounded-full focus:ring-2 focus:ring-blue-500" />
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -665,7 +665,7 @@ function ExamResultsContent() {
                                             <tr 
                                                 key={student.student_id} 
                                                 onClick={() => handleRowClick(student.student_id)}
-                                                className="border-b border-gray-100 dark:border-slate-800 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 cursor-pointer group"
+                                                className="border-b border-gray-100 dark:border-slate-800 hover:bg-[var(--neu-achieve-soft)] dark:hover:bg-slate-800/50 cursor-pointer group"
                                             >
                                                 <td className="p-4 font-semibold text-gray-900 dark:text-white">
                                                     {student.student_name}
@@ -705,7 +705,7 @@ function ExamResultsContent() {
                         </div>
                         {/* Pagination Controls */}
                         {totalPages > 1 && (
-                            <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between">
+                            <div className="p-4 border-t border-[var(--neu-divider)] neu-raised flex items-center justify-between">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
                                     Page <span className="font-semibold text-gray-900 dark:text-white">{page}</span> of <span className="font-semibold text-gray-900 dark:text-white">{totalPages}</span>
                                 </span>
@@ -717,7 +717,7 @@ function ExamResultsContent() {
                                             fetchExamData(newPage);
                                         }}
                                         disabled={page === 1}
-                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                        className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
                                     >
                                         Previous
                                     </button>
@@ -728,7 +728,7 @@ function ExamResultsContent() {
                                             fetchExamData(newPage);
                                         }}
                                         disabled={page === totalPages}
-                                        className="px-4 py-2 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
+                                        className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700 dark:text-gray-300"
                                     >
                                         Next
                                     </button>

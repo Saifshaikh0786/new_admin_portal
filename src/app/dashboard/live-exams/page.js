@@ -82,10 +82,10 @@ export default function LiveExamsPage() {
 
     if (error) {
         return (
-            <div className="max-w-4xl mx-auto mt-10 glass-panel p-8 text-center text-red-500 border-red-200">
+            <div className="max-w-4xl mx-auto mt-10 neu-raised p-8 text-center text-red-500 border-red-200">
                 <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p className="font-semibold text-lg">{error}</p>
-                <button onClick={refreshLiveExams} className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">
+                <button onClick={refreshLiveExams} className="mt-4 px-4 py-2 bg-[var(--neu-danger-soft)] text-red-700 rounded-lg hover:bg-red-200 transition-colors">
                     Retry Connection
                 </button>
             </div>
@@ -99,25 +99,25 @@ export default function LiveExamsPage() {
             <div className="flex justify-between items-end mb-8">
                 <div>
                     <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
-                        <PlayCircle className="w-8 h-8 text-blue-500" />
+                        <span className="w-12 h-12 rounded-2xl neu-chip neu-chip-danger flex items-center justify-center shrink-0"><PlayCircle className="w-6 h-6" /></span>
                         Live Exam Board
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400">Monitor active test takers, real-time progress, and grant time/attempt extensions.</p>
                 </div>
                 <button 
                     onClick={refreshLiveExams}
-                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all font-semibold text-gray-700 dark:text-gray-300 shadow-sm"
+                    className="flex items-center gap-2 px-4 py-2 neu-raised rounded-xl neu-hover transition-all font-semibold text-gray-700 dark:text-gray-300 shadow-sm"
                 >
                     <RefreshCw className="w-4 h-4" />
                     Refresh Now
                 </button>
             </div>
 
-            <div className="glass-panel overflow-hidden border border-gray-200 dark:border-slate-800 rounded-2xl shadow-sm">
+            <div className="neu-raised overflow-hidden rounded-2xl">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50 dark:bg-slate-900/50 border-b border-gray-200 dark:border-slate-800">
+                            <tr className="bg-gray-50 dark:bg-slate-900/50 border-b border-[var(--neu-divider)]">
                                 <th className="px-6 py-4 font-bold text-gray-600 dark:text-gray-300 text-sm uppercase tracking-wider">Student</th>
                                 <th className="px-6 py-4 font-bold text-gray-600 dark:text-gray-300 text-sm uppercase tracking-wider">Exam Details</th>
                                 <th className="px-6 py-4 font-bold text-gray-600 dark:text-gray-300 text-sm uppercase tracking-wider">Type</th>
@@ -158,7 +158,7 @@ export default function LiveExamsPage() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className={`flex items-center gap-2 font-mono text-lg font-bold ${isTimeUp ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                <div className={`flex items-center gap-2 font-mono text-lg font-bold ${isTimeUp ? 'text-red-500' : 'text-[var(--neu-success)] dark:text-[var(--neu-success)]'}`}>
                                                     <Clock className="w-5 h-5" />
                                                     {formatTimeLeft(localTime)}
                                                 </div>
@@ -176,7 +176,7 @@ export default function LiveExamsPage() {
                                                         <button 
                                                             onClick={() => handleExtendTime(exam)}
                                                             disabled={actionLoading === timerKeyTime}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors text-sm font-bold disabled:opacity-50"
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--neu-success-soft)] dark:bg-emerald-900/20 text-emerald-700 dark:text-[var(--neu-success)] border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-[var(--neu-success-soft)] dark:hover:bg-emerald-900/40 transition-colors text-sm font-bold disabled:opacity-50"
                                                         >
                                                             {actionLoading === timerKeyTime ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
                                                             10 Mins
@@ -185,7 +185,7 @@ export default function LiveExamsPage() {
                                                     <button 
                                                         onClick={() => handleExtendAttempt(exam)}
                                                         disabled={actionLoading === timerKeyAttempt}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors text-sm font-bold disabled:opacity-50"
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--neu-achieve-soft)] dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-[var(--neu-achieve-soft)] dark:hover:bg-blue-900/40 transition-colors text-sm font-bold disabled:opacity-50"
                                                     >
                                                         {actionLoading === timerKeyAttempt ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
                                                         1 Attempt

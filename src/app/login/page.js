@@ -47,7 +47,7 @@ function LoginContent() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 font-sans px-4 relative transition-colors duration-300">
       
-      <div className="w-full max-w-md bg-white dark:bg-slate-800 p-10 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 transition-colors">
+      <div className="w-full max-w-md neu-raised p-10 rounded-2xl shadow-xl transition-colors">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">TheEduCode Portal</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Sign in to the {role === 'teacher' ? 'teacher' : 'administration'} panel</p>
@@ -66,7 +66,7 @@ function LoginContent() {
               required
               autoComplete="username"
               placeholder={role === 'teacher' ? "e.g. 12345678" : "admin@university.edu"}
-              className="block w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="block w-full px-4 py-3 neu-inset rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>
           <div>
@@ -81,7 +81,7 @@ function LoginContent() {
               required
               autoComplete="current-password"
               placeholder={role === 'teacher' ? "e.g. JID-12345" : "••••••••"}
-              className="block w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="block w-full px-4 py-3 neu-inset rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>
           
@@ -128,7 +128,7 @@ function LoginContent() {
                   setIsSubmitting(false);
                 }
               }}
-              className="w-full mt-4 flex justify-center items-center py-2 px-4 border border-blue-500 rounded-xl text-sm font-semibold text-blue-600 dark:text-blue-400 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:outline-none transition-all"
+              className="w-full mt-4 flex justify-center items-center py-2 px-4 rounded-xl neu-tile text-[var(--neu-accent)] text-sm font-semibold text-blue-600 dark:text-blue-400 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:outline-none transition-all"
             >
               Fast Dev Login
             </button>

@@ -71,9 +71,9 @@ export default function DashboardLayout({ children }) {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] transition-colors duration-300 relative">
-      <div className="hidden dark:block fixed top-0 right-0 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px] animate-pulse pointer-events-none z-0" />
-      <div className="hidden dark:block fixed bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[120px] animate-pulse delay-75 pointer-events-none z-0" />
+    <div className="min-h-screen neu-page transition-colors duration-300 relative">
+      <div className="hidden dark:block fixed top-0 right-0 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none z-0 transform-gpu will-change-transform" />
+      <div className="hidden dark:block fixed bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[120px] pointer-events-none z-0 transform-gpu will-change-transform" />
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -85,7 +85,7 @@ export default function DashboardLayout({ children }) {
 
       {/* Sidebar */}
       <div 
-        className={`fixed inset-y-0 left-0 z-[100] bg-white dark:bg-[#0B0F19] border-r border-gray-200 dark:border-slate-800 transform transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-[100] neu-rail transform transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${
           isHovered ? "w-72 shadow-2xl" : "w-20"
         } ${sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full lg:translate-x-0"}`}
         onMouseEnter={() => setIsHovered(true)}
@@ -93,9 +93,9 @@ export default function DashboardLayout({ children }) {
       >
         <div className="flex flex-col h-full">
           {/* Logo Section */}
-          <div className="flex items-center justify-between h-20 px-5 border-b border-gray-200 dark:border-slate-800">
+          <div className="flex items-center justify-between h-20 px-5 border-b border-[var(--neu-divider)]">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+              <div className="w-10 h-10 shrink-0 rounded-xl neu-btn-primary flex items-center justify-center font-bold text-xl">
                 E
               </div>
               <span className={`text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 whitespace-nowrap transition-opacity duration-300 ${isHovered || sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
@@ -123,8 +123,8 @@ export default function DashboardLayout({ children }) {
                   title={(!isHovered && !sidebarOpen) ? item.name : undefined}
                   className={`flex items-center gap-3 px-3 py-3.5 rounded-xl font-medium transition-all duration-200 group ${
                     isActive
-                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/30 shadow-sm"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-gray-200"
+                      ? "neu-rail-active"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-[var(--neu-success-soft)] hover:text-gray-900 dark:hover:text-gray-200"
                   }`}
                 >
                   <Icon className={`w-6 h-6 shrink-0 transition-transform duration-200 ${isActive ? "scale-110" : "group-hover:scale-110"}`} />
@@ -137,7 +137,7 @@ export default function DashboardLayout({ children }) {
           </nav>
 
           {/* User Section */}
-          <div className="p-3 border-t border-gray-200 dark:border-slate-800 flex flex-col gap-2 pb-4">
+          <div className="p-3 border-t border-[var(--neu-divider)] flex flex-col gap-2 pb-4">
             <button
               onClick={toggleTheme}
               title={(!isHovered && !sidebarOpen) ? "Toggle Theme" : undefined}
@@ -175,8 +175,8 @@ export default function DashboardLayout({ children }) {
             </button>
             
             {(isHovered || sidebarOpen) && (
-              <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700/50 mt-2">
-                <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold shadow-md" suppressHydrationWarning>
+              <div className="flex items-center gap-3 px-3 py-3 rounded-xl neu-inset mt-2">
+                <div className="w-8 h-8 shrink-0 rounded-full neu-tile flex items-center justify-center neu-accent-text font-bold" suppressHydrationWarning>
                   {user?.name?.charAt(0) || "A"}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -196,7 +196,7 @@ export default function DashboardLayout({ children }) {
       {/* Edit Profile Modal */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-2xl max-w-md w-full animate-slideInRight">
+          <div className="neu-raised rounded-2xl p-6 shadow-2xl max-w-md w-full animate-slideInRight">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Edit Profile</h3>
               <button onClick={() => setIsProfileModalOpen(false)} className="p-2 text-gray-500 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
@@ -211,7 +211,7 @@ export default function DashboardLayout({ children }) {
                   type="text" 
                   value={profileData.admin_name}
                   onChange={(e) => setProfileData({...profileData, admin_name: e.target.value})}
-                  className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -220,7 +220,7 @@ export default function DashboardLayout({ children }) {
                   type="email" 
                   value={profileData.email}
                   onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                  className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -230,14 +230,14 @@ export default function DashboardLayout({ children }) {
                   value={profileData.password}
                   onChange={(e) => setProfileData({...profileData, password: e.target.value})}
                   placeholder="Leave blank to keep current"
-                  className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
               <button 
                 type="submit"
                 disabled={isUpdating}
-                className="w-full mt-6 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
+                className="w-full mt-6 flex items-center justify-center gap-2 neu-btn-primary py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
               >
                 {isUpdating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 {isUpdating ? "Saving..." : "Save Changes"}
@@ -250,7 +250,7 @@ export default function DashboardLayout({ children }) {
       {/* Main Content */}
       <div className="lg:pl-20 flex flex-col min-h-screen relative z-10 transition-all duration-300">
         {/* Top Header - Mobile Only */}
-        <header className="lg:hidden sticky top-0 z-30 h-16 glass-panel border-b border-gray-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between">
+        <header className="lg:hidden sticky top-0 z-30 h-16 neu-raised border-b border-[var(--neu-divider)] px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(true)}
