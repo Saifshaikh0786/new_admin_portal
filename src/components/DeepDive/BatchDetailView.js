@@ -4,6 +4,8 @@ import { CircularProgress } from './CircularProgress';
 import { Skeleton } from './Skeletons';
 import { API_CONFIG } from '@/utils/api';
 import { getAdminToken } from '@/utils/cookies';
+import { swrFetcher } from '@/utils/fetcher';
+import useSWR from 'swr';
 import PortalWrapper from './PortalWrapper';
 
 export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
@@ -12,75 +14,53 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
+    const secParams = new URLSearchParams({ batch_id: batch.batch_id }).toString();
+    const { data: secData, isLoading: isSecLoading } = useSWR(
+        batch.batch_id ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getSectionsByBatch}?${secParams}`, 'GET'] : null,
+        swrFetcher,
+        { revalidateOnFocus: false }
+    );
+
+    const courseParams = new URLSearchParams({ batch_id: batch.batch_id }).toString();
+    const { data: courseData, isLoading: isCourseLoading } = useSWR(
+        batch.batch_id ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getPracticeCoursesByBatch}?${courseParams}`, 'GET'] : null,
+        swrFetcher,
+        { revalidateOnFocus: false }
+    );
+
     useEffect(() => {
-        const fetchBatchData = async () => {
-            setLoading(true);
-            try {
-                const token = getAdminToken();
-                const headers = { 
-                    'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                };
-
-                // 1. Fetch Sections using New API
-                const secRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getSectionsByBatch}`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ batch_id: batch.batch_id }),
-                    credentials: 'include'
-                });
-                const secData = await secRes.json();
-
-                let batchSections = [];
-
-                if (secData.success && secData.data) {
-                    // secData.data.sections is array of strings: ["K24AD", "K23TU"]
-                    // We need to map them to objects for the UI
-                    const sectionNames = secData.data.sections || [];
-                    batchSections = sectionNames.map(name => ({
-                        section_name: name,
-                        batch_id: batch.batch_id,
-                        // Placeholders as new API doesn't provide these yet
-                        student_count: 0,
-                        progress: 0
-                    }));
-                }
-
-                setSections(batchSections);
-
-                // 2. Fetch Courses using New API
-                const courseRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getPracticeCoursesByBatch}`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ batch_id: batch.batch_id }),
-                    credentials: 'include'
-                });
-                const courseData = await courseRes.json();
-
-                // New API Response Structure: { success: true, data: { courses: [...] } } or similar
-                // Based on get-sections pattern, likely data.courses or just data array
-                let courseList = [];
-                if (courseData.success && courseData.data) {
-                    if (Array.isArray(courseData.data)) {
-                        courseList = courseData.data;
-                    } else if (courseData.data.courses) {
-                        courseList = courseData.data.courses;
-                    }
-                }
-
-                setCourses(courseList);
-
-            } catch (error) {
-                console.error("Failed to fetch batch data:", error);
-            } finally {
-                setLoading(false);
+        if (!secData || !courseData) {
+            if ((isSecLoading || isCourseLoading) && sections.length === 0 && courses.length === 0) {
+                setLoading(true);
             }
-        };
-
-        if (batch) {
-            fetchBatchData();
+            return;
         }
-    }, [batch]);
+
+        setLoading(false);
+        
+        try {
+            // secData is json.data
+            const sectionNames = secData.sections || [];
+            const batchSections = sectionNames.map(name => ({
+                section_name: name,
+                batch_id: batch.batch_id,
+                student_count: 0,
+                progress: 0
+            }));
+            setSections(batchSections);
+
+            // courseData is json.data
+            let courseList = [];
+            if (Array.isArray(courseData)) {
+                courseList = courseData;
+            } else if (courseData.courses) {
+                courseList = courseData.courses;
+            }
+            setCourses(courseList);
+        } catch (error) {
+            console.error("Failed to parse batch data:", error);
+        }
+    }, [secData, courseData, isSecLoading, isCourseLoading, batch.batch_id]);
 
     // Derived Analytics from Sections
     const analytics = React.useMemo(() => {

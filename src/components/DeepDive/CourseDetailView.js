@@ -7,6 +7,10 @@ import {
   X, Clock, Zap, BookmarkPlus, ChevronUp, GripVertical
 } from 'lucide-react';
 import { API_CONFIG } from '@/utils/api';
+import { getAdminToken } from '@/utils/cookies';
+import { swrFetcher } from '@/utils/fetcher';
+import useSWR from 'swr';
+import PortalWrapper from './PortalWrapper';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITY HOOKS
@@ -184,7 +188,6 @@ const CopyButton = ({ text, className = "" }) => {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import PortalWrapper from './PortalWrapper';
 
 export default function CourseDetailView({ course, onBack }) {
   // Core State
@@ -218,75 +221,43 @@ export default function CourseDetailView({ course, onBack }) {
   // DATA FETCHING
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const fetchCourseContent = useCallback(async (forceRefresh = false) => {
-    const cacheKey = `course_content_${course.course_id}`;
-    const CACHE_DURATION = 5 * 60 * 1000;
+  const { data: swrData, isLoading: isValidating, error: swrError } = useSWR(
+    course?.course_id ? [
+      `${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getCourseContent}`,
+      'POST',
+      { course_id: course.course_id }
+    ] : null,
+    swrFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60 * 1000 }
+  );
 
-    if (!forceRefresh) {
-      try {
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_DURATION && data?.units) {
-            setStructure(data);
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn("Cache read failed", e);
-      }
+  useEffect(() => {
+    if (!swrData) {
+      if (isValidating && !structure) setLoading(true);
+      if (swrError) setError(swrError.message || "Failed to load course content");
+      return;
     }
 
-    setLoading(true);
+    setLoading(false);
     setError(null);
-
     try {
-      const res = await fetch(
-        `${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getCourseContent}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ course_id: course.course_id }),
-          credentials: 'include'
-        }
-      );
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
       let units = [];
-
+      const data = swrData;
       if (Array.isArray(data)) units = data;
-      else if (Array.isArray(data.data)) units = data.data;
       else if (data.units) units = data.units;
-      else if (data.success === false) throw new Error(data.message || 'Failed to load');
 
       const newStructure = { units };
       setStructure(newStructure);
 
-      localStorage.setItem(cacheKey, JSON.stringify({
-        data: newStructure,
-        timestamp: Date.now()
-      }));
-
       // Auto-expand first unit
-      if (units.length > 0) {
+      if (units.length > 0 && Object.keys(expandedUnits).length === 0) {
         setExpandedUnits({ 0: true });
       }
     } catch (err) {
-      console.error("Fetch error:", err);
-      setError(err.message || "Failed to load course content");
-    } finally {
-      setLoading(false);
+      console.error("Parse error:", err);
+      setError("Failed to parse course content");
     }
-  }, [course?.course_id]);
-
-  useEffect(() => {
-    if (course?.course_id) {
-      fetchCourseContent();
-    }
-  }, [course?.course_id, fetchCourseContent]);
+  }, [swrData, isValidating, swrError, course?.course_id]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // CONTENT HELPERS

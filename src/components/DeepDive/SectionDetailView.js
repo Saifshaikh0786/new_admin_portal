@@ -4,6 +4,8 @@ import { CircularProgress } from './CircularProgress';
 import { Skeleton, SectionDetailSkeleton } from './Skeletons';
 import { API_CONFIG } from '@/utils/api';
 import { getAdminToken } from '@/utils/cookies';
+import { swrFetcher } from '@/utils/fetcher';
+import useSWR from 'swr';
 import PortalWrapper from './PortalWrapper';
 
 export default function SectionDetailView({ section, teachers = [], onBack, onStudentSelect, user, cache = {}, onUpdateCache }) {
@@ -60,124 +62,112 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
         setProgressLoaded(true);
     };
 
+    const queryParams = new URLSearchParams({
+        section: sectionName,
+        page: currentPage,
+        limit: itemsPerPage,
+        sortBy: sortConfig.key,
+        order: sortConfig.direction,
+        search: debouncedSearchQuery
+    }).toString();
+
+    const { data: swrData, isLoading: isValidating } = useSWR(
+        sectionName ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(sectionName)}?${queryParams}`, 'GET'] : null,
+        swrFetcher,
+        { revalidateOnFocus: false }
+    );
+
     useEffect(() => {
-        const fetchAnalytics = async () => {
-            if (!sectionName) return;
-
-            setLoading(true);
-            try {
-                // Optimized: Now using unified POST /api/admin/analytics/section-matrix
-                const url = `${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(sectionName)}`;
-                const token = getAdminToken();
-                const headers = { 'Content-Type': 'application/json' };
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ 
-                        section: sectionName,
-                        page: currentPage,
-                        limit: itemsPerPage,
-                        sortBy: sortConfig.key,
-                        order: sortConfig.direction,
-                        search: debouncedSearchQuery
-                    }),
-                    credentials: 'include'
-                });
-                const json = await res.json();
-
-                if (json.success && json.data) {
-                    setData(json.data);
-                    if (json.data.total_students) {
-                        setTotalStudents(json.data.total_students);
-                    }
-
-                    const newExamMap = {};
-                    const newCompletions = { ...courseCompletions };
-                    const newProgressData = {};
-                    let hasCompUpdates = false;
-
-                    const courses = json.data.course_performance || [];
-                    const students = json.data.student_performance || [];
-
-                    // Initialize data structures
-                    courses.forEach(c => {
-                        newProgressData[c.course_id] = {};
-                        if (c.average_score !== undefined) {
-                            newCompletions[c.course_id] = c.average_score;
-                            hasCompUpdates = true;
-                            if (onUpdateCache) onUpdateCache(sectionName, c.course_id, c.average_score);
-                        }
-                    });
-
-                    // Parse student performance directly from the matrix (0 API calls!)
-                    students.forEach(s => {
-                        (s.courses || []).forEach(c => {
-                            if (c.is_exam) {
-                                if (!newExamMap[c.course_id]) newExamMap[c.course_id] = { course_id: c.course_id, course_name: c.course_name, students: [] };
-                                
-                                let coding_marks = c.result_type?.toLowerCase() === 'coding' ? (c.marks_obtained || 0) : 0;
-                                let mcq_marks = c.result_type?.toLowerCase() === 'mcq' ? (c.marks_obtained || 0) : 0;
-                                
-                                let existingStudent = newExamMap[c.course_id].students.find(es => (es.uni_reg_id && es.uni_reg_id === s.uni_reg_id) || es.student_name === s.student_name);
-                                
-                                if (existingStudent) {
-                                    existingStudent.total_marks = (existingStudent.total_marks || 0) + (c.marks_obtained || 0);
-                                    existingStudent.coding_marks = (existingStudent.coding_marks || 0) + coding_marks;
-                                    existingStudent.mcq_marks = (existingStudent.mcq_marks || 0) + mcq_marks;
-                                    existingStudent.exam_completion_percentage = Math.round(((existingStudent.exam_completion_percentage || 0) + (c.score_percent || 0)) / 2);
-                                    if ((c.attempt_count || 0) > (existingStudent.attempt_count || 0)) existingStudent.attempt_count = c.attempt_count;
-                                    
-                                    if (c.result_type?.toLowerCase() === 'mcq' && c.submitted_at) existingStudent.mcq_submitted_at = c.submitted_at;
-                                    if (c.result_type?.toLowerCase() === 'coding' && c.submitted_at) existingStudent.coding_submitted_at = c.submitted_at;
-                                    
-                                    if (c.status && c.status !== 'Pending') existingStudent.status = c.status;
-                                    
-                                    // Merge analytics if available
-                                    if (c.analytics) {
-                                        existingStudent.analytics = { ...existingStudent.analytics, ...c.analytics };
-                                        if (c.analytics.debug_configs) {
-                                            existingStudent.debug_configs = c.analytics.debug_configs;
-                                        }
-                                    }
-                                } else {
-                                    newExamMap[c.course_id].students.push({
-                                        student_name: s.student_name,
-                                        uni_reg_id: s.uni_reg_id,
-                                        total_marks: c.marks_obtained || 0,
-                                        coding_marks,
-                                        mcq_marks,
-                                        exam_completion_percentage: c.score_percent || 0,
-                                        status: c.status,
-                                        attempt_count: c.attempt_count || 0,
-                                        mcq_submitted_at: c.result_type?.toLowerCase() === 'mcq' ? c.submitted_at : null,
-                                        coding_submitted_at: c.result_type?.toLowerCase() === 'coding' ? c.submitted_at : null,
-                                        analytics: c.analytics || {},
-                                        debug_configs: c.analytics?.debug_configs || null
-                                    });
-                                }
-                            } else {
-                                newProgressData[c.course_id][s.student_name] = c.score_percent || 0;
-                            }
-                        });
-                    });
-
-                    if (hasCompUpdates) setCourseCompletions(newCompletions);
-                    setExamDataMap(newExamMap);
-                    setProgressData(newProgressData);
-                    setProgressLoaded(true);
-                }
-            } catch (error) {
-                console.error("Failed to fetch section analytics:", error);
-            } finally {
-                setLoading(false);
+        if (!swrData) {
+            if (isValidating && !data) setLoading(true);
+            return;
+        }
+        
+        try {
+            setLoading(false);
+            setData(swrData);
+            if (swrData.total_students) {
+                setTotalStudents(swrData.total_students);
             }
-        };
 
-        fetchAnalytics();
-    }, [sectionName, currentPage, sortConfig, debouncedSearchQuery]);
+            const newExamMap = {};
+            const newCompletions = { ...courseCompletions };
+            const newProgressData = {};
+            let hasCompUpdates = false;
+
+            const courses = swrData.course_performance || [];
+            const students = swrData.student_performance || [];
+
+            // Initialize data structures
+            courses.forEach(c => {
+                newProgressData[c.course_id] = {};
+                if (c.average_score !== undefined) {
+                    newCompletions[c.course_id] = c.average_score;
+                    hasCompUpdates = true;
+                    if (onUpdateCache) onUpdateCache(sectionName, c.course_id, c.average_score);
+                }
+            });
+
+            // Parse student performance directly from the matrix (0 API calls!)
+            students.forEach(s => {
+                (s.courses || []).forEach(c => {
+                    if (c.is_exam) {
+                        if (!newExamMap[c.course_id]) newExamMap[c.course_id] = { course_id: c.course_id, course_name: c.course_name, students: [] };
+                        
+                        let coding_marks = c.result_type?.toLowerCase() === 'coding' ? (c.marks_obtained || 0) : 0;
+                        let mcq_marks = c.result_type?.toLowerCase() === 'mcq' ? (c.marks_obtained || 0) : 0;
+                        
+                        let existingStudent = newExamMap[c.course_id].students.find(es => (es.uni_reg_id && es.uni_reg_id === s.uni_reg_id) || es.student_name === s.student_name);
+                        
+                        if (existingStudent) {
+                            existingStudent.total_marks = (existingStudent.total_marks || 0) + (c.marks_obtained || 0);
+                            existingStudent.coding_marks = (existingStudent.coding_marks || 0) + coding_marks;
+                            existingStudent.mcq_marks = (existingStudent.mcq_marks || 0) + mcq_marks;
+                            existingStudent.exam_completion_percentage = Math.round(((existingStudent.exam_completion_percentage || 0) + (c.score_percent || 0)) / 2);
+                            if ((c.attempt_count || 0) > (existingStudent.attempt_count || 0)) existingStudent.attempt_count = c.attempt_count;
+                            
+                            if (c.result_type?.toLowerCase() === 'mcq' && c.submitted_at) existingStudent.mcq_submitted_at = c.submitted_at;
+                            if (c.result_type?.toLowerCase() === 'coding' && c.submitted_at) existingStudent.coding_submitted_at = c.submitted_at;
+                            
+                            if (c.status && c.status !== 'Pending') existingStudent.status = c.status;
+                            
+                            // Merge analytics if available
+                            if (c.analytics) {
+                                existingStudent.analytics = { ...existingStudent.analytics, ...c.analytics };
+                                if (c.analytics.debug_configs) {
+                                    existingStudent.debug_configs = c.analytics.debug_configs;
+                                }
+                            }
+                        } else {
+                            newExamMap[c.course_id].students.push({
+                                student_name: s.student_name,
+                                uni_reg_id: s.uni_reg_id,
+                                total_marks: c.marks_obtained || 0,
+                                coding_marks,
+                                mcq_marks,
+                                exam_completion_percentage: c.score_percent || 0,
+                                status: c.status,
+                                attempt_count: c.attempt_count || 0,
+                                mcq_submitted_at: c.result_type?.toLowerCase() === 'mcq' ? c.submitted_at : null,
+                                coding_submitted_at: c.result_type?.toLowerCase() === 'coding' ? c.submitted_at : null,
+                                analytics: c.analytics || {},
+                                debug_configs: c.analytics?.debug_configs || null
+                            });
+                        }
+                    } else {
+                        newProgressData[c.course_id][s.student_name] = c.score_percent || 0;
+                    }
+                });
+            });
+
+            if (hasCompUpdates) setCourseCompletions(newCompletions);
+            setExamDataMap(newExamMap);
+            setProgressData(newProgressData);
+            setProgressLoaded(true);
+        } catch (error) {
+            console.error("Failed to parse section analytics:", error);
+        }
+    }, [swrData, isValidating]);
 
     // Derived Analytics
     const regularCourses = React.useMemo(() => {
@@ -344,10 +334,10 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const resAnalytics = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(sectionName)}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams({ section: sectionName }).toString();
+            const resAnalytics = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(sectionName)}?${queryParams}`, {
+                method: 'GET',
                 headers,
-                body: JSON.stringify({ section: sectionName }), // No page/limit means all students
                 credentials: 'include'
             });
             const jsonAnalytics = await resAnalytics.json();
@@ -469,10 +459,10 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const resAnalytics = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(sectionName)}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams({ section: sectionName }).toString();
+            const resAnalytics = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(sectionName)}?${queryParams}`, {
+                method: 'GET',
                 headers,
-                body: JSON.stringify({ section: sectionName }), // No page/limit means all students
                 credentials: 'include'
             });
             const jsonAnalytics = await resAnalytics.json();
@@ -769,13 +759,15 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {examCourses.map(course => {
                                     const examData = examDataMap[course.course_id];
-                                    const studentCount = examData?.students?.length || 0;
-                                    const avgMarks = studentCount > 0
-                                        ? (examData.students.reduce((sum, s) => sum + (s.total_marks || 0), 0) / studentCount).toFixed(1)
-                                        : 0;
-                                    const highest = studentCount > 0
-                                        ? Math.max(...examData.students.map(s => s.total_marks || 0))
-                                        : 0;
+                                    const enrolled = student_performance?.length || 0;
+                                    const students = examData?.students || [];
+                                    const attempted = students.length;
+                                    const notAttempted = Math.max(0, enrolled - attempted);
+                                    
+                                    const totalMarksSum = students.reduce((sum, s) => sum + (s.total_marks || ((s.coding_marks || 0) + (s.mcq_marks || 0))), 0);
+                                    
+                                    const avgAttempted = attempted > 0 ? (totalMarksSum / attempted).toFixed(1) : 0;
+                                    const avgAll = enrolled > 0 ? (totalMarksSum / enrolled).toFixed(1) : 0;
 
                                     return (
                                         <button
@@ -798,18 +790,26 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
                                                     {course.course_name}
                                                 </h4>
 
-                                                <div className="grid grid-cols-3 gap-3 mb-4">
+                                                <div className="grid grid-cols-3 gap-2 mb-4">
                                                     <div className="text-center p-2 neu-raised rounded-lg border border-gray-200/50 dark:border-white/5">
-                                                        <div className="text-lg font-black text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)]">{studentCount}</div>
-                                                        <div className="text-[9px] text-gray-500 uppercase font-bold">Students</div>
+                                                        <div className="text-[13px] font-black text-gray-700 dark:text-gray-300">{enrolled}</div>
+                                                        <div className="text-[8px] text-gray-500 uppercase font-bold">Enrolled</div>
                                                     </div>
                                                     <div className="text-center p-2 neu-raised rounded-lg border border-gray-200/50 dark:border-white/5">
-                                                        <div className="text-lg font-black text-cyan-600 dark:text-cyan-400">{avgMarks}</div>
-                                                        <div className="text-[9px] text-gray-500 uppercase font-bold">Avg Score</div>
+                                                        <div className="text-[13px] font-black text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)]">{attempted}</div>
+                                                        <div className="text-[8px] text-gray-500 uppercase font-bold">Attempted</div>
                                                     </div>
                                                     <div className="text-center p-2 neu-raised rounded-lg border border-gray-200/50 dark:border-white/5">
-                                                        <div className="text-lg font-black text-[var(--neu-warn)] dark:text-[var(--neu-warn)]">{highest}</div>
-                                                        <div className="text-[9px] text-gray-500 uppercase font-bold">Highest</div>
+                                                        <div className="text-[13px] font-black text-[var(--neu-warn)] dark:text-[var(--neu-warn)]">{notAttempted}</div>
+                                                        <div className="text-[8px] text-gray-500 uppercase font-bold">Not Attemp.</div>
+                                                    </div>
+                                                    <div className="text-center p-2 neu-raised rounded-lg border border-gray-200/50 dark:border-white/5 col-span-1">
+                                                        <div className="text-[13px] font-black text-cyan-600 dark:text-cyan-400">{avgAttempted}</div>
+                                                        <div className="text-[8px] text-gray-500 uppercase font-bold">Avg (Attemp.)</div>
+                                                    </div>
+                                                    <div className="text-center p-2 neu-raised rounded-lg border border-gray-200/50 dark:border-white/5 col-span-2">
+                                                        <div className="text-[13px] font-black text-violet-600 dark:text-violet-400">{avgAll}</div>
+                                                        <div className="text-[8px] text-gray-500 uppercase font-bold">Avg (All)</div>
                                                     </div>
                                                 </div>
 

@@ -120,10 +120,10 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
                 if (token) {
                     compHeaders['Authorization'] = `Bearer ${token}`;
                 }
-                const compRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionCompletion}`, {
-                    method: 'POST',
+                const queryParams = new URLSearchParams(payload).toString();
+                const compRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionCompletion}?${queryParams}`, {
+                    method: 'GET',
                     headers: compHeaders,
-                    body: JSON.stringify(payload),
                     credentials: 'include'
                 });
                 const compData = await compRes.json();

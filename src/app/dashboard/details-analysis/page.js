@@ -2,11 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-    ArrowLeft, Video, Clock, Activity, FileText, Code,
-    CheckCircle, ChevronDown, AlertCircle, Target, Loader2, Download
-} from "lucide-react";
-import { getAdminToken } from "@/utils/cookies";
+import { Loader2, ArrowLeft, Terminal, AlertCircle, Clock, Globe, ShieldAlert, Monitor, Activity, Shield, Wifi, WifiOff, FileText, CheckCircle, XCircle } from 'lucide-react';
+import useSWR from 'swr';
+import { getAdminToken } from '@/utils/cookies';
 import { API_CONFIG } from "@/utils/api";
 import { generateExamReport } from "@/utils/generateExamReport";
 
@@ -49,138 +47,169 @@ function DetailsAnalysisContent() {
         if (!courseId || !studentId) {
             setError("Missing required parameters (courseId, studentId).");
             setLoading(false);
-            return;
         }
+    }, [courseId, studentId]);
 
-        const fetchDetails = async () => {
-            setLoading(true);
-            try {
-                const token = getAdminToken();
-                const headers = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
+    const compositeFetcher = async () => {
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-                // Exams split MCQ and Coding into separate sub-units, so collect
-                // ALL sub-units of the course, not just the first one.
-                // NOTE: must use course-structure-analytics (POST) — the plain
-                // course-structure endpoint returns units without sub_units.
-                let subUnitIds = subUnitIdParam ? [subUnitIdParam] : [];
-                if (subUnitIds.length === 0) {
-                    const structureRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}`, {
-                        method: 'POST', headers, credentials: 'include',
-                        body: JSON.stringify({ student_id: studentId, course_id: courseId })
-                    });
-                    const structureJson = await structureRes.json();
-                    if (structureJson.success && Array.isArray(structureJson.data)) {
-                        for (const unit of structureJson.data) {
-                            for (const su of (unit.sub_units || [])) {
-                                if (su.sub_unit_id) subUnitIds.push(su.sub_unit_id);
-                            }
+            // Exams split MCQ and Coding into separate sub-units, so collect
+            // ALL sub-units of the course, not just the first one.
+            let subUnitIds = subUnitIdParam ? [subUnitIdParam] : [];
+            if (subUnitIds.length === 0) {
+                const qs = new URLSearchParams({ student_id: studentId, course_id: courseId }).toString();
+                const structureRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}?${qs}`, {
+                    method: 'GET', headers, credentials: 'include'
+                });
+                const structureJson = await structureRes.json();
+                if (structureJson.success && Array.isArray(structureJson.data)) {
+                    for (const unit of structureJson.data) {
+                        for (const su of (unit.sub_units || [])) {
+                            if (su.sub_unit_id) subUnitIds.push(su.sub_unit_id);
                         }
                     }
                 }
-
-                // Analytics handoff from the deep-dive page (skips a network call);
-                // falls back to student-overview when the page is opened directly.
-                let telemetry = null;
-                let handoff = null;
-                try {
-                    handoff = JSON.parse(sessionStorage.getItem('detailsAnalysisCtx') || 'null');
-                    if (handoff && handoff.studentId === studentId && handoff.courseId === courseId) {
-                        telemetry = handoff.analytics || null;
-                    } else {
-                        handoff = null;
-                    }
-                } catch (e) { handoff = null; }
-
-                const [subUnitResults, envJson, overviewJson] = await Promise.all([
-                    Promise.all(subUnitIds.map(suId =>
-                        fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}`, {
-                            method: 'POST', headers, credentials: 'include',
-                            body: JSON.stringify({ student_id: studentId, course_id: courseId, unit_id: "1", sub_unit_id: suId })
-                        }).then(r => r.json()).catch(() => null)
-                    )),
-                    fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/exam-environment`, {
-                        method: 'POST', headers, credentials: 'include',
-                        body: JSON.stringify({ student_id: studentId, course_id: courseId })
-                    }).then(r => r.json()).catch(() => null),
-                    (!telemetry && batchId) ? fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}`, {
-                        method: 'POST', headers, credentials: 'include',
-                        body: JSON.stringify({ student_id: studentId, batch_id: batchId })
-                    }).then(r => r.json()).catch(() => null) : Promise.resolve(null)
-                ]);
-
-                let totalMarks = handoff?.totalMarks || 0;
-                let marksBreakdown = handoff?.marksBreakdown || {};
-                let completionPct = handoff?.completionPct || 0;
-                if (overviewJson?.success) {
-                    const ec = (overviewJson.data?.exam_courses || []).find(c => c.course_id === courseId);
-                    if (ec?.examData) {
-                        telemetry = telemetry || ec.examData.analytics || null;
-                        totalMarks = totalMarks || ec.examData.total_marks || 0;
-                        if (!Object.keys(marksBreakdown).length) marksBreakdown = ec.examData.marks_breakdown || {};
-                        completionPct = completionPct || ec.examData.exam_completion_percentage || 0;
-                    }
-                }
-
-                setStudentInfo({
-                    name: nameParam || "Student",
-                    email: emailParam,
-                    regNo: regNo || studentId,
-                    section: sectionName,
-                    course: examName,
-                    telemetry, totalMarks, marksBreakdown, completionPct
-                });
-
-                if (envJson?.success) setEnvLogs(envJson.data || {});
-
-                // Merge submissions across ALL sub-units. Attempts are ordered
-                // newest-first, but the newest row can have zero submissions
-                // (auto-submitted retries) — pick the newest attempt that has data.
-                const allSubs = [];
-                for (const suJson of (subUnitResults || [])) {
-                    if (!suJson?.success || !Array.isArray(suJson.data) || suJson.data.length === 0) continue;
-                    const bestAttempt = suJson.data.find(a => (a.submissions || []).length > 0) || suJson.data[0];
-                    for (const s of (bestAttempt.submissions || [])) {
-                        allSubs.push({ ...s, type: s.question_type, attempt_number: bestAttempt.attempt_count });
-                    }
-                }
-
-                const mcqSubs = allSubs.filter(s => s.type === 'mcq');
-                const codingSubs = allSubs.filter(s => s.type === 'coding');
-
-                // Per-section timing window from submission timestamps
-                const timeWindow = (subs) => {
-                    const ts = subs.map(s => new Date(s.submitted_at).getTime()).filter(t => !isNaN(t));
-                    if (ts.length === 0) return { start: null, end: null };
-                    return { start: new Date(Math.min(...ts)), end: new Date(Math.max(...ts)) };
-                };
-
-                setMcqDetails({
-                    submissions: mcqSubs,
-                    timing: timeWindow(mcqSubs),
-                    overview: {
-                        total_score: mcqSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
-                        max_score: mcqSubs.reduce((a, s) => a + (s.max_score || 0), 0)
-                    }
-                });
-                setCodingDetails({
-                    submissions: codingSubs,
-                    timing: timeWindow(codingSubs),
-                    overview: {
-                        total_score: codingSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
-                        max_score: codingSubs.reduce((a, s) => a + (s.max_score || 0), 0)
-                    }
-                });
-            } catch (err) {
-                console.error("Failed to fetch detailed analysis", err);
-                setError("Failed to fetch data. Please try again.");
-            } finally {
-                setLoading(false);
             }
+
+            // Analytics handoff from the deep-dive page
+            let telemetry = null;
+            let handoff = null;
+            try {
+                handoff = JSON.parse(sessionStorage.getItem('detailsAnalysisCtx') || 'null');
+                if (handoff && handoff.studentId === studentId && handoff.courseId === courseId) {
+                    telemetry = handoff.analytics || null;
+                } else {
+                    handoff = null;
+                }
+            } catch (e) { handoff = null; }
+
+            const [subUnitResults, envJson, overviewJson] = await Promise.all([
+                Promise.all(subUnitIds.map(suId => {
+                    const qs = new URLSearchParams({ student_id: studentId, course_id: courseId, unit_id: "1", sub_unit_id: suId }).toString();
+                    return fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}?${qs}`, {
+                        method: 'GET', headers, credentials: 'include'
+                    }).then(r => r.json()).catch(() => null);
+                })),
+                (async () => {
+                    const qs = new URLSearchParams({ student_id: studentId, course_id: courseId }).toString();
+                    return fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/exam-environment?${qs}`, {
+                        method: 'GET', headers, credentials: 'include'
+                    }).then(r => r.json()).catch(() => null);
+                })(),
+                (!telemetry && batchId) ? (async () => {
+                    const qs = new URLSearchParams({ student_id: studentId, batch_id: batchId }).toString();
+                    return fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}?${qs}`, {
+                        method: 'GET', headers, credentials: 'include'
+                    }).then(r => r.json()).catch(() => null);
+                })() : Promise.resolve(null)
+            ]);
+
+            let totalMarks = handoff?.totalMarks || 0;
+            let marksBreakdown = handoff?.marksBreakdown || {};
+            let completionPct = handoff?.completionPct || 0;
+            if (overviewJson?.success) {
+                const ec = (overviewJson.data?.exam_courses || []).find(c => c.course_id === courseId);
+                if (ec?.examData) {
+                    telemetry = telemetry || ec.examData.analytics || null;
+                    totalMarks = totalMarks || ec.examData.total_marks || 0;
+                    if (!Object.keys(marksBreakdown).length) marksBreakdown = ec.examData.marks_breakdown || {};
+                    completionPct = completionPct || ec.examData.exam_completion_percentage || 0;
+                }
+            }
+
+            return { subUnitResults, envJson, overviewJson, telemetry, totalMarks, marksBreakdown, completionPct };
         };
 
-        fetchDetails();
-    }, [courseId, studentId, regNo, subUnitIdParam, sectionName, examName, batchId, nameParam, emailParam]);
+        const { data: swrData, isLoading: isValidating, error: swrError } = useSWR(
+            (courseId && studentId) ? [`details_analysis`, courseId, studentId, subUnitIdParam, batchId] : null,
+            compositeFetcher,
+            { revalidateOnFocus: false }
+        );
+
+        useEffect(() => {
+            if (!swrData) {
+                if (isValidating && !subUnitData) setLoading(true);
+                if (swrError) setError(swrError.message || "Failed to fetch data.");
+                return;
+            }
+
+            setLoading(false);
+            const { subUnitResults, envJson, telemetry, totalMarks, marksBreakdown, completionPct } = swrData;
+
+            setStudentInfo({
+                name: nameParam || "Student",
+                regId: uniRegIdParam || studentId,
+                courseName: courseNameParam || "Exam Course"
+            });
+            setTotalExamMarks(totalMarks);
+            setExamMarksBreakdown(marksBreakdown);
+            setExamCompletion(completionPct);
+
+            let mcq = null;
+            let coding = null;
+
+            for (const suRes of subUnitResults) {
+                if (suRes?.success && suRes.data) {
+                    if (suRes.data.sub_unit_type?.toLowerCase() === 'mcq') mcq = suRes.data;
+                    if (suRes.data.sub_unit_type?.toLowerCase() === 'coding') coding = suRes.data;
+                }
+            }
+
+            setSubUnitData({ mcq, coding });
+
+            const envData = envJson?.success && envJson.data ? envJson.data : {};
+            if (!telemetry && Object.keys(envData).length === 0) {
+                setTelemetryData(null);
+            } else {
+                setTelemetryData({
+                    environment: envData,
+                    ...telemetry
+                });
+            }
+            if (envJson?.success) setEnvLogs(envJson.data || {});
+
+            // Merge submissions across ALL sub-units. Attempts are ordered
+            // newest-first, but the newest row can have zero submissions
+            // (auto-submitted retries) — pick the newest attempt that has data.
+            const allSubs = [];
+            for (const suJson of (subUnitResults || [])) {
+                if (!suJson?.success || !Array.isArray(suJson.data) || suJson.data.length === 0) continue;
+                const bestAttempt = suJson.data.find(a => (a.submissions || []).length > 0) || suJson.data[0];
+                for (const s of (bestAttempt.submissions || [])) {
+                    allSubs.push({ ...s, type: s.question_type, attempt_number: bestAttempt.attempt_count });
+                }
+            }
+
+            const mcqSubs = allSubs.filter(s => s.type === 'mcq');
+            const codingSubs = allSubs.filter(s => s.type === 'coding');
+
+            // Per-section timing window from submission timestamps
+            const timeWindow = (subs) => {
+                const ts = subs.map(s => new Date(s.submitted_at).getTime()).filter(t => !isNaN(t));
+                if (ts.length === 0) return { start: null, end: null };
+                return { start: new Date(Math.min(...ts)), end: new Date(Math.max(...ts)) };
+            };
+
+            setMcqDetails({
+                submissions: mcqSubs,
+                timing: timeWindow(mcqSubs),
+                overview: {
+                    total_score: mcqSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
+                    max_score: mcqSubs.reduce((a, s) => a + (s.max_score || 0), 0)
+                }
+            });
+            
+            setCodingDetails({
+                submissions: codingSubs,
+                timing: timeWindow(codingSubs),
+                overview: {
+                    total_score: codingSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
+                    max_score: codingSubs.reduce((a, s) => a + (s.max_score || 0), 0)
+                }
+            });
+        }, [swrData, isValidating, swrError, nameParam, uniRegIdParam, studentId, courseNameParam]);
 
     // ── Derived Data (legacy names preserved) ──
     const telemetry = studentInfo?.telemetry || {};

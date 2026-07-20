@@ -3,6 +3,8 @@ import { ArrowLeft, ChevronDown, ChevronRight, BookOpen, Clock, AlertCircle, Awa
 import { CircularProgress } from './CircularProgress';
 import { API_CONFIG } from '@/utils/api';
 import { getAdminToken } from '@/utils/cookies';
+import { swrFetcher } from '@/utils/fetcher';
+import useSWR from 'swr';
 import { Skeleton } from './Skeletons';
 import { useAuth } from '@/context/AuthContext';
 import PortalWrapper from './PortalWrapper';
@@ -115,11 +117,6 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
             } else {
                 setFullStudent(student);
             }
-
-            if (currentStudent.batch_id || currentStudent.batch) {
-                const bId = currentStudent.batch_id || currentStudent.batch;
-                fetchStudentOverview(bId, currentStudent);
-            }
         };
 
         if (student) init();
@@ -159,10 +156,10 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.unitCompletion}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams(payload).toString();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.unitCompletion}?${queryParams}`, {
+                method: 'GET',
                 headers,
-                body: JSON.stringify(payload),
                 credentials: 'include'
             });
 
@@ -200,10 +197,10 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                 const headers = { 'Content-Type': 'application/json' };
                 if (token) headers['Authorization'] = `Bearer ${token}`;
 
-                const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.unitCompletion}`, {
-                    method: 'POST',
+                const queryParams = new URLSearchParams(payload).toString();
+                const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.unitCompletion}?${queryParams}`, {
+                    method: 'GET',
                     headers,
-                    body: JSON.stringify(payload),
                     credentials: 'include'
                 });
 
@@ -222,68 +219,56 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
         setOverallCourseProgress(units.length > 0 ? Math.round(totalCompletion / units.length) : 0);
     };
 
-    const fetchStudentOverview = async (batchId, studentData) => {
-        setLoadingCourses(true);
-        setLoadingExamCourses(true);
+    const batchId = fullStudent?.batch_id || fullStudent?.batch;
+    const studentIdParam = fullStudent?.student_id || fullStudent?.uuid;
+    const qsOverview = new URLSearchParams({ student_id: studentIdParam, batch_id: batchId }).toString();
+    const { data: overviewData, isLoading: isOverviewLoading } = useSWR(
+        (batchId && studentIdParam) ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}?${qsOverview}`, 'GET'] : null,
+        swrFetcher,
+        { revalidateOnFocus: false }
+    );
+
+    useEffect(() => {
+        if (!overviewData) {
+            if (isOverviewLoading) {
+                setLoadingCourses(true);
+                setLoadingExamCourses(true);
+            }
+            return;
+        }
+
+        setLoadingCourses(false);
+        setLoadingExamCourses(false);
+
         try {
-            if (!batchId) {
-                setCourses([]);
-                setExamCourses([]);
-                return;
-            }
-
-            const token = getAdminToken();
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                    student_id: studentData.student_id || studentData.uuid,
-                    batch_id: batchId
-                }),
-                credentials: 'include'
-            });
-            const data = await res.json();
-
-            if (data.success && data.data) {
-                setCourses(data.data.practice_courses || []);
-                
-                // Map the new examData structure to what the UI expects for myResult
-                const mappedExamCourses = (data.data.exam_courses || []).map(course => {
-                    if (course.examData) {
-                        return {
-                            ...course,
-                            examData: {
-                                ...course.examData,
-                                myResult: {
-                                    total_marks: course.examData.total_marks,
-                                    marks_breakdown: course.examData.marks_breakdown,
-                                    status: course.examData.status,
-                                    attempt_count: course.examData.attempt_count,
-                                    analytics: course.examData.analytics
-                                }
+            setCourses(overviewData.practice_courses || []);
+            
+            const mappedExamCourses = (overviewData.exam_courses || []).map(course => {
+                if (course.examData) {
+                    return {
+                        ...course,
+                        examData: {
+                            ...course.examData,
+                            myResult: {
+                                total_marks: course.examData.total_marks,
+                                marks_breakdown: course.examData.marks_breakdown,
+                                status: course.examData.status,
+                                attempt_count: course.examData.attempt_count,
+                                analytics: course.examData.analytics
                             }
-                        };
-                    }
-                    return course;
-                });
-                
-                setExamCourses(mappedExamCourses);
-            } else {
-                setCourses([]);
-                setExamCourses([]);
-            }
+                        }
+                    };
+                }
+                return course;
+            });
+            
+            setExamCourses(mappedExamCourses);
         } catch (e) {
-            console.error('Failed to fetch student overview:', e);
+            console.error('Failed to parse student overview:', e);
             setCourses([]);
             setExamCourses([]);
-        } finally {
-            setLoadingCourses(false);
-            setLoadingExamCourses(false);
         }
-    };
+    }, [overviewData, isOverviewLoading]);
 
     const handleExamCourseSelect = async (examCourse) => {
         setSelectedExamCourse(examCourse);
@@ -306,11 +291,11 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                 course_id: examCourse.course_id
             };
 
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams(payload).toString();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}?${queryParams}`, {
+                method: 'GET',
                 credentials: 'include',
-                headers,
-                body: JSON.stringify(payload)
+                headers
             });
             const data = await res.json();
             const structure = data.data || [];
@@ -344,11 +329,11 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                 course_id: course.course_id
             };
 
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams(payload).toString();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}?${queryParams}`, {
+                method: 'GET',
                 credentials: 'include',
-                headers,
-                body: JSON.stringify(payload)
+                headers
             });
             const data = await res.json();
             const structure = data.data || [];
@@ -421,10 +406,10 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams(payload).toString();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}?${queryParams}`, {
+                method: 'GET',
                 headers,
-                body: JSON.stringify(payload),
                 credentials: 'include'
             });
 
@@ -543,7 +528,7 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                                         <div className="flex items-center gap-6">
                                             <div className="text-center">
                                                 <div className="text-2xl font-black bg-[var(--neu-accent)] bg-clip-text text-transparent">
-                                                    {selectedExamCourse.examData.myResult.total_marks}
+                                                    {selectedExamCourse.examData.myResult.total_marks || ((selectedExamCourse.examData.myResult.marks_breakdown?.coding_marks || 0) + (selectedExamCourse.examData.myResult.marks_breakdown?.mcq_marks || 0))}
                                                 </div>
                                                 <div className="text-[9px] text-gray-500 font-bold uppercase">Score</div>
                                             </div>
@@ -569,8 +554,8 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                                             </div>
                                         </div>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedExamCourse.examData.myResult.exam_completion_percentage === 100 ? 'bg-[var(--neu-success-soft)] text-emerald-700 dark:bg-[var(--neu-success-soft)] dark:text-emerald-300' : 'bg-[var(--neu-warn-soft)] text-yellow-700 dark:bg-[var(--neu-warn-soft)] dark:text-yellow-300'}`}>
-                                        {selectedExamCourse.examData.myResult.exam_completion_percentage || 0}% Complete
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${((selectedExamCourse.examData.myResult.exam_completion_percentage || 0) === 100 || selectedExamCourse.examData.myResult.status === 'completed' || selectedExamCourse.examData.myResult.submitted_at || ((selectedExamCourse.examData.myResult.marks_breakdown?.coding_marks || 0) + (selectedExamCourse.examData.myResult.marks_breakdown?.mcq_marks || 0) > 0)) ? 'bg-[var(--neu-success-soft)] text-emerald-700 dark:bg-[var(--neu-success-soft)] dark:text-emerald-300' : 'bg-[var(--neu-warn-soft)] text-yellow-700 dark:bg-[var(--neu-warn-soft)] dark:text-yellow-300'}`}>
+                                        {((selectedExamCourse.examData.myResult.exam_completion_percentage || 0) === 100 || selectedExamCourse.examData.myResult.status === 'completed' || selectedExamCourse.examData.myResult.submitted_at || ((selectedExamCourse.examData.myResult.marks_breakdown?.coding_marks || 0) + (selectedExamCourse.examData.myResult.marks_breakdown?.mcq_marks || 0) > 0)) ? '100% Complete' : `${selectedExamCourse.examData.myResult.exam_completion_percentage || 0}% Complete`}
                                     </span>
                                 </div>
                             </div>
@@ -1051,7 +1036,7 @@ const CoursesGridView = ({ courses, examCourses = [], loading, onSelect, onExamS
                                                     <div>
                                                         <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider block">Score</span>
                                                         <span className="text-2xl font-black text-[var(--neu-accent)]">
-                                                            {myResult.total_marks}
+                                                            {myResult.total_marks || ((myResult.marks_breakdown?.coding_marks || 0) + (myResult.marks_breakdown?.mcq_marks || 0))}
                                                         </span>
                                                     </div>
                                                     {rank && (
@@ -1080,8 +1065,8 @@ const CoursesGridView = ({ courses, examCourses = [], loading, onSelect, onExamS
                                                 {/* Completion */}
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-xs text-gray-500">Completion</span>
-                                                    <span className={`neu-badge ${myResult.exam_completion_percentage === 100 ? 'neu-badge-success' : 'neu-badge-warn'}`}>
-                                                        {myResult.exam_completion_percentage || 0}%
+                                                    <span className={`neu-badge ${((myResult.exam_completion_percentage || 0) === 100 || myResult.status === 'completed' || myResult.submitted_at || ((myResult.marks_breakdown?.coding_marks || 0) + (myResult.marks_breakdown?.mcq_marks || 0) > 0)) ? 'neu-badge-success' : 'neu-badge-warn'}`}>
+                                                        {((myResult.exam_completion_percentage || 0) === 100 || myResult.status === 'completed' || myResult.submitted_at || ((myResult.marks_breakdown?.coding_marks || 0) + (myResult.marks_breakdown?.mcq_marks || 0) > 0)) ? '100%' : `${myResult.exam_completion_percentage || 0}%`}
                                                     </span>
                                                 </div>
                                             </div>
@@ -1361,10 +1346,10 @@ const DeepDiveRightPanel = ({ student, courseId, subUnit, history, loadingHistor
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams(payload).toString();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}?${queryParams}`, {
+                method: 'GET',
                 headers,
-                body: JSON.stringify(payload),
                 credentials: 'include'
             });
 
@@ -2400,8 +2385,8 @@ const CodingSubmissionDetail = ({ sub, analytics }) => {
                     <div className="text-xs font-bold text-[var(--neu-success)] uppercase tracking-wider flex items-center gap-2">
                         <Check className="w-4 h-4" /> Reference Solution
                     </div>
-                    <div className="bg-emerald-900/20 rounded-lg overflow-hidden border border-emerald-500/20">
-                        <pre className="p-4 text-emerald-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-64">
+                    <div className="bg-gray-900 rounded-lg overflow-hidden border border-[var(--neu-success)]/30">
+                        <pre className="p-4 text-emerald-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-64 custom-scrollbar">
                             {sub.correct_code}
                         </pre>
                     </div>

@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import useSWR, { preload } from 'swr';
 import { useAuth } from '@/context/AuthContext';
 import { API_CONFIG } from '@/utils/api';
 import { getAdminToken } from '@/utils/cookies';
@@ -16,6 +17,7 @@ import BatchDetailView from '../../components/DeepDive/BatchDetailView';
 import CourseDetailView from '../../components/DeepDive/CourseDetailView'; // [NEW]
 import PortalWrapper from '../../components/DeepDive/PortalWrapper';
 import { useTheme } from '@/context/ThemeContext';
+import { swrFetcher } from '@/utils/fetcher';
 
 export default function DeepDiveDashboard() {
     const { user, logout, loading: authLoading } = useAuth();
@@ -28,15 +30,29 @@ export default function DeepDiveDashboard() {
     const [showError, setShowError] = useState(false);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
-    // Primary Data Lists
-    const [batches, setBatches] = useState([]);
-    const [sections, setSections] = useState([]);
-    const [masterSections, setMasterSections] = useState([]); // Cache for client-side search
-    const [students, setStudents] = useState([]);
-    const [teachers, setTeachers] = useState([]);
-    const [masterTeachers, setMasterTeachers] = useState([]); // Cache for client-side search
-    const [courses, setCourses] = useState([]); // [NEW] Courses List
-    const [masterCourses, setMasterCourses] = useState([]); // [NEW] Cache for search
+    // SWR Data Fetching
+    const { data: batchesData, isLoading: batchesLoading } = useSWR(
+        user ? [`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, 'GET'] : null, swrFetcher, { revalidateOnFocus: false }
+    );
+    const { data: sectionsData, isLoading: sectionsLoading } = useSWR(
+        user ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.masters.sections}`, 'GET'] : null, swrFetcher, { revalidateOnFocus: false }
+    );
+    const { data: teachersData, isLoading: teachersLoading } = useSWR(
+        user ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myTeachers}`, 'GET'] : null, swrFetcher, { revalidateOnFocus: false }
+    );
+    const { data: coursesData, isLoading: coursesLoading } = useSWR(
+        user ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getAllCourses}?email=${encodeURIComponent(user.uni_reg_id || user.email)}`, 'GET'] : null, swrFetcher, { revalidateOnFocus: false }
+    );
+    
+    const masterBatches = Array.isArray(batchesData) ? batchesData : (batchesData?.batches || []);
+    const masterSections = Array.isArray(sectionsData) ? sectionsData : [];
+    const masterTeachers = Array.isArray(teachersData) ? teachersData : [];
+    
+    let masterCourses = [];
+    if (coursesData?.courses && Array.isArray(coursesData.courses)) masterCourses = coursesData.courses;
+    else if (Array.isArray(coursesData)) masterCourses = coursesData;
+
+    const [students, setStudents] = useState([]); // Students remain manual search
 
     // --- Deep Dive States ---
     const [inspectingStudent, setInspectingStudent] = useState(null);
@@ -138,11 +154,18 @@ export default function DeepDiveDashboard() {
         setExamStudentsLoading(true);
         try {
             const token = getAdminToken();
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}`, {
-                method: 'POST',
+            const queryParams = new URLSearchParams({
+                course_id: exam.course_id,
+                page,
+                limit: 50,
+                ...(sectionFilter && { section: sectionFilter }),
+                ...(search && { search }),
+                mode
+            }).toString();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${queryParams}`, {
+                method: 'GET',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                credentials: 'include',
-                body: JSON.stringify({ course_id: exam.course_id, page, limit: 50, section: sectionFilter || undefined, search: search || undefined, mode })
+                credentials: 'include'
             });
             const json = await res.json();
             if (json?.success) {
@@ -211,16 +234,52 @@ export default function DeepDiveDashboard() {
 
 
 
-    // Initial Data Fetch
+    // --- Heuristic Client-Side Prefetching ---
+    const trackClick = (tabId) => {
+        if (!user) return;
+        try {
+            const key = `educode_tab_clicks_${user?.email || 'guest'}`;
+            const data = JSON.parse(localStorage.getItem(key) || '{}');
+            data[tabId] = (data[tabId] || 0) + 1;
+            localStorage.setItem(key, JSON.stringify(data));
+        } catch (e) { }
+    };
+
     useEffect(() => {
         if (!authLoading && user) {
-            // Only fetch if empty to persist data across tab switches (unless explicit refresh needed)
-            if (view === 'teachers' && teachers.length === 0) fetchTeachers();
-            if (view === 'batches' && batches.length === 0) fetchBatches();
-            if (view === 'sections' && sections.length === 0) fetchSections();
-            if (view === 'courses' && courses.length === 0) fetchCourses(); // [NEW]
+            try {
+                const key = `educode_tab_clicks_${user?.email || 'guest'}`;
+                const data = JSON.parse(localStorage.getItem(key) || '{}');
+                const sortedTabs = Object.entries(data).sort((a, b) => b[1] - a[1]);
+                const topTabs = sortedTabs.slice(0, 2).map(entry => entry[0]);
+                
+                const allTabs = [
+                    { id: 'batches', prefetch: () => preload([`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, 'GET'], swrFetcher) },
+                    { id: 'sections', prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.masters.sections}`, 'GET'], swrFetcher) },
+                    { id: 'teachers', prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myTeachers}`, 'GET'], swrFetcher) },
+                    { id: 'courses', prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getAllCourses}?email=${encodeURIComponent(user?.uni_reg_id || user?.email)}`, 'GET'], swrFetcher) },
+                    { id: 'exams', prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examsOverview}`, 'GET'], swrFetcher) },
+                ];
+                
+                topTabs.forEach(tabId => {
+                    const tab = allTabs.find(t => t.id === tabId);
+                    if (tab && tab.prefetch) {
+                        tab.prefetch();
+                    }
+                });
+            } catch (e) { }
         }
-    }, [authLoading, user, view]);
+    }, [authLoading, user]);
+
+    // Computed loading state from SWR
+    useEffect(() => {
+        setLoading(
+            (view === 'batches' && batchesLoading) ||
+            (view === 'sections' && sectionsLoading) ||
+            (view === 'teachers' && teachersLoading) ||
+            (view === 'courses' && coursesLoading)
+        );
+    }, [view, batchesLoading, sectionsLoading, teachersLoading, coursesLoading]);
 
     // --- API Helpers ---
 
@@ -249,90 +308,22 @@ export default function DeepDiveDashboard() {
         }
     };
 
-    // --- Top Level Fetches ---
-
-    const fetchTeachers = async () => {
-        const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myTeachers}`);
-        const list = Array.isArray(data) ? data : [];
-        setTeachers(list);
-        setMasterTeachers(list);
-    };
-
-    const fetchBatches = async () => {
-        const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`);
-        setBatches(Array.isArray(data) ? data : (data?.batches || []));
-    };
-
-    const fetchSections = async () => {
-        const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.masters.sections}`);
-        const list = Array.isArray(data) ? data : [];
-        setSections(list);
-        setMasterSections(list);
-    };
-
-    // [NEW] Fetch Courses
-    const fetchCourses = async () => {
-        setLoading(true);
-        try {
-            const identifier = user.uni_reg_id || user.email;
-
-            const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getAllCourses}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: identifier })
-            });
-
-            // Handle various response structures
-            let list = [];
-            if (data.courses && Array.isArray(data.courses)) {
-                list = data.courses;
-            } else if (Array.isArray(data)) {
-                list = data;
-            }
-            
-            setCourses(list);
-            setMasterCourses(list);
-        } catch (error) {
-            console.error('Error fetching courses:', error);
-            setCourses([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Live Filtering Effect
-    useEffect(() => {
-        const lowerQuery = searchQuery.toLowerCase().trim();
-
-        if (view === 'teachers') {
-            if (!lowerQuery) setTeachers(masterTeachers);
-            else {
-                const filtered = masterTeachers.filter(t =>
-                    (t.teacher_name && t.teacher_name.toLowerCase().includes(lowerQuery)) ||
-                    (t.uni_reg_id && String(t.uni_reg_id).toLowerCase().includes(lowerQuery)) ||
-                    (t.teacher_email && t.teacher_email.toLowerCase().includes(lowerQuery))
-                );
-                setTeachers(filtered);
-            }
-        } else if (view === 'sections') {
-            if (!lowerQuery) setSections(masterSections);
-            else {
-                const filtered = masterSections.filter(s =>
-                    String(s).toLowerCase().includes(lowerQuery)
-                );
-                setSections(filtered);
-            }
-        } else if (view === 'courses') {
-            if (!lowerQuery) setCourses(masterCourses);
-            else {
-                const filtered = masterCourses.filter(c =>
-                    (c.course_name && c.course_name.toLowerCase().includes(lowerQuery)) ||
-                    (c.course_code && c.course_code.toLowerCase().includes(lowerQuery))
-                );
-                setCourses(filtered);
-            }
-        }
-    }, [searchQuery, view, masterTeachers, masterSections, masterCourses]);
+    // Computed Live Filtering from SWR cache
+    const lowerQuery = searchQuery.toLowerCase().trim();
+    
+    const batches = masterBatches;
+    
+    const sections = lowerQuery 
+        ? masterSections.filter(s => String(s).toLowerCase().includes(lowerQuery))
+        : masterSections;
+        
+    const teachers = lowerQuery
+        ? masterTeachers.filter(t => (t.teacher_name && t.teacher_name.toLowerCase().includes(lowerQuery)) || (t.uni_reg_id && String(t.uni_reg_id).toLowerCase().includes(lowerQuery)) || (t.teacher_email && t.teacher_email.toLowerCase().includes(lowerQuery)))
+        : masterTeachers;
+        
+    const courses = lowerQuery
+        ? masterCourses.filter(c => (c.course_name && c.course_name.toLowerCase().includes(lowerQuery)) || (c.course_code && c.course_code.toLowerCase().includes(lowerQuery)))
+        : masterCourses;
 
     // --- Auth Loading Guard ---
     if (authLoading) {
@@ -435,10 +426,9 @@ export default function DeepDiveDashboard() {
     const loadBatchCourses = async (batchId) => {
         setLoading(true);
         try {
-            const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getPracticeCoursesByBatch}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ batch_id: batchId })
+            const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getPracticeCoursesByBatch}?batch_id=${encodeURIComponent(batchId)}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
             });
 
             if (data && data.courses) return data.courses;
@@ -832,16 +822,17 @@ export default function DeepDiveDashboard() {
                     {/* Pill Tabs */}
                     <div className="flex gap-1.5 overflow-x-auto pb-1 neu-raised rounded-full p-1.5 w-fit max-w-full">
                         {[
-                            { id: 'batches', label: 'Batches', icon: LayoutGrid, count: batches.length },
-                            { id: 'sections', label: 'Sections', icon: Layers, count: sections.length },
-                            { id: 'teachers', label: 'Teachers', icon: Users, count: teachers.length },
+                            { id: 'batches', label: 'Batches', icon: LayoutGrid, count: batches.length, prefetch: () => preload([`${API_CONFIG.baseUrl.admin}/admin/dashboard/overview`, 'GET'], swrFetcher) },
+                            { id: 'sections', label: 'Sections', icon: Layers, count: sections.length, prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.masters.sections}`, 'GET'], swrFetcher) },
+                            { id: 'teachers', label: 'Teachers', icon: Users, count: teachers.length, prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myTeachers}`, 'GET'], swrFetcher) },
                             { id: 'students', label: 'Students', icon: GraduationCap },
-                            { id: 'courses', label: 'Courses', icon: BookOpen, count: courses.length },
-                            { id: 'exams', label: 'Exams', icon: Trophy, count: examsOverview?.length },
+                            { id: 'courses', label: 'Courses', icon: BookOpen, count: courses.length, prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getAllCourses}?email=${encodeURIComponent(user?.uni_reg_id || user?.email)}`, 'GET'], swrFetcher) },
+                            { id: 'exams', label: 'Exams', icon: Trophy, count: examsOverview?.length, prefetch: () => preload([`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examsOverview}`, 'GET'], swrFetcher) },
                         ].map(item => (
                             <button
                                 key={item.id}
-                                onClick={() => { setView(item.id); setSearchQuery(''); if (item.id === 'exams' && examsOverview === null) fetchExamsOverview(); }}
+                                onMouseEnter={item.prefetch}
+                                onClick={() => { setView(item.id); trackClick(item.id); setSearchQuery(''); if (item.id === 'exams' && examsOverview === null) fetchExamsOverview(); }}
                                 className={`flex items-center gap-2 pl-4 pr-3.5 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 ${view === item.id
                                     ? 'neu-btn-primary'
                                     : 'text-[#6B7280] dark:text-gray-400 hover:text-[#111827] dark:hover:text-white hover:bg-[#F6F4F0] dark:hover:bg-slate-700/50'}`}
