@@ -593,7 +593,19 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                                             <span className="text-xs font-extrabold uppercase tracking-widest text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)]">Exam Analytics</span>
                                         </div>
                                     <div className="flex items-center gap-2">
-                                        <button
+                                        <a
+                                            href={`/dashboard/details-analysis?${new URLSearchParams({
+                                                examName: selectedExamCourse.course_name || 'Exam',
+                                                courseId: selectedExamCourse.course_id || '',
+                                                studentId: fullStudent.student_id || fullStudent.uuid || fullStudent.uni_reg_id || fullStudent.reg_id || '',
+                                                regNo: fullStudent.uni_reg_id || fullStudent.reg_id || '',
+                                                name: fullStudent.name || fullStudent.student_name || '',
+                                                email: fullStudent.email || '',
+                                                sectionName: fullStudent.section || fullStudent.section_name || '',
+                                                batchId: fullStudent.batch_id || fullStudent.batch || ''
+                                            }).toString()}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 try {
@@ -606,24 +618,13 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                                                         completionPct: selectedExamCourse.examData?.myResult?.exam_completion_percentage || 0
                                                     }));
                                                 } catch (err) { /* sessionStorage full/unavailable — page will refetch */ }
-                                                const params = new URLSearchParams({
-                                                    examName: selectedExamCourse.course_name || 'Exam',
-                                                    courseId: selectedExamCourse.course_id || '',
-                                                    studentId: fullStudent.student_id || fullStudent.uuid || fullStudent.uni_reg_id || fullStudent.reg_id || '',
-                                                    regNo: fullStudent.uni_reg_id || fullStudent.reg_id || '',
-                                                    name: fullStudent.name || fullStudent.student_name || '',
-                                                    email: fullStudent.email || '',
-                                                    sectionName: fullStudent.section || fullStudent.section_name || '',
-                                                    batchId: fullStudent.batch_id || fullStudent.batch || ''
-                                                });
-                                                window.open(`/dashboard/details-analysis?${params.toString()}`, '_blank');
                                             }}
                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-widest text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-sm transition-all active:scale-95"
                                             title="Open full analysis with proctoring recording & PDF report"
                                         >
                                             <Eye className="w-3.5 h-3.5" />
                                             Full Report
-                                        </button>
+                                        </a>
                                         <div className="text-gray-400 neu-inset rounded-full p-1 group-hover:bg-gray-200 dark:group-hover:bg-[var(--card)]/10 transition-colors">
                                             {showExamAnalytics ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                         </div>
