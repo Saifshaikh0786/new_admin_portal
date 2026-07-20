@@ -6,6 +6,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'react-hot-toast';
 
 
 function LoginContent() {
@@ -32,16 +33,26 @@ function LoginContent() {
     setIsSubmitting(true);
 
     try {
-      await login({ email, password }, role);
-      router.push('/dashboard');
+      const res = await login({ email, password }, role);
+      if (res && res.success === false) {
+        toast.error(res.error || 'Invalid email or password');
+        setError(res.error || 'Invalid email or password');
+        setIsSubmitting(false);
+      } else {
+        toast.success('Login successful');
+        // Add a small artificial delay so the user can see the "Logging in..." state and toast
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 800);
+      }
     } catch (err) {
+      toast.error(err.message || 'Login failed. Please check your credentials.');
       setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (authLoading) return null;
+  if (authLoading && !isSubmitting) return null;
   if (user) return null;
 
   return (
@@ -102,7 +113,7 @@ function LoginContent() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             ) : null}
-            {isSubmitting ? 'Signing in...' : 'Sign In'}
+            {isSubmitting ? 'Logging in...' : 'Sign In'}
           </button>
 
           {process.env.NODE_ENV === 'development' && (

@@ -22,6 +22,7 @@ export const metadata = {
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { GlobalLogger } from "@/components/GlobalLogger";
+import { Toaster } from "react-hot-toast";
 
 export default function RootLayout({ children }) {
   return (
@@ -30,6 +31,7 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <AuthProvider>
             <GlobalLogger />
+            <Toaster position="top-right" />
             {children}
           </AuthProvider>
         </ThemeProvider>
