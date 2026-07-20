@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, ArrowLeft, Terminal, AlertCircle, Clock, Globe, ShieldAlert, Monitor, Activity, Shield, Wifi, WifiOff, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Terminal, AlertCircle, Clock, Globe, ShieldAlert, Monitor, Activity, Shield, Wifi, WifiOff, FileText, CheckCircle, XCircle, Download, Video, Code, ChevronDown, Target } from 'lucide-react';
 import useSWR from 'swr';
 import { getAdminToken } from '@/utils/cookies';
 import { API_CONFIG } from "@/utils/api";
@@ -130,7 +130,7 @@ function DetailsAnalysisContent() {
 
         useEffect(() => {
             if (!swrData) {
-                if (isValidating && !subUnitData) setLoading(true);
+                if (isValidating) setLoading(true);
                 if (swrError) setError(swrError.message || "Failed to fetch data.");
                 return;
             }
@@ -140,34 +140,14 @@ function DetailsAnalysisContent() {
 
             setStudentInfo({
                 name: nameParam || "Student",
-                regId: uniRegIdParam || studentId,
-                courseName: courseNameParam || "Exam Course"
+                email: emailParam,
+                regNo: regNo || studentId,
+                section: sectionName,
+                course: examName,
+                telemetry, totalMarks, marksBreakdown, completionPct
             });
-            setTotalExamMarks(totalMarks);
-            setExamMarksBreakdown(marksBreakdown);
-            setExamCompletion(completionPct);
 
-            let mcq = null;
-            let coding = null;
 
-            for (const suRes of subUnitResults) {
-                if (suRes?.success && suRes.data) {
-                    if (suRes.data.sub_unit_type?.toLowerCase() === 'mcq') mcq = suRes.data;
-                    if (suRes.data.sub_unit_type?.toLowerCase() === 'coding') coding = suRes.data;
-                }
-            }
-
-            setSubUnitData({ mcq, coding });
-
-            const envData = envJson?.success && envJson.data ? envJson.data : {};
-            if (!telemetry && Object.keys(envData).length === 0) {
-                setTelemetryData(null);
-            } else {
-                setTelemetryData({
-                    environment: envData,
-                    ...telemetry
-                });
-            }
             if (envJson?.success) setEnvLogs(envJson.data || {});
 
             // Merge submissions across ALL sub-units. Attempts are ordered
@@ -209,7 +189,7 @@ function DetailsAnalysisContent() {
                     max_score: codingSubs.reduce((a, s) => a + (s.max_score || 0), 0)
                 }
             });
-        }, [swrData, isValidating, swrError, nameParam, uniRegIdParam, studentId, courseNameParam]);
+        }, [swrData, isValidating, swrError, nameParam, emailParam, regNo, studentId, sectionName, examName]);
 
     // ── Derived Data (legacy names preserved) ──
     const telemetry = studentInfo?.telemetry || {};
