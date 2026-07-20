@@ -70,6 +70,14 @@ export default function DashboardLayout({ children }) {
     { name: "Live Roster", href: "/dashboard/live-roster", icon: Users },
   ];
 
+  if (pathname && pathname.includes("/details-analysis")) {
+    return (
+      <DashboardProvider>
+        {children}
+      </DashboardProvider>
+    );
+  }
+
   return (
     <div className="min-h-screen neu-page transition-colors duration-300 relative">
       <div className="hidden dark:block fixed top-0 right-0 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none z-0 transform-gpu will-change-transform" />

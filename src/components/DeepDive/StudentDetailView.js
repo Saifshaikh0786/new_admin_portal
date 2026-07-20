@@ -13,8 +13,8 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
     const [viewLink, setViewLink] = useState('courses');
     const [courses, setCourses] = useState([]);
     const [examCourses, setExamCourses] = useState([]);
-    const [loadingCourses, setLoadingCourses] = useState(false);
-    const [loadingExamCourses, setLoadingExamCourses] = useState(false);
+    const [loadingCourses, setLoadingCourses] = useState(true);
+    const [loadingExamCourses, setLoadingExamCourses] = useState(true);
     const { user } = useAuth();
 
     const [selectedCourse, setSelectedCourse] = useState(null);

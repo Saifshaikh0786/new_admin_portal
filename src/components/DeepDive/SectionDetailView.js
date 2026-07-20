@@ -1216,11 +1216,11 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
             {/* ──── Export Configuration Modal ──── */}
             {showExportModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 neu-raised rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+                    <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 bg-[#f0f4f8] dark:bg-[#0B0F19] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 pb-4 border-b border-[var(--neu-divider)]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-[var(--neu-accent)] flex items-center justify-center shadow-lg shadow-cyan-500/25">
+                                <div className="w-10 h-10 rounded-xl bg-[var(--neu-accent)] flex items-center justify-center">
                                     <Download className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
@@ -1255,7 +1255,7 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
                                         >
                                             <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                                                 exportConfig[metric.id] 
-                                                    ? 'bg-cyan-500 border-cyan-500 shadow-sm shadow-cyan-500/30' 
+                                                    ? 'bg-cyan-500 border-cyan-500' 
                                                     : 'border-gray-300 dark:border-gray-600 group-hover:border-cyan-500/50'
                                             }`}>
                                                 {exportConfig[metric.id] && (
@@ -1318,14 +1318,14 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
                                                                     onClick={() => toggleExportUnit(key)}
                                                                     className={`flex items-center gap-2.5 p-3 rounded-xl text-sm font-semibold text-left transition-all duration-200
                                                                         ${isSelected
-                                                                            ? 'bg-[var(--neu-achieve-soft)] border-2 border-cyan-500/50 text-cyan-700 dark:text-cyan-300 shadow-sm'
+                                                                            ? 'bg-cyan-50/50 dark:bg-cyan-900/20 border border-cyan-500 text-cyan-700 dark:text-cyan-300 shadow-sm'
                                                                             : 'neu-raised text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/10'
                                                                         }`}
                                                                 >
-                                                                    <div className={`w-4.5 h-4.5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all
+                                                                    <div className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-all
                                                                         ${isSelected
-                                                                            ? 'bg-cyan-500 border-cyan-500 shadow-sm shadow-cyan-500/30'
-                                                                            : 'border-gray-300 dark:border-gray-600'
+                                                                            ? 'bg-cyan-500'
+                                                                            : 'border-2 border-gray-300 dark:border-gray-600'
                                                                         }`}
                                                                     >
                                                                         {isSelected && (

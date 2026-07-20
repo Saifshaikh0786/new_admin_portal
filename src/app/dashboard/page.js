@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import useSWR, { preload } from 'swr';
+import useSWR, { mutate } from 'swr';
 import { useAuth } from '@/context/AuthContext';
 import { API_CONFIG } from '@/utils/api';
 import { getAdminToken } from '@/utils/cookies';
@@ -45,7 +45,7 @@ export default function DeepDiveDashboard() {
     );
     
     const masterBatches = Array.isArray(batchesData) ? batchesData : (batchesData?.batches || []);
-    const masterSections = Array.isArray(sectionsData) ? sectionsData : [];
+    const masterSections = Array.isArray(sectionsData?.data) ? sectionsData.data : (Array.isArray(sectionsData) ? sectionsData : []);
     const masterTeachers = Array.isArray(teachersData) ? teachersData : [];
     
     let masterCourses = [];
@@ -128,6 +128,44 @@ export default function DeepDiveDashboard() {
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [examStudentSearch]);
+
+    // --- Preload Section Matrices ---
+    useEffect(() => {
+        if (!user || !masterSections || masterSections.length === 0) return;
+        const token = getAdminToken();
+        if (!token) return;
+        
+        let isMounted = true;
+        const fetchAll = async () => {
+            for (const section of masterSections) {
+                if (!isMounted) break;
+                const sectionNameStr = typeof section === 'string' ? section : section?.section_name;
+                if (!sectionNameStr) continue;
+                
+                const qs = new URLSearchParams({
+                    section: sectionNameStr,
+                    page: 1,
+                    limit: 50,
+                    sortBy: 'student_name',
+                    order: 'asc',
+                    search: ''
+                }).toString();
+                
+                const key = [`${API_CONFIG.baseUrl.admin}/admin/analytics/section-matrix?${qs}`, 'GET'];
+                
+                try {
+                    swrFetcher(key).then(data => {
+                        if (isMounted) mutate(key, data, { revalidate: false });
+                    }).catch(() => {});
+                    // Stagger the network requests by 200ms to prevent flooding the backend
+                    await new Promise(r => setTimeout(r, 200));
+                } catch (e) {}
+            }
+        };
+        fetchAll();
+
+        return () => { isMounted = false; };
+    }, [user, masterSections]);
 
     const filteredExamsOverview = React.useMemo(() => {
         if (!examsOverview) return null;
@@ -328,7 +366,7 @@ export default function DeepDiveDashboard() {
     // --- Auth Loading Guard ---
     if (authLoading) {
         return (
-            <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center">
+            <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
             </div>
         );
