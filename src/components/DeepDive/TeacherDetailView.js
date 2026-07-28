@@ -63,7 +63,7 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
 
         // Fetch from API
         try {
-            const url = `${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(encodeURIComponent(encodeURIComponent(sectionName)))}`;
+            const url = `${API_CONFIG.baseUrl.admin}/admin/analytics/section-matrix?section=${encodeURIComponent(sectionName)}`;
             const token = getAdminToken();
             const headers = {};
             if (token) {
@@ -150,21 +150,16 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
             setLoadingAll(true);
 
             for (const sectionName of teacher.assigned_section) {
-                // Skip if we already have completion data for this section
-                if (cache[sectionName] && Object.keys(cache[sectionName]).length > 0) {
+                // Skip if we already have analytics data for this section
+                if (sectionAnalyticsCache[sectionName]) {
                     continue;
                 }
 
                 setLoadingProgress(prev => ({ ...prev, [sectionName]: true }));
 
                 try {
-                    // Fetch section analytics (with caching)
-                    const analyticsData = await fetchSectionAnalytics(sectionName);
-
-                    if (analyticsData?.course_performance) {
-                        // Fetch completion for each course
-                        await fetchSectionCompletion(sectionName, analyticsData.course_performance);
-                    }
+                    // Fetch section analytics (with caching) - this gives us course_performance with average_score
+                    await fetchSectionAnalytics(sectionName);
                 } catch (err) {
                     console.error(`Failed to load section ${sectionName}`, err);
                 } finally {
@@ -176,7 +171,7 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
         };
 
         loadAllSections();
-    }, [teacher?.assigned_section, user, fetchSectionAnalytics, fetchSectionCompletion, cache]);
+    }, [teacher?.assigned_section, user, fetchSectionAnalytics, sectionAnalyticsCache]);
 
     // Manual refresh for a single section
     const handleRefreshSection = async (sectionName, e) => {
@@ -185,20 +180,8 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
         setLoadingProgress(prev => ({ ...prev, [sectionName]: true }));
 
         try {
-            // Force refresh analytics
-            const analyticsData = await fetchSectionAnalytics(sectionName, true);
-
-            if (analyticsData?.course_performance) {
-                // Clear existing cache for this section
-                if (onUpdateCache) {
-                    analyticsData.course_performance.forEach(course => {
-                        onUpdateCache(sectionName, course.course_id, undefined);
-                    });
-                }
-
-                // Fetch fresh completion data
-                await fetchSectionCompletion(sectionName, analyticsData.course_performance);
-            }
+            // Force refresh analytics - this gives us fresh course_performance with average_score
+            await fetchSectionAnalytics(sectionName, true);
         } catch (err) {
             console.error(`Failed to refresh section ${sectionName}`, err);
         } finally {
@@ -207,14 +190,13 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
     };
 
     const getSectionProgress = (sectionName) => {
-        const cachedData = cache[sectionName];
-        if (!cachedData) return null;
+        // Use course_performance average_score from the section-matrix API data
+        const analyticsData = sectionAnalyticsCache[sectionName];
+        if (!analyticsData?.course_performance || analyticsData.course_performance.length === 0) return null;
 
-        const courses = Object.values(cachedData).filter(v => typeof v === 'number');
-        if (courses.length === 0) return null;
-
-        const sum = courses.reduce((a, b) => a + b, 0);
-        return Math.round(sum / courses.length);
+        const scores = analyticsData.course_performance.map(c => c.average_score || 0);
+        const sum = scores.reduce((a, b) => a + b, 0);
+        return Math.round(sum / scores.length);
     };
 
     const getOverallProgress = () => {
