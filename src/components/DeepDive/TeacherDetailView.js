@@ -436,8 +436,8 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
                                                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5">
                                                     <div className="h-1.5 w-full neu-inset rounded-full overflow-hidden">
                                                         <div
-                                                            className={`h-full rounded-full transition-all duration-1000 ${progress > 75 ? 'bg-[var(--neu-success-soft)]' :
-                                                                    progress > 40 ? 'bg-[var(--neu-achieve-soft)]' :
+                                                            className={`h-full rounded-full transition-all duration-1000 ${progress > 75 ? 'bg-emerald-500' :
+                                                                    progress > 40 ? 'bg-blue-500' :
                                                                         'bg-orange-500'
                                                                 }`}
                                                             style={{ width: `${progress}%` }}
