@@ -560,28 +560,30 @@ function DetailsAnalysisContent() {
                         <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center"><Target className="w-4 h-4 text-violet-400" /></div>
                         <h3 className="text-sm font-bold uppercase tracking-widest text-gray-300">Proctoring Analytics</h3>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className={`grid grid-cols-1 ${hasPerSectionTiming ? 'md:grid-cols-2' : ''} gap-6`}>
                         {/* MCQ Section */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                                <div className="text-[11px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                                    <FileText className="w-3.5 h-3.5" /> MCQ Section
-                                </div>
-                                {mcqDuration && (
-                                    <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 border-blue-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                                        ⏱ {mcqDuration}m
+                        {hasPerSectionTiming && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                                    <div className="text-[11px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                                        <FileText className="w-3.5 h-3.5" /> MCQ Section
                                     </div>
-                                )}
+                                    {mcqDuration && (
+                                        <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 border-blue-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                                            ⏱ {mcqDuration}m
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <StatPill label="Started" value={mcqStartedAt ? formatTime(mcqStartedAt) : 'N/A'} />
+                                    <StatPill label="Ended" value={mcqEndedAt ? formatTime(mcqEndedAt) : 'N/A'} />
+                                    <StatPill label="Focus Lost" value={mcqAnalytics.focus_lost_count ?? telemetry.lostFocusCount ?? 0} warn={(mcqAnalytics.focus_lost_count || 0) > 0} />
+                                    <StatPill label="Face Warnings" value={mcqAnalytics.face_warnings ?? telemetry.faceWarnings ?? 0} warn={(mcqAnalytics.face_warnings || 0) > 0} />
+                                    <StatPill label="Net Health" value={mcqAnalytics.network_health || ((telemetry.internetDisconnects || 0) > 0 ? 'Unstable' : 'Stable')} warn={(telemetry.internetDisconnects || 0) > 0} />
+                                    <StatPill label="Blocked" value={`${mcqAnalytics.blocked_seconds ?? telemetry.blockedSeconds ?? 0}s`} warn={(telemetry.blockedSeconds || 0) > 0} />
+                                </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <StatPill label="Started" value={mcqStartedAt ? formatTime(mcqStartedAt) : 'N/A'} />
-                                <StatPill label="Ended" value={mcqEndedAt ? formatTime(mcqEndedAt) : 'N/A'} />
-                                <StatPill label="Focus Lost" value={mcqAnalytics.focus_lost_count ?? telemetry.lostFocusCount ?? 0} warn={(mcqAnalytics.focus_lost_count || 0) > 0} />
-                                <StatPill label="Face Warnings" value={mcqAnalytics.face_warnings ?? telemetry.faceWarnings ?? 0} warn={(mcqAnalytics.face_warnings || 0) > 0} />
-                                <StatPill label="Net Health" value={mcqAnalytics.network_health || ((telemetry.internetDisconnects || 0) > 0 ? 'Unstable' : 'Stable')} warn={(telemetry.internetDisconnects || 0) > 0} />
-                                <StatPill label="Blocked" value={`${mcqAnalytics.blocked_seconds ?? telemetry.blockedSeconds ?? 0}s`} warn={(telemetry.blockedSeconds || 0) > 0} />
-                            </div>
-                        </div>
+                        )}
                         {/* Coding Section */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between pb-2 border-b border-white/5">
