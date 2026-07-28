@@ -211,15 +211,15 @@ function DetailsAnalysisContent() {
     let codingStartedAt, codingEndedAt, codingDuration;
 
     if (hasPerSectionTiming) {
-        // Tier 1: Real per-section data
+        // Tier 1: Real per-section data — show both MCQ and Coding individually
         mcqStartedAt = envLogs.mcq_timing?.startedAt ? new Date(envLogs.mcq_timing.startedAt) : examStartedAt;
         mcqEndedAt = envLogs.mcq_timing?.lastUpdatedAt ? new Date(envLogs.mcq_timing.lastUpdatedAt) : null;
         codingStartedAt = envLogs.coding_timing?.startedAt ? new Date(envLogs.coding_timing.startedAt) : null;
         codingEndedAt = envLogs.coding_timing?.lastUpdatedAt ? new Date(envLogs.coding_timing.lastUpdatedAt) : examEndedAt;
     } else {
-        // Tier 2: No per-section data — use overall exam timing for both
-        mcqStartedAt = examStartedAt;
-        mcqEndedAt = examEndedAt;
+        // Tier 2: No per-section data — show overall exam timing under Coding only
+        mcqStartedAt = null;
+        mcqEndedAt = null;
         codingStartedAt = examStartedAt;
         codingEndedAt = examEndedAt;
     }
@@ -569,7 +569,7 @@ function DetailsAnalysisContent() {
                                 </div>
                                 {mcqDuration && (
                                     <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 border-blue-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                                        ⏱ {mcqDuration}m{!hasPerSectionTiming ? ' (overall)' : ''}
+                                        ⏱ {mcqDuration}m
                                     </div>
                                 )}
                             </div>
@@ -590,7 +590,7 @@ function DetailsAnalysisContent() {
                                 </div>
                                 {codingDuration && (
                                     <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border-violet-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                                        ⏱ {codingDuration}m{!hasPerSectionTiming ? ' (overall)' : ''}
+                                        ⏱ {codingDuration}m
                                     </div>
                                 )}
                             </div>
