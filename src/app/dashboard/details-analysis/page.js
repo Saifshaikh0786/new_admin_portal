@@ -200,14 +200,25 @@ function DetailsAnalysisContent() {
     const examEndedAt = telemetry.lastUpdatedAt ? new Date(telemetry.lastUpdatedAt) : null;
     const examDuration = examStartedAt && examEndedAt ? Math.round((examEndedAt - examStartedAt) / 60000) : null;
 
-    // Per-section windows from submission timestamps; section start falls back
-    // to the exam start (a section begins before its first submit lands).
-    const mcqStartedAt = examStartedAt || mcqDetails?.timing?.start || null;
-    const mcqEndedAt = mcqDetails?.timing?.end || null;
-    const mcqDuration = mcqStartedAt && mcqEndedAt ? Math.max(1, Math.round((mcqEndedAt - mcqStartedAt) / 60000)) : null;
-    const codingStartedAt = mcqEndedAt || codingDetails?.timing?.start || examStartedAt;
-    const codingEndedAt = codingDetails?.timing?.end || examEndedAt;
-    const codingDuration = codingStartedAt && codingEndedAt ? Math.max(1, Math.round((codingEndedAt - codingStartedAt) / 60000)) : null;
+    // Per-section timing: prefer authoritative per-section data from
+    // exam-environment API (mcq_timing / coding_timing). These are populated
+    // for exams taken after the result_type deploy. For older exams they'll be
+    // null and we fall back to the overall exam telemetry window.
+    const mcqStartedAt = envLogs.mcq_timing?.startedAt
+        ? new Date(envLogs.mcq_timing.startedAt) : examStartedAt;
+    const mcqEndedAt = envLogs.mcq_timing?.lastUpdatedAt
+        ? new Date(envLogs.mcq_timing.lastUpdatedAt) : null;
+    const mcqDuration = mcqStartedAt && mcqEndedAt
+        ? Math.max(1, Math.round((mcqEndedAt - mcqStartedAt) / 60000))
+        : null;
+
+    const codingStartedAt = envLogs.coding_timing?.startedAt
+        ? new Date(envLogs.coding_timing.startedAt) : (mcqEndedAt || examStartedAt);
+    const codingEndedAt = envLogs.coding_timing?.lastUpdatedAt
+        ? new Date(envLogs.coding_timing.lastUpdatedAt) : examEndedAt;
+    const codingDuration = codingStartedAt && codingEndedAt
+        ? Math.max(1, Math.round((codingEndedAt - codingStartedAt) / 60000))
+        : null;
 
     const overallMcqScore = mcqDetails?.overview?.total_score || 0;
     const maxMcqScore = mcqDetails?.overview?.max_score || 0;
