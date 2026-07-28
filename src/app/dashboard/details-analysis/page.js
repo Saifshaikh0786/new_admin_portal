@@ -200,25 +200,42 @@ function DetailsAnalysisContent() {
     const examEndedAt = telemetry.lastUpdatedAt ? new Date(telemetry.lastUpdatedAt) : null;
     const examDuration = examStartedAt && examEndedAt ? Math.round((examEndedAt - examStartedAt) / 60000) : null;
 
-    // Per-section timing: prefer authoritative per-section data from
-    // exam-environment API (mcq_timing / coding_timing). These are populated
-    // for exams taken after the result_type deploy. For older exams they'll be
-    // null and we fall back to the overall exam telemetry window.
-    const mcqStartedAt = envLogs.mcq_timing?.startedAt
-        ? new Date(envLogs.mcq_timing.startedAt) : examStartedAt;
-    const mcqEndedAt = envLogs.mcq_timing?.lastUpdatedAt
-        ? new Date(envLogs.mcq_timing.lastUpdatedAt) : null;
-    const mcqDuration = mcqStartedAt && mcqEndedAt
-        ? Math.max(1, Math.round((mcqEndedAt - mcqStartedAt) / 60000))
-        : null;
+    // ── Per-section timing (3 tiers) ──
+    // Tier 1: Authoritative per-section data from exam-environment API
+    //         (only available for exams after the result_type deploy)
+    // Tier 2: Overall exam telemetry (shown for both sections when Tier 1 unavailable)
+    // Tier 3: Safety — ensure start <= end; if impossible, show only duration or N/A
+    const hasPerSectionTiming = !!(envLogs.mcq_timing || envLogs.coding_timing);
 
-    const codingStartedAt = envLogs.coding_timing?.startedAt
-        ? new Date(envLogs.coding_timing.startedAt) : (mcqEndedAt || examStartedAt);
-    const codingEndedAt = envLogs.coding_timing?.lastUpdatedAt
-        ? new Date(envLogs.coding_timing.lastUpdatedAt) : examEndedAt;
-    const codingDuration = codingStartedAt && codingEndedAt
-        ? Math.max(1, Math.round((codingEndedAt - codingStartedAt) / 60000))
-        : null;
+    let mcqStartedAt, mcqEndedAt, mcqDuration;
+    let codingStartedAt, codingEndedAt, codingDuration;
+
+    if (hasPerSectionTiming) {
+        // Tier 1: Real per-section data
+        mcqStartedAt = envLogs.mcq_timing?.startedAt ? new Date(envLogs.mcq_timing.startedAt) : examStartedAt;
+        mcqEndedAt = envLogs.mcq_timing?.lastUpdatedAt ? new Date(envLogs.mcq_timing.lastUpdatedAt) : null;
+        codingStartedAt = envLogs.coding_timing?.startedAt ? new Date(envLogs.coding_timing.startedAt) : null;
+        codingEndedAt = envLogs.coding_timing?.lastUpdatedAt ? new Date(envLogs.coding_timing.lastUpdatedAt) : examEndedAt;
+    } else {
+        // Tier 2: No per-section data — use overall exam timing for both
+        mcqStartedAt = examStartedAt;
+        mcqEndedAt = examEndedAt;
+        codingStartedAt = examStartedAt;
+        codingEndedAt = examEndedAt;
+    }
+
+    // Tier 3 safety: ensure start <= end (swap if backwards)
+    if (mcqStartedAt && mcqEndedAt && mcqStartedAt > mcqEndedAt) {
+        [mcqStartedAt, mcqEndedAt] = [mcqEndedAt, mcqStartedAt];
+    }
+    if (codingStartedAt && codingEndedAt && codingStartedAt > codingEndedAt) {
+        [codingStartedAt, codingEndedAt] = [codingEndedAt, codingStartedAt];
+    }
+
+    mcqDuration = mcqStartedAt && mcqEndedAt
+        ? Math.max(1, Math.round((mcqEndedAt - mcqStartedAt) / 60000)) : null;
+    codingDuration = codingStartedAt && codingEndedAt
+        ? Math.max(1, Math.round((codingEndedAt - codingStartedAt) / 60000)) : null;
 
     const overallMcqScore = mcqDetails?.overview?.total_score || 0;
     const maxMcqScore = mcqDetails?.overview?.max_score || 0;
@@ -551,8 +568,8 @@ function DetailsAnalysisContent() {
                                     <FileText className="w-3.5 h-3.5" /> MCQ Section
                                 </div>
                                 {mcqDuration && (
-                                    <div className="text-[10px] font-bold bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 px-2.5 py-0.5 rounded-lg border border-blue-500/20">
-                                        ⏱ {mcqDuration}m
+                                    <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 border-blue-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                                        ⏱ {mcqDuration}m{!hasPerSectionTiming ? ' (overall)' : ''}
                                     </div>
                                 )}
                             </div>
@@ -572,8 +589,8 @@ function DetailsAnalysisContent() {
                                     <Code className="w-3.5 h-3.5" /> Coding Section
                                 </div>
                                 {codingDuration && (
-                                    <div className="text-[10px] font-bold bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 px-2.5 py-0.5 rounded-lg border border-violet-500/20">
-                                        ⏱ {codingDuration}m
+                                    <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border-violet-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                                        ⏱ {codingDuration}m{!hasPerSectionTiming ? ' (overall)' : ''}
                                     </div>
                                 )}
                             </div>
