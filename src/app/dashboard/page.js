@@ -220,90 +220,47 @@ export default function DeepDiveDashboard() {
         setIsExportingCSV(true);
         try {
             const token = getAdminToken();
-            const sections = exam.sections?.map(s => s.section) || [];
-            if (sections.length === 0) {
-                setIsExportingCSV(false);
-                return;
-            }
-
-            // Fetch section-matrix data for every section in parallel (rich proctoring/timing data)
-            const allStudentRows = [];
-            for (const sectionName of sections) {
-                try {
-                    const qs = new URLSearchParams({ section: sectionName, page: 1, limit: 10000, sortBy: 'student_name', order: 'asc', search: '' }).toString();
-                    const res = await fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/section-matrix?${qs}`, {
+            const allStudents = [];
+            for (const mode of ['attempted', 'not_attempted']) {
+                let page = 1, total = 0;
+                do {
+                    const qs = new URLSearchParams({ course_id: exam.course_id, page, limit: 200, mode }).toString();
+                    const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${qs}`, {
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         credentials: 'include'
                     });
                     const json = await res.json();
-                    if (!json?.success) continue;
-
-                    const students = json.data?.student_performance || [];
-                    for (const student of students) {
-                        // Find THIS exam's course data in the student's courses array
-                        const coursesForExam = (student.courses || []).filter(c => c.course_id === exam.course_id);
-                        if (coursesForExam.length === 0) continue;
-
-                        // Aggregate MCQ + Coding rows for this course
-                        let mcqMarks = 0, codingMarks = 0, totalMarks = 0;
-                        let analytics = {};
-                        let submittedAt = null, scorePct = 0;
-
-                        for (const c of coursesForExam) {
-                            totalMarks += Number(c.marks_obtained || 0);
-                            if (c.result_type === 'mcq') mcqMarks += Number(c.marks_obtained || 0);
-                            else codingMarks += Number(c.marks_obtained || 0);
-                            if (c.submitted_at) submittedAt = c.submitted_at;
-                            scorePct = Math.max(scorePct, Number(c.score_percent || 0));
-                            // Merge analytics from any course row (start + end events)
-                            if (c.analytics && Object.keys(c.analytics).length > 0) {
-                                analytics = { ...analytics, ...c.analytics };
-                            }
-                        }
-
-                        allStudentRows.push({
-                            student_name: student.student_name,
-                            uni_reg_id: student.uni_reg_id,
-                            section: sectionName,
-                            completion_pct: scorePct,
-                            total_marks: totalMarks,
-                            coding_marks: codingMarks,
-                            mcq_marks: mcqMarks,
-                            submitted_at: submittedAt,
-                            analytics
-                        });
-                    }
-                } catch (e) {
-                    console.error(`Section ${sectionName} fetch error:`, e);
-                }
+                    if (!json?.success) break;
+                    allStudents.push(...(json.data || []));
+                    total = json.pagination?.total || 0;
+                    page++;
+                } while (allStudents.length < total);
             }
-
-            if (!allStudentRows.length) {
-                setIsExportingCSV(false);
-                return;
-            }
+            if (!allStudents.length) { setIsExportingCSV(false); return; }
 
             // Sort by total marks descending for ranking
-            allStudentRows.sort((a, b) => b.total_marks - a.total_marks);
+            allStudents.sort((a, b) => (b.total_marks_obtained || 0) - (a.total_marks_obtained || 0));
+
+            // Safely parse a JSON string
+            const parseJSON = (str) => {
+                if (!str) return {};
+                if (typeof str === 'object') return str;
+                try { return JSON.parse(str); } catch { return {}; }
+            };
 
             // Helper to safely format values for CSV
             const safe = (v) => {
-                if (v === null || v === undefined) return '-';
+                if (v === null || v === undefined || v === '') return '-';
                 if (typeof v === 'object') {
                     try { return JSON.stringify(v).replace(/"/g, "'"); } catch { return '-'; }
                 }
                 return String(v).replace(/"/g, "'");
             };
 
-            // Format duration from ms or seconds
-            const fmtDur = (startedAt, lastUpdatedAt) => {
-                if (!startedAt || !lastUpdatedAt) return '-';
-                try {
-                    const diffMs = new Date(lastUpdatedAt) - new Date(startedAt);
-                    if (isNaN(diffMs) || diffMs < 0) return '-';
-                    const mins = Math.round(diffMs / 60000);
-                    return mins > 0 ? String(mins) : '< 1';
-                } catch { return '-'; }
+            // Format duration from seconds
+            const fmtDurSecs = (secs) => {
+                if (!secs || isNaN(secs)) return '-';
+                return String(Math.round(secs / 60));
             };
 
             // Format timestamp to readable string
@@ -312,9 +269,9 @@ export default function DeepDiveDashboard() {
                 try { return new Date(ts).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch { return String(ts); }
             };
 
-            // CSV columns matching existing Excel format exactly
+            // CSV columns matching existing Exam_Results_Ranked.xlsx format exactly
             const csvHeaders = [
-                'Rank', 'Student Name', 'Reg ID', 'Completion (%)',
+                'Rank', 'Student Name', 'Reg ID', 'Section', 'Completion (%)',
                 'Total Marks', 'Coding Marks', 'MCQ Marks',
                 'Duration (mins)', 'Submitted At', 'Started At', 'Last Updated At',
                 'Starting IP', 'Ending IP',
@@ -331,52 +288,58 @@ export default function DeepDiveDashboard() {
                 'End Hostname', 'End Network', 'End Proxy'
             ];
 
-            const csvRows = allStudentRows.map((s, idx) => {
-                const a = s.analytics || {};
+            const csvRows = allStudents.map((s, idx) => {
+                // Parse start_config and end_config JSON for fallback nested data
+                const sc = parseJSON(s.start_config);
+                const ec = parseJSON(s.end_config);
+                const scOs = sc.os || {};
+                const ecOs = ec.os || {};
+
                 return [
                     idx + 1,
                     safe(s.student_name),
                     safe(s.uni_reg_id),
-                    safe(s.completion_pct),
-                    safe(s.total_marks),
-                    safe(s.coding_marks),
-                    safe(s.mcq_marks),
-                    fmtDur(a.startedAt, a.lastUpdatedAt),
-                    fmtTime(s.submitted_at),
-                    fmtTime(a.startedAt),
-                    fmtTime(a.lastUpdatedAt),
-                    safe(a.startingIp ?? a.starting_ip ?? ''),
-                    safe(a.endingIp ?? a.ending_ip ?? ''),
-                    safe(a.lostFocusCount ?? a.lost_focus_count ?? ''),
-                    safe(a.regainedFocusCount ?? a.regained_focus_count ?? ''),
-                    safe(a.faceWarnings ?? a.face_warnings ?? ''),
-                    safe(a.faceWarningsMax ?? a.face_warnings_max ?? ''),
-                    safe(a.internetDisconnects ?? a.internet_disconnects ?? ''),
-                    safe(a.internetOfflineSeconds ?? a.internet_offline_seconds ?? ''),
-                    safe(a.blockedByProcterCount ?? a.blockedByProctorCount ?? a.blocked_by_proctor ?? ''),
-                    safe(a.blockedSeconds ?? a.blocked_seconds ?? ''),
-                    safe(a.compileClicks ?? a.compile_clicks ?? ''),
-                    safe(a.submitClicks ?? a.submit_clicks ?? ''),
-                    safe(a.continueClicks ?? a.continue_clicks ?? ''),
-                    safe(a.submitReason ?? a.submit_reason ?? ''),
-                    fmtTime(a.startTimestamp ?? a.start_timestamp ?? ''),
-                    fmtTime(a.startCapturedAt ?? a.start_captured_at ?? ''),
-                    safe(a.osPlatform ?? a.os_platform ?? a.platform ?? ''),
-                    safe(a.osVersion ?? a.os_version ?? ''),
-                    safe(a.osRelease ?? a.os_release ?? ''),
-                    safe(a.osArch ?? a.os_arch ?? ''),
-                    safe(a.hostname ?? ''),
-                    safe(a.network ?? ''),
-                    safe(a.proxy ?? ''),
-                    fmtTime(a.endTimestamp ?? a.end_timestamp ?? ''),
-                    fmtTime(a.endCapturedAt ?? a.end_captured_at ?? ''),
-                    safe(a.endOsPlatform ?? a.end_os_platform ?? ''),
-                    safe(a.endOsVersion ?? a.end_os_version ?? ''),
-                    safe(a.endOsRelease ?? a.end_os_release ?? ''),
-                    safe(a.endOsArch ?? a.end_os_arch ?? ''),
-                    safe(a.endHostname ?? a.end_hostname ?? ''),
-                    safe(a.endNetwork ?? a.end_network ?? ''),
-                    safe(a.endProxy ?? a.end_proxy ?? '')
+                    safe(s.section),
+                    safe(s.course_score_percent ?? Math.round((s.total_marks_obtained / (s.total_possible_marks || 1)) * 100)),
+                    safe(s.total_marks_obtained ?? 0),
+                    safe(s.coding_marks ?? 0),
+                    safe(s.mcq_marks ?? 0),
+                    fmtDurSecs(s.exam_duration_seconds),
+                    fmtTime(s.exam_submitted_at || s.end_timestamp),
+                    fmtTime(s.exam_started_at || s.start_timestamp || sc.timestamp),
+                    fmtTime(s.exam_submitted_at || s.end_timestamp || ec.lastUpdatedAt),
+                    safe(s.starting_ip || ec.startingIp || ''),
+                    safe(s.ending_ip || ec.endingIp || ''),
+                    safe(s.lost_focus_count ?? ec.lostFocusCount ?? 0),
+                    safe(s.regained_focus_count ?? ec.regainedFocusCount ?? 0),
+                    safe(s.face_warnings ?? ec.faceWarnings ?? 0),
+                    safe(s.face_warnings_max ?? ec.faceWarningsMax ?? 0),
+                    safe(s.internet_disconnects ?? ec.internetDisconnects ?? 0),
+                    safe(s.internet_offline_seconds ?? ec.internetOfflineSeconds ?? 0),
+                    safe(s.blocked_by_proctor ?? ec.blockedByProctorCount ?? 0),
+                    safe(s.blocked_seconds ?? ec.blockedSeconds ?? 0),
+                    safe(s.compile_clicks ?? ec.compileClicks ?? 0),
+                    safe(s.submit_clicks ?? ec.submitClicks ?? 0),
+                    safe(s.continue_clicks ?? ec.continueClicks ?? 0),
+                    safe(s.submit_reason || ec.submitReason || ''),
+                    fmtTime(s.start_timestamp || sc.timestamp || ''),
+                    fmtTime(s.start_captured_at || sc.capturedAt || ''),
+                    safe(s.start_os_platform || scOs.platform || ''),
+                    safe(s.start_os_version || scOs.version || ''),
+                    safe(s.start_os_release || scOs.release || ''),
+                    safe(s.start_os_arch || scOs.arch || ''),
+                    safe(s.start_hostname || scOs.hostname || ''),
+                    safe(s.start_network || (sc.network ? JSON.stringify(sc.network) : '') || ''),
+                    safe(s.start_proxy || (sc.proxy ? JSON.stringify(sc.proxy) : '') || ''),
+                    fmtTime(s.end_timestamp || ec.timestamp || ''),
+                    fmtTime(s.end_captured_at || ec.capturedAt || ''),
+                    safe(s.end_os_platform || ecOs.platform || ''),
+                    safe(s.end_os_version || ecOs.version || ''),
+                    safe(s.end_os_release || ecOs.release || ''),
+                    safe(s.end_os_arch || ecOs.arch || ''),
+                    safe(s.end_hostname || ecOs.hostname || ''),
+                    safe(s.end_network || (ec.network ? JSON.stringify(ec.network) : '') || ''),
+                    safe(s.end_proxy || (ec.proxy ? JSON.stringify(ec.proxy) : '') || '')
                 ];
             });
 
