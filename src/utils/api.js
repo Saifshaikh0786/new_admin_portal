@@ -79,5 +79,16 @@ export const API_CONFIG = {
     analytics: {
         summary: '/api/analytics/summary',
         export: '/api/export/excel',
+    },
+
+    // Enterprise v2 Analytics
+    v2: {
+        batchProctoring: (batchId) => `/admin/analytics/batch-proctoring?batch_id=${batchId}`,
+        batchTeachers: (batchId) => `/admin/analytics/batch-teachers?batch_id=${batchId}`,
+        batchTimeline: (batchId) => `/admin/analytics/batch-timeline?batch_id=${batchId}`,
+        batchSubmissions: (batchId) => `/admin/analytics/batch-submissions?batch_id=${batchId}`,
+        sectionDetail: (batchId, section) => `/admin/analytics/section-detail?batch_id=${batchId}&section=${encodeURIComponent(section)}`,
+        studentDetail: (batchId, studentId) => `/admin/analytics/student-detail?batch_id=${batchId}&student_id=${studentId}`,
+        studentFullAnalytics: (batchId, studentId) => `/admin/analytics/student-full-analytics?batch_id=${batchId}&student_id=${studentId}`,
     }
 };
