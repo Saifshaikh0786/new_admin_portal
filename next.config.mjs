@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    const backendUrl = (process.env.BACKEND_API_URL || 'http://localhost:4001').trim();
+    const backendUrl = (process.env.BACKEND_API_URL || 'https://ap-is-seven.vercel.app').trim();
     return [
       // PROD URL: 'https://new-edu-code-testing.vercel.app/:path*'
       {
