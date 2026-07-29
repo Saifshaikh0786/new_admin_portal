@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import useSWR, { mutate } from 'swr';
+import useSWR, { mutate, preload } from 'swr';
 import { useAuth } from '@/context/AuthContext';
 import { API_CONFIG } from '@/utils/api';
 import { getAdminToken } from '@/utils/cookies';
