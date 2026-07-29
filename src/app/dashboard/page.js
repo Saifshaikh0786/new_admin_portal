@@ -118,6 +118,7 @@ export default function DeepDiveDashboard() {
     const [sectionChipSearch, setSectionChipSearch] = useState('');     // filters section chips in drill-down
     const [examStudentSearch, setExamStudentSearch] = useState('');     // server-side student search
     const [examStudentsMode, setExamStudentsMode] = useState('attempted'); // 'attempted' | 'not_attempted'
+    const [isExportingCSV, setIsExportingCSV] = useState(false);
 
     // Debounce the student search -> server
     useEffect(() => {
@@ -216,32 +217,180 @@ export default function DeepDiveDashboard() {
     };
 
     const downloadExamCSV = async (exam) => {
+        setIsExportingCSV(true);
         try {
             const token = getAdminToken();
-            const allStudents = [];
-            for (const mode of ['attempted', 'not_attempted']) {
-                let page = 1, total = 0;
-                do {
-                    const qs = new URLSearchParams({ course_id: exam.course_id, page, limit: 200, mode }).toString();
-                    const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${qs}`, {
+            const sections = exam.sections?.map(s => s.section) || [];
+            if (sections.length === 0) {
+                setIsExportingCSV(false);
+                return;
+            }
+
+            // Fetch section-matrix data for every section in parallel (rich proctoring/timing data)
+            const allStudentRows = [];
+            for (const sectionName of sections) {
+                try {
+                    const qs = new URLSearchParams({ section: sectionName, page: 1, limit: 10000, sortBy: 'student_name', order: 'asc', search: '' }).toString();
+                    const res = await fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/section-matrix?${qs}`, {
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         credentials: 'include'
                     });
                     const json = await res.json();
-                    if (!json?.success) break;
-                    allStudents.push(...(json.data || []));
-                    total = json.pagination?.total || 0;
-                    page++;
-                } while (allStudents.length < total);
+                    if (!json?.success) continue;
+
+                    const students = json.data?.student_performance || [];
+                    for (const student of students) {
+                        // Find THIS exam's course data in the student's courses array
+                        const coursesForExam = (student.courses || []).filter(c => c.course_id === exam.course_id);
+                        if (coursesForExam.length === 0) continue;
+
+                        // Aggregate MCQ + Coding rows for this course
+                        let mcqMarks = 0, codingMarks = 0, totalMarks = 0;
+                        let analytics = {};
+                        let submittedAt = null, scorePct = 0;
+
+                        for (const c of coursesForExam) {
+                            totalMarks += Number(c.marks_obtained || 0);
+                            if (c.result_type === 'mcq') mcqMarks += Number(c.marks_obtained || 0);
+                            else codingMarks += Number(c.marks_obtained || 0);
+                            if (c.submitted_at) submittedAt = c.submitted_at;
+                            scorePct = Math.max(scorePct, Number(c.score_percent || 0));
+                            // Merge analytics from any course row (start + end events)
+                            if (c.analytics && Object.keys(c.analytics).length > 0) {
+                                analytics = { ...analytics, ...c.analytics };
+                            }
+                        }
+
+                        allStudentRows.push({
+                            student_name: student.student_name,
+                            uni_reg_id: student.uni_reg_id,
+                            section: sectionName,
+                            completion_pct: scorePct,
+                            total_marks: totalMarks,
+                            coding_marks: codingMarks,
+                            mcq_marks: mcqMarks,
+                            submitted_at: submittedAt,
+                            analytics
+                        });
+                    }
+                } catch (e) {
+                    console.error(`Section ${sectionName} fetch error:`, e);
+                }
             }
-            if (!allStudents.length) return;
-            const headers = Object.keys(allStudents[0]).join(',');
-            const csv = [headers, ...allStudents.map(r => Object.values(r).map(v => `"${v}"`).join(','))].join('\n');
+
+            if (!allStudentRows.length) {
+                setIsExportingCSV(false);
+                return;
+            }
+
+            // Sort by total marks descending for ranking
+            allStudentRows.sort((a, b) => b.total_marks - a.total_marks);
+
+            // Helper to safely format values for CSV
+            const safe = (v) => {
+                if (v === null || v === undefined) return '-';
+                if (typeof v === 'object') {
+                    try { return JSON.stringify(v).replace(/"/g, "'"); } catch { return '-'; }
+                }
+                return String(v).replace(/"/g, "'");
+            };
+
+            // Format duration from ms or seconds
+            const fmtDur = (startedAt, lastUpdatedAt) => {
+                if (!startedAt || !lastUpdatedAt) return '-';
+                try {
+                    const diffMs = new Date(lastUpdatedAt) - new Date(startedAt);
+                    if (isNaN(diffMs) || diffMs < 0) return '-';
+                    const mins = Math.round(diffMs / 60000);
+                    return mins > 0 ? String(mins) : '< 1';
+                } catch { return '-'; }
+            };
+
+            // Format timestamp to readable string
+            const fmtTime = (ts) => {
+                if (!ts) return '-';
+                try { return new Date(ts).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch { return String(ts); }
+            };
+
+            // CSV columns matching existing Excel format exactly
+            const csvHeaders = [
+                'Rank', 'Student Name', 'Reg ID', 'Completion (%)',
+                'Total Marks', 'Coding Marks', 'MCQ Marks',
+                'Duration (mins)', 'Submitted At', 'Started At', 'Last Updated At',
+                'Starting IP', 'Ending IP',
+                'Lost Focus', 'Regained Focus',
+                'Face Warnings', 'Face Warnings Max',
+                'Internet Disconnects', 'Offline Seconds',
+                'Blocked by Proctor', 'Blocked Seconds',
+                'Compile Clicks', 'Submit Clicks', 'Continue Clicks', 'Submit Reason',
+                'Start Timestamp', 'Start Captured At',
+                'Start OS Platform', 'Start OS Version', 'Start OS Release', 'Start OS Arch',
+                'Start Hostname', 'Start Network', 'Start Proxy',
+                'End Timestamp', 'End Captured At',
+                'End OS Platform', 'End OS Version', 'End OS Release', 'End OS Arch',
+                'End Hostname', 'End Network', 'End Proxy'
+            ];
+
+            const csvRows = allStudentRows.map((s, idx) => {
+                const a = s.analytics || {};
+                return [
+                    idx + 1,
+                    safe(s.student_name),
+                    safe(s.uni_reg_id),
+                    safe(s.completion_pct),
+                    safe(s.total_marks),
+                    safe(s.coding_marks),
+                    safe(s.mcq_marks),
+                    fmtDur(a.startedAt, a.lastUpdatedAt),
+                    fmtTime(s.submitted_at),
+                    fmtTime(a.startedAt),
+                    fmtTime(a.lastUpdatedAt),
+                    safe(a.startingIp ?? a.starting_ip ?? ''),
+                    safe(a.endingIp ?? a.ending_ip ?? ''),
+                    safe(a.lostFocusCount ?? a.lost_focus_count ?? ''),
+                    safe(a.regainedFocusCount ?? a.regained_focus_count ?? ''),
+                    safe(a.faceWarnings ?? a.face_warnings ?? ''),
+                    safe(a.faceWarningsMax ?? a.face_warnings_max ?? ''),
+                    safe(a.internetDisconnects ?? a.internet_disconnects ?? ''),
+                    safe(a.internetOfflineSeconds ?? a.internet_offline_seconds ?? ''),
+                    safe(a.blockedByProcterCount ?? a.blockedByProctorCount ?? a.blocked_by_proctor ?? ''),
+                    safe(a.blockedSeconds ?? a.blocked_seconds ?? ''),
+                    safe(a.compileClicks ?? a.compile_clicks ?? ''),
+                    safe(a.submitClicks ?? a.submit_clicks ?? ''),
+                    safe(a.continueClicks ?? a.continue_clicks ?? ''),
+                    safe(a.submitReason ?? a.submit_reason ?? ''),
+                    fmtTime(a.startTimestamp ?? a.start_timestamp ?? ''),
+                    fmtTime(a.startCapturedAt ?? a.start_captured_at ?? ''),
+                    safe(a.osPlatform ?? a.os_platform ?? a.platform ?? ''),
+                    safe(a.osVersion ?? a.os_version ?? ''),
+                    safe(a.osRelease ?? a.os_release ?? ''),
+                    safe(a.osArch ?? a.os_arch ?? ''),
+                    safe(a.hostname ?? ''),
+                    safe(a.network ?? ''),
+                    safe(a.proxy ?? ''),
+                    fmtTime(a.endTimestamp ?? a.end_timestamp ?? ''),
+                    fmtTime(a.endCapturedAt ?? a.end_captured_at ?? ''),
+                    safe(a.endOsPlatform ?? a.end_os_platform ?? ''),
+                    safe(a.endOsVersion ?? a.end_os_version ?? ''),
+                    safe(a.endOsRelease ?? a.end_os_release ?? ''),
+                    safe(a.endOsArch ?? a.end_os_arch ?? ''),
+                    safe(a.endHostname ?? a.end_hostname ?? ''),
+                    safe(a.endNetwork ?? a.end_network ?? ''),
+                    safe(a.endProxy ?? a.end_proxy ?? '')
+                ];
+            });
+
+            const csv = [
+                csvHeaders.map(h => `"${h}"`).join(','),
+                ...csvRows.map(row => row.map(v => `"${v}"`).join(','))
+            ].join('\n');
+
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${exam.course_name.replace(/[^a-zA-Z0-9]/g, '_')}_export.csv`; a.click();
             URL.revokeObjectURL(url);
         } catch (e) { console.error('Export error', e); }
+        finally { setIsExportingCSV(false); }
     };
 
     const openExamDrilldown = (exam) => {
@@ -631,8 +780,10 @@ export default function DeepDiveDashboard() {
                             </div>
                         </div>
                         <button onClick={() => downloadExamCSV(inspectingExam)}
-                            className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-[#6B7280] dark:text-gray-300 hover:text-[#111827] dark:hover:text-white flex items-center gap-2 transition-all active:scale-95">
-                            <FileText className="w-4 h-4" /> Export CSV
+                            disabled={isExportingCSV}
+                            className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-[#6B7280] dark:text-gray-300 hover:text-[#111827] dark:hover:text-white flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed">
+                            {isExportingCSV ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                            {isExportingCSV ? 'Exporting...' : 'Export CSV'}
                         </button>
                     </div>
 
