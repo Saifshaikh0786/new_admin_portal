@@ -459,7 +459,7 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const queryParams = new URLSearchParams({ section: sectionName }).toString();
+            const queryParams = new URLSearchParams({ section: sectionName, t: Date.now() }).toString();
             const resAnalytics = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionAnalytics(sectionName)}?${queryParams}`, {
                 method: 'GET',
                 headers,
@@ -599,23 +599,23 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
                         // ── Start Config ──
                         'Start Timestamp': startTime ? new Date(startTime).toLocaleString() : '-',
                         'Start Captured At': sc.capturedAt ? new Date(sc.capturedAt).toLocaleString() : '-',
-                        'Start OS Platform': sc.os?.platform || '-',
-                        'Start OS Version': sc.os?.version || '-',
-                        'Start OS Release': sc.os?.release || '-',
-                        'Start OS Arch': sc.os?.arch || '-',
-                        'Start Hostname': sc.os?.hostname || '-',
-                        'Start Network': fmtNet(sc.network?.interfaces),
-                        'Start Proxy': sc.proxy?.settings || '-',
+                        'Start OS Platform': sc.os?.platform || an.os?.platform || '-',
+                        'Start OS Version': sc.os?.version || an.os?.version || '-',
+                        'Start OS Release': sc.os?.release || an.os?.release || '-',
+                        'Start OS Arch': sc.os?.arch || an.os?.arch || '-',
+                        'Start Hostname': sc.os?.hostname || an.os?.hostname || '-',
+                        'Start Network': fmtNet(sc.network?.interfaces || an.network?.interfaces),
+                        'Start Proxy': sc.proxy?.settings || an.proxy?.settings || '-',
                         // ── End Config ──
                         'End Timestamp': endTime ? new Date(endTime).toLocaleString() : '-',
                         'End Captured At': ec.capturedAt ? new Date(ec.capturedAt).toLocaleString() : '-',
-                        'End OS Platform': ec.os?.platform || '-',
-                        'End OS Version': ec.os?.version || '-',
-                        'End OS Release': ec.os?.release || '-',
-                        'End OS Arch': ec.os?.arch || '-',
-                        'End Hostname': ec.os?.hostname || '-',
-                        'End Network': fmtNet(ec.network?.interfaces),
-                        'End Proxy': ec.proxy?.settings || '-',
+                        'End OS Platform': ec.os?.platform || an.os?.platform || '-',
+                        'End OS Version': ec.os?.version || an.os?.version || '-',
+                        'End OS Release': ec.os?.release || an.os?.release || '-',
+                        'End OS Arch': ec.os?.arch || an.os?.arch || '-',
+                        'End Hostname': ec.os?.hostname || an.os?.hostname || '-',
+                        'End Network': fmtNet(ec.network?.interfaces || an.network?.interfaces),
+                        'End Proxy': ec.proxy?.settings || an.proxy?.settings || '-',
                     };
                 });
 
