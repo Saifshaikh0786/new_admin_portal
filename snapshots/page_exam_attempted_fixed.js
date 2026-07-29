@@ -234,9 +234,91 @@ export default function DeepDiveDashboard() {
                     page++;
                 } while (allStudents.length < total);
             }
-            if (!allStudents.length) return;
-            const headers = Object.keys(allStudents[0]).join(',');
-            const csv = [headers, ...allStudents.map(r => Object.values(r).map(v => `"${v}"`).join(','))].join('\n');
+            if (!allStudents.length) { console.warn('No students from exam-attempted-students API'); return; }
+            const envPromises = allStudents.map((st, idx) =>
+                fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/exam-environment?student_id=${st.student_id}&course_id=${exam.course_id}`, {
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    credentials: 'include'
+                }).then(r => r.json()).then(envJson => {
+                    if (!envJson?.success) return;
+                    const env = envJson.data || {};
+                    const sc = env.start_config || {};
+                    const ec = env.end_config || {};
+                    st.start_timestamp = sc.timestamp || '';
+                    st.start_captured_at = sc.capturedAt || '';
+                    st.start_os_platform = sc.os?.platform ?? sc.osPlatform ?? '';
+                    st.start_os_version = sc.os?.version ?? sc.osVersion ?? '';
+                    st.start_os_release = sc.os?.release ?? sc.osRelease ?? '';
+                    st.start_os_arch = sc.os?.arch ?? sc.osArch ?? '';
+                    st.start_hostname = sc.os?.hostname ?? sc.hostname ?? '';
+                    st.start_network = sc.network?.interfaces ? sc.network.interfaces.map(i => `${i.interface||''} IP:${i.ip||''} MAC:${i.mac||''}`).join('; ') : (sc.network ? JSON.stringify(sc.network) : '');
+                    st.start_proxy = sc.proxy?.settings ? `Proxy: ${sc.proxy.settings}` : (sc.proxy ? JSON.stringify(sc.proxy) : '');
+                    st.end_timestamp = ec.timestamp || '';
+                    st.end_captured_at = ec.capturedAt || '';
+                    st.end_os_platform = ec.os?.platform ?? ec.osPlatform ?? '';
+                    st.end_os_version = ec.os?.version ?? ec.osVersion ?? '';
+                    st.end_os_release = ec.os?.release ?? ec.osRelease ?? '';
+                    st.end_os_arch = ec.os?.arch ?? ec.osArch ?? '';
+                    st.end_hostname = ec.os?.hostname ?? ec.hostname ?? '';
+                    st.end_network = ec.network?.interfaces ? ec.network.interfaces.map(i => `${i.interface||''} IP:${i.ip||''} MAC:${i.mac||''}`).join('; ') : (ec.network ? JSON.stringify(ec.network) : '');
+                    st.end_proxy = ec.proxy?.settings ? `Proxy: ${ec.proxy.settings}` : (ec.proxy ? JSON.stringify(ec.proxy) : '');
+                }).catch(() => {})
+            );
+            await Promise.all(envPromises);
+            allStudents.sort((a, b) => (b.total_marks_obtained || 0) - (a.total_marks_obtained || 0));
+            const columns = [
+                { key: 'rank', label: 'Rank' },
+                { key: 'student_name', label: 'Student Name' },
+                { key: 'uni_reg_id', label: 'Registration ID' },
+                { key: 'course_score_percent', label: 'Completion (%)' },
+                { key: 'total_marks_obtained', label: 'Total Marks' },
+                { key: 'coding_marks', label: 'Coding Marks' },
+                { key: 'mcq_marks', label: 'MCQ Marks' },
+                { key: 'duration', label: 'Duration (Minutes)' },
+                { key: 'exam_submitted_at', label: 'Submitted At' },
+                { key: 'exam_started_at', label: 'Started At' },
+                { key: 'last_activity', label: 'Last Updated At' },
+                { key: 'starting_ip', label: 'Starting IP Address' },
+                { key: 'ending_ip', label: 'Ending IP Address' },
+                { key: 'lost_focus_count', label: 'Lost Focus Count' },
+                { key: 'regained_focus_count', label: 'Regained Focus Count' },
+                { key: 'face_warnings', label: 'Face Detection Warnings' },
+                { key: 'face_warnings_max', label: 'Maximum Face Warnings' },
+                { key: 'internet_disconnects', label: 'Internet Disconnect Count' },
+                { key: 'internet_offline_seconds', label: 'Offline Duration (Seconds)' },
+                { key: 'blocked_by_proctor', label: 'Blocked by Proctor' },
+                { key: 'blocked_seconds', label: 'Blocked Duration (Seconds)' },
+                { key: 'compile_clicks', label: 'Compile Attempts' },
+                { key: 'submit_clicks', label: 'Code Submission Attempts' },
+                { key: 'continue_clicks', label: 'Continue Button Clicks' },
+                { key: 'submit_reason', label: 'Submission Reason' },
+                { key: 'start_timestamp', label: 'Start Timestamp' },
+                { key: 'start_captured_at', label: 'Start Device Capture Time' },
+                { key: 'start_os_platform', label: 'Start OS Platform' },
+                { key: 'start_os_version', label: 'Start OS Version' },
+                { key: 'start_os_release', label: 'Start OS Release' },
+                { key: 'start_os_arch', label: 'Start OS Architecture' },
+                { key: 'start_hostname', label: 'Start Hostname' },
+                { key: 'start_network', label: 'Start Network Type' },
+                { key: 'start_proxy', label: 'Start Proxy Status' },
+                { key: 'end_timestamp', label: 'End Timestamp' },
+                { key: 'end_captured_at', label: 'End Device Capture Time' },
+                { key: 'end_os_platform', label: 'End OS Platform' },
+                { key: 'end_os_version', label: 'End OS Version' },
+                { key: 'end_os_release', label: 'End OS Release' },
+                { key: 'end_os_arch', label: 'End OS Architecture' },
+                { key: 'end_hostname', label: 'End Hostname' },
+                { key: 'end_network', label: 'End Network Type' },
+                { key: 'end_proxy', label: 'End Proxy Status' }
+            ];
+            const header = columns.map(c => c.label).join(',');
+            const csv = [header, ...allStudents.map((r, i) => {
+                r.rank = i + 1;
+                const s = r.exam_started_at ? new Date(r.exam_started_at) : null;
+                const e = r.exam_submitted_at ? new Date(r.exam_submitted_at) : (r.last_activity ? new Date(r.last_activity) : null);
+                r.duration = (s && e) ? Math.round((e - s) / 60000) : (r.exam_duration_seconds ? Math.round(r.exam_duration_seconds / 60) : '');
+                return columns.map(c => `"${r[c.key] ?? ''}"`).join(',');
+            })].join('\n');
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${exam.course_name.replace(/[^a-zA-Z0-9]/g, '_')}_export.csv`; a.click();

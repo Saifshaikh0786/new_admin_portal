@@ -229,14 +229,67 @@ export default function DeepDiveDashboard() {
                     });
                     const json = await res.json();
                     if (!json?.success) break;
-                    allStudents.push(...(json.data || []));
+                    const students = json.data || [];
+                    allStudents.push(...students);
                     total = json.pagination?.total || 0;
                     page++;
                 } while (allStudents.length < total);
             }
             if (!allStudents.length) return;
-            const headers = Object.keys(allStudents[0]).join(',');
-            const csv = [headers, ...allStudents.map(r => Object.values(r).map(v => `"${v}"`).join(','))].join('\n');
+            allStudents.sort((a, b) => (b.total_marks_obtained || 0) - (a.total_marks_obtained || 0));
+            const csvRows = [['Rank','Student Name','Registration ID','Completion (%)','Total Marks','Coding Marks','MCQ Marks','Duration (Minutes)','Submitted At','Started At','Last Updated At','Starting IP Address','Ending IP Address','Lost Focus Count','Regained Focus Count','Face Detection Warnings','Maximum Face Warnings','Internet Disconnect Count','Offline Duration (Seconds)','Blocked by Proctor','Blocked Duration (Seconds)','Compile Attempts','Code Submission Attempts','Continue Button Clicks','Submission Reason','Start Timestamp','Start Device Capture Time','Start OS Platform','Start OS Version','Start OS Release','Start OS Architecture','Start Hostname','Start Network Type','Start Proxy Status','End Timestamp','End Device Capture Time','End OS Platform','End OS Version','End OS Release','End OS Architecture','End Hostname','End Network Type','End Proxy Status']];
+            for (let i = 0; i < allStudents.length; i++) {
+                const r = allStudents[i];
+                const s = r.exam_started_at ? new Date(r.exam_started_at) : null;
+                const e = r.exam_submitted_at ? new Date(r.exam_submitted_at) : (r.last_activity ? new Date(r.last_activity) : null);
+                const dur = (s && e) ? Math.round((e - s) / 60000) : (r.exam_duration_seconds ? Math.round(r.exam_duration_seconds / 60) : '');
+                csvRows.push([
+                    i + 1,
+                    r.student_name ?? '',
+                    r.uni_reg_id ?? '',
+                    r.course_score_percent ?? '',
+                    r.total_marks_obtained ?? '',
+                    r.coding_marks ?? '',
+                    r.mcq_marks ?? '',
+                    dur,
+                    r.exam_submitted_at ?? '',
+                    r.exam_started_at ?? '',
+                    r.last_activity ?? '',
+                    r.starting_ip ?? '',
+                    r.ending_ip ?? '',
+                    r.lost_focus_count ?? '',
+                    r.regained_focus_count ?? '',
+                    r.face_warnings ?? '',
+                    r.face_warnings_max ?? '',
+                    r.internet_disconnects ?? '',
+                    r.internet_offline_seconds ?? '',
+                    r.blocked_by_proctor ?? '',
+                    r.blocked_seconds ?? '',
+                    r.compile_clicks ?? '',
+                    r.submit_clicks ?? '',
+                    r.continue_clicks ?? '',
+                    r.submit_reason ?? '',
+                    r.start_timestamp ?? '',
+                    r.start_captured_at ?? '',
+                    r.start_os_platform ?? '',
+                    r.start_os_version ?? '',
+                    r.start_os_release ?? '',
+                    r.start_os_arch ?? '',
+                    r.start_hostname ?? '',
+                    r.start_network ?? '',
+                    r.start_proxy ?? '',
+                    r.end_timestamp ?? '',
+                    r.end_captured_at ?? '',
+                    r.end_os_platform ?? '',
+                    r.end_os_version ?? '',
+                    r.end_os_release ?? '',
+                    r.end_os_arch ?? '',
+                    r.end_hostname ?? '',
+                    r.end_network ?? '',
+                    r.end_proxy ?? ''
+                ]);
+            }
+            const csv = csvRows.map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${exam.course_name.replace(/[^a-zA-Z0-9]/g, '_')}_export.csv`; a.click();

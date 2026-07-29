@@ -1,0 +1,20 @@
+SNAPSHOT SYSTEM - EXAM CSV EXPORT
+====================================
+
+Available snapshots:
+  point_A                 - section-matrix + exam-environment + all 43 columns
+  point_A_fixed           - Fixed async bug (Map<rowIndex> instead of rows[last])
+  exam_attempted_fixed    - Uses exam-attempted-students endpoint (enriched fields:
+                            focus_losses, starting_ip, ending_ip, exam_duration, etc.)
+                            + exam-environment for OS/network/proxy.
+                            Column keys match exact API field names.
+
+HOW TO RESTORE A SNAPSHOT:
+  Copy-Item -Path "snapshots\page_FILE_NAME.js" -Destination "src\app\dashboard\page.js" -Force
+
+  Example:
+    Copy-Item -Path "snapshots\page_exam_attempted_fixed.js" -Destination "src\app\dashboard\page.js" -Force
+
+HOW TO SAVE A NEW SNAPSHOT:
+  Copy-Item -Path "src\app\dashboard\page.js" -Destination "snapshots\page_NEW_NAME.js" -Force
+  Then add an entry to "Available snapshots" above.

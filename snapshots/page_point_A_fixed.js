@@ -218,25 +218,160 @@ export default function DeepDiveDashboard() {
     const downloadExamCSV = async (exam) => {
         try {
             const token = getAdminToken();
-            const allStudents = [];
-            for (const mode of ['attempted', 'not_attempted']) {
-                let page = 1, total = 0;
-                do {
-                    const qs = new URLSearchParams({ course_id: exam.course_id, page, limit: 200, mode }).toString();
-                    const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${qs}`, {
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        credentials: 'include'
+            const sections = exam.sections || [];
+            if (!sections.length) { console.warn('No sections found on exam object', exam); return; }
+            const rows = [];
+            const envMap = new Map();
+            for (const s of sections) {
+                const sectionName = s.section || s;
+                const qs = new URLSearchParams({ section: sectionName, page: 1, limit: 10000 }).toString();
+                const res = await fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/section-matrix?${qs}`, {
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    credentials: 'include'
+                });
+                const json = await res.json();
+                if (!json?.success) { console.warn('section-matrix failed for', sectionName); continue; }
+                const students = json.data?.student_performance || [];
+                for (const st of students) {
+                    const entries = (st.courses || []).filter(c => c.course_id === exam.course_id);
+                    if (!entries.length) continue;
+                    const mcq = entries.find(c => c.result_type === 'mcq');
+                    const coding = entries.find(c => c.result_type === 'coding');
+                    const a1 = (mcq?.analytics || {});
+                    const a2 = (coding?.analytics || {});
+                    const analytics = { ...a1, ...a2 };
+                    rows.push({
+                        student_name: st.student_name,
+                        uni_reg_id: st.uni_reg_id,
+                        completion: (mcq || coding)?.score_percent ?? '',
+                        total_marks: (mcq?.marks_obtained ?? 0) + (coding?.marks_obtained ?? 0),
+                        coding_marks: coding?.marks_obtained ?? '',
+                        mcq_marks: mcq?.marks_obtained ?? '',
+                        submitted_at: (coding?.submitted_at || mcq?.submitted_at || ''),
+                        started_at: (analytics.startedAt || ''),
+                        last_updated: (analytics.lastUpdatedAt || ''),
+                        starting_ip: analytics.startingIp || '',
+                        ending_ip: analytics.endingIp || '',
+                        lost_focus: analytics.lostFocusCount ?? '',
+                        regained_focus: analytics.regainedFocusCount ?? '',
+                        face_warnings: analytics.faceWarnings ?? '',
+                        face_warnings_max: analytics.faceWarningsMax ?? '',
+                        internet_disconnects: analytics.internetDisconnects ?? '',
+                        offline_seconds: analytics.internetOfflineSeconds ?? '',
+                        blocked_by_proctor: analytics.blockedByProctorCount ?? '',
+                        blocked_seconds: analytics.blockedSeconds ?? '',
+                        compile_clicks: analytics.compileClicks ?? '',
+                        submit_clicks: analytics.submitClicks ?? '',
+                        continue_clicks: analytics.continueClicks ?? '',
+                        submit_reason: analytics.submitReason || '',
+                        start_timestamp: '',
+                        start_captured_at: '',
+                        start_os_platform: '',
+                        start_os_version: '',
+                        start_os_release: '',
+                        start_os_arch: '',
+                        start_hostname: '',
+                        start_network: '',
+                        start_proxy: '',
+                        end_timestamp: '',
+                        end_captured_at: '',
+                        end_os_platform: '',
+                        end_os_version: '',
+                        end_os_release: '',
+                        end_os_arch: '',
+                        end_hostname: '',
+                        end_network: '',
+                        end_proxy: ''
                     });
-                    const json = await res.json();
-                    if (!json?.success) break;
-                    allStudents.push(...(json.data || []));
-                    total = json.pagination?.total || 0;
-                    page++;
-                } while (allStudents.length < total);
+                    envMap.set(rows.length - 1, { student_id: st.student_id, course_id: exam.course_id });
+                }
             }
-            if (!allStudents.length) return;
-            const headers = Object.keys(allStudents[0]).join(',');
-            const csv = [headers, ...allStudents.map(r => Object.values(r).map(v => `"${v}"`).join(','))].join('\n');
+            const envKeys = [...envMap.entries()];
+            await Promise.all(envKeys.map(([rowIdx, params]) =>
+                fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/exam-environment?student_id=${params.student_id}&course_id=${params.course_id}`, {
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    credentials: 'include'
+                }).then(r => r.json()).then(envJson => {
+                    if (!envJson?.success) return;
+                    const env = envJson.data || {};
+                    const sc = env.start_config || {};
+                    const ec = env.end_config || {};
+                    const r = rows[rowIdx];
+                    r.start_timestamp = sc.timestamp || '';
+                    r.start_captured_at = sc.capturedAt || '';
+                    r.start_os_platform = sc.os?.platform ?? sc.osPlatform ?? '';
+                    r.start_os_version = sc.os?.version ?? sc.osVersion ?? '';
+                    r.start_os_release = sc.os?.release ?? sc.osRelease ?? '';
+                    r.start_os_arch = sc.os?.arch ?? sc.osArch ?? '';
+                    r.start_hostname = sc.os?.hostname ?? sc.hostname ?? '';
+                    r.start_network = sc.network?.interfaces ? sc.network.interfaces.map(i => `${i.interface||''} IP:${i.ip||''} MAC:${i.mac||''}`).join('; ') : (sc.network ? JSON.stringify(sc.network) : '');
+                    r.start_proxy = sc.proxy?.settings ? `Proxy: ${sc.proxy.settings}` : (sc.proxy ? JSON.stringify(sc.proxy) : '');
+                    r.end_timestamp = ec.timestamp || '';
+                    r.end_captured_at = ec.capturedAt || '';
+                    r.end_os_platform = ec.os?.platform ?? ec.osPlatform ?? '';
+                    r.end_os_version = ec.os?.version ?? ec.osVersion ?? '';
+                    r.end_os_release = ec.os?.release ?? ec.osRelease ?? '';
+                    r.end_os_arch = ec.os?.arch ?? ec.osArch ?? '';
+                    r.end_hostname = ec.os?.hostname ?? ec.hostname ?? '';
+                    r.end_network = ec.network?.interfaces ? ec.network.interfaces.map(i => `${i.interface||''} IP:${i.ip||''} MAC:${i.mac||''}`).join('; ') : (ec.network ? JSON.stringify(ec.network) : '');
+                    r.end_proxy = ec.proxy?.settings ? `Proxy: ${ec.proxy.settings}` : (ec.proxy ? JSON.stringify(ec.proxy) : '');
+                }).catch(() => {})
+            ));
+            if (!rows.length) { console.warn('No rows generated after processing all sections'); return; }
+            rows.sort((a, b) => b.total_marks - a.total_marks);
+            const columns = [
+                { key: 'rank', label: 'Rank' },
+                { key: 'student_name', label: 'Student Name' },
+                { key: 'uni_reg_id', label: 'Registration ID' },
+                { key: 'completion', label: 'Completion (%)' },
+                { key: 'total_marks', label: 'Total Marks' },
+                { key: 'coding_marks', label: 'Coding Marks' },
+                { key: 'mcq_marks', label: 'MCQ Marks' },
+                { key: 'duration', label: 'Duration (Minutes)' },
+                { key: 'submitted_at', label: 'Submitted At' },
+                { key: 'started_at', label: 'Started At' },
+                { key: 'last_updated', label: 'Last Updated At' },
+                { key: 'starting_ip', label: 'Starting IP Address' },
+                { key: 'ending_ip', label: 'Ending IP Address' },
+                { key: 'lost_focus', label: 'Lost Focus Count' },
+                { key: 'regained_focus', label: 'Regained Focus Count' },
+                { key: 'face_warnings', label: 'Face Detection Warnings' },
+                { key: 'face_warnings_max', label: 'Maximum Face Warnings' },
+                { key: 'internet_disconnects', label: 'Internet Disconnect Count' },
+                { key: 'offline_seconds', label: 'Offline Duration (Seconds)' },
+                { key: 'blocked_by_proctor', label: 'Blocked by Proctor' },
+                { key: 'blocked_seconds', label: 'Blocked Duration (Seconds)' },
+                { key: 'compile_clicks', label: 'Compile Attempts' },
+                { key: 'submit_clicks', label: 'Code Submission Attempts' },
+                { key: 'continue_clicks', label: 'Continue Button Clicks' },
+                { key: 'submit_reason', label: 'Submission Reason' },
+                { key: 'start_timestamp', label: 'Start Timestamp' },
+                { key: 'start_captured_at', label: 'Start Device Capture Time' },
+                { key: 'start_os_platform', label: 'Start OS Platform' },
+                { key: 'start_os_version', label: 'Start OS Version' },
+                { key: 'start_os_release', label: 'Start OS Release' },
+                { key: 'start_os_arch', label: 'Start OS Architecture' },
+                { key: 'start_hostname', label: 'Start Hostname' },
+                { key: 'start_network', label: 'Start Network Type' },
+                { key: 'start_proxy', label: 'Start Proxy Status' },
+                { key: 'end_timestamp', label: 'End Timestamp' },
+                { key: 'end_captured_at', label: 'End Device Capture Time' },
+                { key: 'end_os_platform', label: 'End OS Platform' },
+                { key: 'end_os_version', label: 'End OS Version' },
+                { key: 'end_os_release', label: 'End OS Release' },
+                { key: 'end_os_arch', label: 'End OS Architecture' },
+                { key: 'end_hostname', label: 'End Hostname' },
+                { key: 'end_network', label: 'End Network Type' },
+                { key: 'end_proxy', label: 'End Proxy Status' }
+            ];
+            const header = columns.map(c => c.label).join(',');
+            const csv = [header, ...rows.map((r, i) => {
+                r.rank = i + 1;
+                const s = r.started_at ? new Date(r.started_at) : null;
+                const e = r.submitted_at ? new Date(r.submitted_at) : (r.last_updated ? new Date(r.last_updated) : null);
+                r.duration = (s && e) ? Math.round((e - s) / 60000) : '';
+                return columns.map(c => `"${r[c.key] ?? ''}"`).join(',');
+            })].join('\n');
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${exam.course_name.replace(/[^a-zA-Z0-9]/g, '_')}_export.csv`; a.click();
