@@ -6,9 +6,11 @@ import { API_CONFIG } from '@/utils/api';
 import { getAdminToken } from '@/utils/cookies';
 import { swrFetcher } from '@/utils/fetcher';
 import useSWR from 'swr';
+import { useRouter } from 'next/navigation';
 import PortalWrapper from './PortalWrapper';
 
 export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
+    const router = useRouter();
     const [sections, setSections] = useState([]);
     const [courses, setCourses] = useState([]); // Added courses state
     const [loading, setLoading] = useState(true);
@@ -115,6 +117,14 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
                             <div className="text-gray-500 dark:text-gray-400 text-xs uppercase mb-2">Total Sections</div>
                             <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics?.totalSections || 0}</div>
                         </div>
+
+                        <button
+                            onClick={() => router.push(`/dashboard/batch-analytics?batch_id=${batch.batch_id}`)}
+                            className="w-full mt-4 flex items-center justify-center gap-2 bg-[var(--neu-achieve)] text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5 transition-all duration-200"
+                        >
+                            <TrendingUp className="w-5 h-5" />
+                            View Batch Analytics
+                        </button>
                     </div>
 
                     {/* Registered Courses List */}
