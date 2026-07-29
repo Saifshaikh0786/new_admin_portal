@@ -1181,6 +1181,7 @@ function BatchAnalyticsContent() {
                 {activeTab === 'Student Leaderboard' && (
                   <LeaderboardTab
                     data={data}
+                    batch_id={batch_id}
                     filteredStudents={filteredStudents}
                     paginatedStudents={paginatedStudents}
                     searchQuery={searchQuery}
@@ -1195,10 +1196,6 @@ function BatchAnalyticsContent() {
                     totalPages={totalPages}
                     rowsPerPage={rowsPerPage}
                     setRowsPerPage={setRowsPerPage}
-                    onStudentClick={(id, name, reg) => {
-                      const params = new URLSearchParams({ batch_id, student_id: id, name, reg: reg || '' });
-                      window.open(`/dashboard/batch-analytics/student-view?${params.toString()}`, '_blank');
-                    }}
                   />
                 )}
 
@@ -2058,13 +2055,12 @@ function AcademicTab({ data }) {
    TAB 4: STUDENT LEADERBOARD
    ========================================================================= */
 function LeaderboardTab({
-  data, filteredStudents, paginatedStudents,
+  data, batch_id, filteredStudents, paginatedStudents,
   searchQuery, setSearchQuery,
   sectionFilter, setSectionFilter, allSections,
   sortBy, setSortBy,
   page, setPage, totalPages,
-  rowsPerPage, setRowsPerPage,
-  onStudentClick
+  rowsPerPage, setRowsPerPage
 }) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
@@ -2199,10 +2195,12 @@ function LeaderboardTab({
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <button onClick={(e) => { e.stopPropagation(); onStudentClick && onStudentClick(s.id, s.name, s.reg); }}
+                      <a href={`/dashboard/batch-analytics/student-view?batch_id=${batch_id}&student_id=${s.id}&name=${encodeURIComponent(s.name)}&reg=${encodeURIComponent(s.reg || '')}`}
+                        target="_blank" rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all whitespace-nowrap">
                         <ExternalLink size={12} /> Analytics
-                      </button>
+                      </a>
                     </td>
                   </tr>
                 );
