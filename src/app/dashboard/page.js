@@ -237,9 +237,15 @@ export default function DeepDiveDashboard() {
             const notAttempted = await fetchAll('not_attempted');
             const allStudents = [...attempted, ...notAttempted];
             if (!allStudents.length) return;
-            const excludeKeys = new Set(['student_id','batch_id','course_id','university_id','lectures_attempted','lectures_completed','lecture_short','course_name','course_type','raw_metadata']);
+            const excludeKeys = new Set(['student_id','batch_id','course_id','university_id','lectures_attempted','lectures_completed','lecture_short','course_name','course_type','start_config','end_config']);
             const keys = Object.keys(allStudents[0]).filter(k => !excludeKeys.has(k));
-            const headerLabels = {'student_name':'Student Name','uni_reg_id':'Reg ID','section':'Section','total_marks_obtained':'Total Marks','total_possible_marks':'Max Marks','mcq_marks':'MCQ','coding_marks':'Coding','course_score_percent':'Score %','last_activity':'Last Activity','device_info':'Device Info','platform':'Platform','browser':'Browser','exam_started_at':'Exam Start','exam_submitted_at':'Exam Submitted','exam_duration_seconds':'Duration (sec)','tab_switches':'Tab Switches','focus_losses':'Focus Losses','internet_disconnects':'Internet Disconnects','internet_offline_seconds':'Offline Seconds','compile_clicks':'Compile Clicks','submit_clicks':'Submit Clicks'};
+            const headerLabels = {
+              'student_name':'Student Name','uni_reg_id':'Reg ID','section':'Section','total_marks_obtained':'Total Marks','total_possible_marks':'Max Marks','mcq_marks':'MCQ','coding_marks':'Coding','course_score_percent':'Score %','last_activity':'Last Activity',
+              'starting_ip':'Starting IP','start_timestamp':'Start Timestamp','start_os_platform':'Start OS Platform','start_os_version':'Start OS Version','start_os_release':'Start OS Release','start_os_arch':'Start OS Arch','start_hostname':'Start Hostname','start_network':'Start Network','start_proxy':'Start Proxy','start_device':'Start Device','start_browser':'Start Browser',
+              'ending_ip':'Ending IP','end_timestamp':'End Timestamp','end_os_platform':'End OS Platform','end_os_version':'End OS Version','end_os_release':'End OS Release','end_os_arch':'End OS Arch','end_hostname':'End Hostname','end_network':'End Network','end_proxy':'End Proxy',
+              'lost_focus_count':'Lost Focus','regained_focus_count':'Regained Focus','face_warnings':'Face Warnings','face_warnings_max':'Face Warnings Max','tab_switches':'Tab Switches','focus_losses':'Focus Losses','internet_disconnects':'Internet Disconnects','internet_offline_seconds':'Offline Seconds','blocked_by_proctor':'Blocked by Proctor','blocked_seconds':'Blocked Seconds','compile_clicks':'Compile Clicks','submit_clicks':'Submit Clicks','continue_clicks':'Continue Clicks','submit_reason':'Submit Reason',
+              'exam_started_at':'Started At','exam_submitted_at':'Submitted At','exam_duration_seconds':'Duration (sec)'
+            };
             const headers = ['#', ...keys.map(k => headerLabels[k] || k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))];
             const rows = allStudents.map((s, i) => [i + 1, ...keys.map(k => s[k] ?? '')]);
             const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
