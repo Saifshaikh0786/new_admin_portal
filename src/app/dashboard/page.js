@@ -215,6 +215,30 @@ export default function DeepDiveDashboard() {
         finally { setExamStudentsLoading(false); }
     };
 
+    const downloadExamCSV = async (exam) => {
+        try {
+            const token = getAdminToken();
+            const queryParams = new URLSearchParams({
+                course_id: exam.course_id,
+                page: 1, limit: 9999, mode: 'attempted'
+            }).toString();
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${queryParams}`, {
+                headers: { 'Authorization': `Bearer ${token}` }, credentials: 'include'
+            });
+            const json = await res.json();
+            const students = json?.data || [];
+            const rows = [['#', 'Student Name', 'Reg ID', 'Section', 'Total Marks', 'MCQ', 'Coding']];
+            students.forEach((s, i) => {
+                rows.push([i + 1, s.student_name || '', s.uni_reg_id || '', s.section || '', s.total_marks_obtained ?? '', s.mcq_marks ?? '', s.coding_marks ?? '']);
+            });
+            const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${exam.course_name.replace(/[^a-zA-Z0-9]/g, '_')}_export.csv`; a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) { console.error('Export error', e); }
+    };
+
     const openExamDrilldown = (exam) => {
         pushOverlayState();
         setInspectingExam(exam);
@@ -601,6 +625,9 @@ export default function DeepDiveDashboard() {
                                 <h2 className="text-xl font-bold text-[#111827] dark:text-white">{inspectingExam.course_name}</h2>
                             </div>
                         </div>
+                        <button onClick={() => downloadExamCSV(inspectingExam)}
+                            className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-[#6B7280] dark:text-gray-300 hover:text-[#111827] dark:hover:text-white flex items-center gap-2 transition-all active:scale-95">
+                            <FileText className="w-4 h-4" /> Export CSV
                     </div>
 
                     <div className="flex-1 p-8 overflow-auto neu-page">
