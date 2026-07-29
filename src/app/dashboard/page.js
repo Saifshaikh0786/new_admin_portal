@@ -218,20 +218,30 @@ export default function DeepDiveDashboard() {
     const downloadExamCSV = async (exam) => {
         try {
             const token = getAdminToken();
-            const queryParams = new URLSearchParams({
-                course_id: exam.course_id,
-                page: 1, limit: 9999, mode: 'attempted'
-            }).toString();
-            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${queryParams}`, {
-                headers: { 'Authorization': `Bearer ${token}` }, credentials: 'include'
-            });
-            const json = await res.json();
-            const students = json?.data || [];
-            const rows = [['#', 'Student Name', 'Reg ID', 'Section', 'Total Marks', 'MCQ', 'Coding']];
-            students.forEach((s, i) => {
-                rows.push([i + 1, s.student_name || '', s.uni_reg_id || '', s.section || '', s.total_marks_obtained ?? '', s.mcq_marks ?? '', s.coding_marks ?? '']);
-            });
-            const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const fetchAll = async (mode) => {
+                const all = []; let page = 1; let total = 0;
+                do {
+                    const qs = new URLSearchParams({ course_id: exam.course_id, page, limit: 200, mode }).toString();
+                    const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${qs}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }, credentials: 'include'
+                    });
+                    const json = await res.json();
+                    const students = json?.data || [];
+                    all.push(...students);
+                    total = json?.pagination?.total || 0;
+                    page++;
+                } while (all.length < total);
+                return all;
+            };
+            const attempted = await fetchAll('attempted');
+            const notAttempted = await fetchAll('not_attempted');
+            const allStudents = [...attempted, ...notAttempted];
+            if (!allStudents.length) return;
+            const keys = Object.keys(allStudents[0]).filter(k => k !== 'student_id');
+            const headerLabels = {'student_name':'Student Name','uni_reg_id':'Reg ID','section':'Section','total_marks_obtained':'Total Marks','total_possible_marks':'Max Marks','mcq_marks':'MCQ','coding_marks':'Coding','course_score_percent':'Score %','course_type':'Course Type','batch_id':'Batch ID','course_id':'Course ID','lectures_attempted':'Lectures Attempted','lecture_short':'Lecture','last_activity':'Last Activity','student_id':'Student ID'};
+            const headers = ['#', ...keys.map(k => headerLabels[k] || k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))];
+            const rows = allStudents.map((s, i) => [i + 1, ...keys.map(k => s[k] ?? '')]);
+            const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${exam.course_name.replace(/[^a-zA-Z0-9]/g, '_')}_export.csv`; a.click();
