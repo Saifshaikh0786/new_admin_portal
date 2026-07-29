@@ -628,6 +628,7 @@ export default function DeepDiveDashboard() {
                         <button onClick={() => downloadExamCSV(inspectingExam)}
                             className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-[#6B7280] dark:text-gray-300 hover:text-[#111827] dark:hover:text-white flex items-center gap-2 transition-all active:scale-95">
                             <FileText className="w-4 h-4" /> Export CSV
+                        </button>
                     </div>
 
                     <div className="flex-1 p-8 overflow-auto neu-page">
