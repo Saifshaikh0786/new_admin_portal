@@ -224,10 +224,11 @@ export default function DeepDiveDashboard() {
             for (const mode of ['attempted', 'not_attempted']) {
                 let page = 1, total = 0;
                 do {
-                    const qs = new URLSearchParams({ course_id: exam.course_id, page, limit: 200, mode }).toString();
+                    const qs = new URLSearchParams({ course_id: exam.course_id, page, limit: 200, mode, t: Date.now() }).toString();
                     const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${qs}`, {
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        credentials: 'include'
+                        credentials: 'include',
+                        cache: 'no-store'
                     });
                     const json = await res.json();
                     if (!json?.success) break;
