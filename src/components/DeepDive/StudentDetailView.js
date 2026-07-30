@@ -39,7 +39,8 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
     useEffect(() => {
         if (!courseStructure || !Array.isArray(courseStructure)) return;
 
-        let totalCompletion = 0;
+        let totalSubUnitsAcrossAllUnits = 0;
+        let totalCompletedSubUnitsAcrossAllUnits = 0;
         const newUnitCompletions = {};
         const newUnitBreakdowns = {};
 
@@ -49,23 +50,22 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
             
             unit.sub_units?.forEach(su => {
                 let suProgress = su.progress || 0;
+                totalSubUnitsAcrossAllUnits += 1;
                 
                 if (progressMode === 'attempts' && su.details) {
                     const { has_mcq, mcq_submitted, has_coding, coding_submitted } = su.details;
-                    if (has_mcq && has_coding) {
+                    if (mcq_submitted || coding_submitted) {
+                        suProgress = 100;
+                    } else if (has_mcq || has_coding) {
                         suProgress = 0;
-                        if (mcq_submitted) suProgress += 50;
-                        if (coding_submitted) suProgress += 50;
-                    } else if (has_mcq) {
-                        suProgress = mcq_submitted ? 100 : 0;
-                    } else if (has_coding) {
-                        suProgress = coding_submitted ? 100 : 0;
                     } else {
                         suProgress = su.progress || 0;
                     }
                 }
                 
                 unitTotalProgress += suProgress;
+                totalCompletedSubUnitsAcrossAllUnits += (suProgress / 100);
+                
                 subUnitBreakdown.push({
                     sub_unit_id: su.sub_unit_id,
                     progress_percentage: suProgress,
@@ -77,12 +77,19 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
             
             newUnitCompletions[unit.unit_id] = unitProgress;
             newUnitBreakdowns[unit.unit_id] = subUnitBreakdown;
-            totalCompletion += unitProgress;
         });
 
         setUnitCompletions(newUnitCompletions);
         setUnitBreakdowns(newUnitBreakdowns);
-        setOverallCourseProgress(courseStructure.length > 0 ? Math.round(totalCompletion / courseStructure.length) : 0);
+        
+        if (progressMode === 'attempts') {
+            setOverallCourseProgress(totalSubUnitsAcrossAllUnits > 0 ? Math.round((totalCompletedSubUnitsAcrossAllUnits / totalSubUnitsAcrossAllUnits) * 100) : 0);
+        } else {
+            // Keep original behavior for marks to avoid disrupting existing completion_rate averages
+            let totalUnitAverages = 0;
+            courseStructure.forEach(unit => { totalUnitAverages += (newUnitCompletions[unit.unit_id] || 0); });
+            setOverallCourseProgress(courseStructure.length > 0 ? Math.round(totalUnitAverages / courseStructure.length) : 0);
+        }
     }, [courseStructure, progressMode]);
 
 
