@@ -47,13 +47,13 @@ function SummaryCard({ title, value, subtitle, icon, accentColor, sparkData, cal
   return (
     <GlassCard className="p-5">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">{title}</span>
+        <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400 font-bold uppercase tracking-wider">{title}</span>
         <span className="text-lg">{icon}</span>
       </div>
       <div className="flex items-end justify-between">
         <div>
           <div className="text-3xl font-extrabold text-gray-900 dark:text-white leading-none">{value}</div>
-          {subtitle && <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{subtitle}</div>}
+          {subtitle && <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400 mt-1">{subtitle}</div>}
         </div>
         {sparkData?.length >= 2 && <Sparkline data={sparkData} color={accentColor} width={70} height={28} />}
       </div>
@@ -75,7 +75,7 @@ function StrengthItem({ rank, name, percentage, color, type }) {
       <span className="w-7 h-7 flex items-center justify-center rounded-full text-[11px] font-bold shrink-0" style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}25` }}>{rank}</span>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-medium text-gray-900 dark:text-white truncate">{name}</div>
-        <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{type}</div>
+        <div className="text-[10px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400 truncate">{type}</div>
       </div>
       <div className="text-right shrink-0">
         <span className="text-[13px] font-bold" style={{ color }}>{percentage}%</span>
@@ -156,7 +156,7 @@ function ConcentricRings({ overall = 0, mcq = 0, coding = 0, size = 200 }) {
         {rings.map((r, i) => (
           <div key={i} className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: r.color }} />
-            <span className="text-[10px] text-gray-500 dark:text-gray-400">{r.label}: {r.val}%</span>
+            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400">{r.label}: {r.val}%</span>
           </div>
         ))}
       </div>
@@ -220,7 +220,7 @@ function AchievementBadges({ data }) {
           {b.unlocked && <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-yellow-400 border-2 border-white dark:border-gray-900 shadow-sm" />}
           <div className={`mb-1 flex justify-center ${b.unlocked ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>{b.icon}</div>
           <div className={`text-[10px] font-bold ${b.unlocked ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-500'}`}>{b.title}</div>
-          <div className="text-[8px] text-gray-500 mt-0.5">{b.desc}</div>
+          <div className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">{b.desc}</div>
         </div>
       ))}
     </div>
@@ -256,8 +256,8 @@ function AIInsights({ data }) {
         <div key={i} className={`flex items-start gap-3 p-3 rounded-xl border ${typeStyles[tip.type] || typeStyles.info}`}>
           <div className="shrink-0 mt-0.5">{tip.icon}</div>
           <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-bold text-white">{tip.title}</div>
-            <div className="text-[11px] text-gray-300 leading-relaxed mt-0.5">{tip.text}</div>
+            <div className="text-[12px] font-bold text-gray-800">{tip.title}</div>
+            <div className="text-[11px] text-gray-600 leading-relaxed mt-0.5">{tip.text}</div>
           </div>
         </div>
       ))}
@@ -309,14 +309,14 @@ function ImprovementVelocity({ data }) {
             <span className="text-[13px] font-medium text-gray-900 truncate">{item.name}</span>
             <span className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: `${item.color}15`, color: item.color }}>{item.type}</span>
           </div>
-          <div className="text-[10px] text-gray-500">{item.unit} {'\u2022'} {item.first}% {'\u2192'} {item.last}% ({item.attempts} attempts)</div>
+          <div className="text-[10px] text-slate-600 dark:text-slate-400 font-medium">{item.unit} {'\u2022'} {item.first}% {'\u2192'} {item.last}% ({item.attempts} attempts)</div>
           <div className="mt-1 h-1 bg-gray-200/50 rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${bw}%`, backgroundColor: pos ? C.mcq : C.red }} />
           </div>
         </div>
         <div className="text-right shrink-0">
           <div className={`text-[14px] font-bold ${pos ? 'text-green-600' : 'text-red-600'}`}>{pos ? '+' : ''}{item.velocity}%</div>
-          <div className="text-[9px] text-gray-500">/attempt</div>
+          <div className="text-[9px] text-slate-600 dark:text-slate-400 font-medium">/attempt</div>
         </div>
       </div>
     );
@@ -324,27 +324,27 @@ function ImprovementVelocity({ data }) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-transparent border border-green-200">
+        <div className="p-4 rounded-xl bg-gradient-to-br from-green-500/15 to-transparent border border-green-500/20">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">MCQ Speed</span>
-            <span>{'\ud83d\udcdd'}</span>
+            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider">MCQ Speed</span>
+            <span>{'📝'}</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className={`text-3xl font-extrabold ${avgM > 0 ? 'text-green-600' : avgM < 0 ? 'text-red-600' : 'text-gray-500'}`}>{avgM > 0 ? '+' : ''}{avgM}%</span>
-            <span className="text-[11px] text-gray-500">/attempt</span>
+            <span className={`text-3xl font-extrabold ${avgM > 0 ? 'text-green-500' : avgM < 0 ? 'text-red-500' : 'text-gray-500'}`}>{avgM > 0 ? '+' : ''}{avgM}%</span>
+            <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">/attempt</span>
           </div>
-          <div className="text-[10px] text-gray-500 mt-1">{avgM > 5 ? 'Rapid improvement!' : avgM > 2 ? 'Good progress' : avgM > 0 ? 'Slowly improving' : avgM === 0 ? 'No change' : 'Declining'}</div>
+          <div className="text-[10px] text-slate-600 dark:text-slate-400 font-medium mt-1">{avgM > 5 ? 'Rapid improvement!' : avgM > 2 ? 'Good progress' : avgM > 0 ? 'Slowly improving' : avgM === 0 ? 'No change' : 'Declining'}</div>
         </div>
-        <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-50 to-transparent border border-cyan-200">
+        <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-500/15 to-transparent border border-cyan-500/20">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Coding Speed</span>
-            <span>{'\ud83d\udcbb'}</span>
+            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider">Coding Speed</span>
+            <span>{'💻'}</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className={`text-3xl font-extrabold ${avgC > 0 ? 'text-cyan-600' : avgC < 0 ? 'text-red-600' : 'text-gray-500'}`}>{avgC > 0 ? '+' : ''}{avgC}%</span>
-            <span className="text-[11px] text-gray-500">/attempt</span>
+            <span className={`text-3xl font-extrabold ${avgC > 0 ? 'text-cyan-500' : avgC < 0 ? 'text-red-500' : 'text-gray-500'}`}>{avgC > 0 ? '+' : ''}{avgC}%</span>
+            <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">/attempt</span>
           </div>
-          <div className="text-[10px] text-gray-500 mt-1">{avgC > 5 ? 'Rapid improvement!' : avgC > 2 ? 'Good progress' : avgC > 0 ? 'Slowly improving' : avgC === 0 ? 'No change' : 'Declining'}</div>
+          <div className="text-[10px] text-slate-600 dark:text-slate-400 font-medium mt-1">{avgC > 5 ? 'Rapid improvement!' : avgC > 2 ? 'Good progress' : avgC > 0 ? 'Slowly improving' : avgC === 0 ? 'No change' : 'Declining'}</div>
         </div>
       </div>
       {fast.length > 0 && (
@@ -428,7 +428,7 @@ function GaugeChart({ percentage = 0, size = 200, label = 'Score' }) {
 function CustomDonutChart({ percentage = 0, color, label, size = 150, strokeWidth = 12 }) {
   const [ap, setAp] = useState(0); const r = (size - strokeWidth) / 2, circ = 2 * Math.PI * r;
   useEffect(() => { const t = setTimeout(() => setAp(percentage), 100); return () => clearTimeout(t) }, [percentage]);
-  return (<div className="flex flex-col items-center"><div className="relative" style={{ width: size, height: size }}><svg width={size} height={size} className="-rotate-90"><circle cx={size / 2} cy={size / 2} r={r} fill="transparent" stroke="#e5e7eb" strokeWidth={strokeWidth} opacity="0.4" /><circle cx={size / 2} cy={size / 2} r={r} fill="transparent" stroke={color} strokeWidth={strokeWidth} strokeDasharray={circ} strokeDashoffset={circ - (ap / 100) * circ} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)', filter: `drop-shadow(0 0 5px ${color}44)` }} /></svg><div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-xl font-bold text-gray-900 dark:text-white"><AnimatedNumber value={percentage} suffix="%" /></span><span className="text-[9px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-0.5">{label}</span></div></div></div>);
+  return (<div className="flex flex-col items-center"><div className="relative" style={{ width: size, height: size }}><svg width={size} height={size} className="-rotate-90"><circle cx={size / 2} cy={size / 2} r={r} fill="transparent" stroke="#e5e7eb" strokeWidth={strokeWidth} opacity="0.4" /><circle cx={size / 2} cy={size / 2} r={r} fill="transparent" stroke={color} strokeWidth={strokeWidth} strokeDasharray={circ} strokeDashoffset={circ - (ap / 100) * circ} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)', filter: `drop-shadow(0 0 5px ${color}44)` }} /></svg><div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-xl font-bold text-gray-900 dark:text-white"><AnimatedNumber value={percentage} suffix="%" /></span><span className="text-[9px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400 uppercase tracking-wider mt-0.5">{label}</span></div></div></div>);
 }
 
 /* ═══ RADAR ═══ */
@@ -446,7 +446,7 @@ function CustomBarChart({ data, keys, colors, height = 280, showLegend = true })
   useEffect(() => { const t = setTimeout(() => setAnim(true), 100); return () => clearTimeout(t) }, [data]);
   if (!data?.length) return <div className="h-[200px] flex items-center justify-center text-gray-500 text-sm">No data</div>;
   const pad = { top: 20, right: 20, bottom: 40, left: 45 };
-  return (<div className="w-full"><div style={{ height: `${height}px` }}><svg viewBox={`0 0 600 ${height}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">{[0, 25, 50, 75, 100].map(t => { const y = pad.top + (1 - t / 100) * (height - pad.top - pad.bottom); return (<g key={t}><line x1={pad.left} y1={y} x2={580} y2={y} stroke="#e5e7eb" strokeWidth="0.5" strokeDasharray="4 4" /><text x={pad.left - 8} y={y + 4} textAnchor="end" fill="#9ca3af" fontSize="10">{t}%</text></g>) })}{data.map((item, i) => { const gx = pad.left + (i / data.length) * (600 - pad.left - pad.right); const gw = (600 - pad.left - pad.right) / data.length; return (<g key={i}>{keys.map((key, ki) => { const val = item[key] || 0; const bh = (val / 100) * (height - pad.top - pad.bottom); const bw = gw * 0.28; const bx = gx + (gw - keys.length * (bw + 4)) / 2 + ki * (bw + 4); const by = height - pad.bottom - bh; const ih = hov === `${i}-${ki}`; const gid = `bg${i}${ki}`; return (<g key={ki} onMouseEnter={() => setHov(`${i}-${ki}`)} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}><defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={colors[ki]} stopOpacity="0.95" /><stop offset="100%" stopColor={colors[ki]} stopOpacity="0.55" /></linearGradient></defs><rect x={bx} width={bw} rx="4" y={anim ? by : height - pad.bottom} height={anim ? bh : 0} fill={`url(#${gid})`} opacity={ih ? 1 : 0.8} style={{ transition: 'y 0.8s cubic-bezier(.4,0,.2,1), height 0.8s cubic-bezier(.4,0,.2,1), opacity 0.15s' }} />{ih && <><rect x={bx - 2} width={bw + 4} rx="5" y={by - 2} height={bh + 4} fill="none" stroke={colors[ki]} strokeWidth="1.2" opacity="0.4" /><rect x={bx - 10} y={by - 24} width={bw + 20} height={18} rx="5" fill="#1f2937" stroke={colors[ki]} strokeWidth="0.6" /><text x={bx + bw / 2} y={by - 11} textAnchor="middle" fill={colors[ki]} fontSize="10" fontWeight="bold">{val}%</text></>}</g>) })}<text x={gx + gw / 2} y={height - pad.bottom + 18} textAnchor="middle" fill="#6b7280" fontSize="10">{item.name}</text></g>) })}</svg></div>{showLegend && <div className="flex items-center justify-center gap-5 mt-2">{keys.map((k, i) => (<div key={k} className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: colors[i] }} /><span className="text-[11px] text-gray-500">{k}</span></div>))}</div>}</div>);
+  return (<div className="w-full"><div style={{ height: `${height}px` }}><svg viewBox={`0 0 600 ${height}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">{[0, 25, 50, 75, 100].map(t => { const y = pad.top + (1 - t / 100) * (height - pad.top - pad.bottom); return (<g key={t}><line x1={pad.left} y1={y} x2={580} y2={y} stroke="#e5e7eb" strokeWidth="0.5" strokeDasharray="4 4" /><text x={pad.left - 8} y={y + 4} textAnchor="end" fill="#9ca3af" fontSize="10">{t}%</text></g>) })}{data.map((item, i) => { const gx = pad.left + (i / data.length) * (600 - pad.left - pad.right); const gw = (600 - pad.left - pad.right) / data.length; return (<g key={i}>{keys.map((key, ki) => { const val = item[key] || 0; const bh = (val / 100) * (height - pad.top - pad.bottom); const bw = gw * 0.28; const bx = gx + (gw - keys.length * (bw + 4)) / 2 + ki * (bw + 4); const by = height - pad.bottom - bh; const ih = hov === `${i}-${ki}`; const gid = `bg${i}${ki}`; return (<g key={ki} onMouseEnter={() => setHov(`${i}-${ki}`)} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}><defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={colors[ki]} stopOpacity="0.95" /><stop offset="100%" stopColor={colors[ki]} stopOpacity="0.55" /></linearGradient></defs><rect x={bx} width={bw} rx="4" y={anim ? by : height - pad.bottom} height={anim ? bh : 0} fill={`url(#${gid})`} opacity={ih ? 1 : 0.8} style={{ transition: 'y 0.8s cubic-bezier(.4,0,.2,1), height 0.8s cubic-bezier(.4,0,.2,1), opacity 0.15s' }} />{ih && <><rect x={bx - 2} width={bw + 4} rx="5" y={by - 2} height={bh + 4} fill="none" stroke={colors[ki]} strokeWidth="1.2" opacity="0.4" /><rect x={bx - 10} y={by - 24} width={bw + 20} height={18} rx="5" fill="#1f2937" stroke={colors[ki]} strokeWidth="0.6" /><text x={bx + bw / 2} y={by - 11} textAnchor="middle" fill={colors[ki]} fontSize="10" fontWeight="bold">{val}%</text></>}</g>) })}<text x={gx + gw / 2} y={height - pad.bottom + 18} textAnchor="middle" fill="#6b7280" fontSize="10">{item.name}</text></g>) })}</svg></div>{showLegend && <div className="flex items-center justify-center gap-5 mt-2">{keys.map((k, i) => (<div key={k} className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: colors[i] }} /><span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">{k}</span></div>))}</div>}</div>);
 }
 
 /* ═══ FUNNEL ═══ */
@@ -594,13 +594,13 @@ function processAnalytics(units, resultMap, todayIST) {
 }
 
 /* ═══ CONSISTENCY ANALYSIS ═══ */
-function ConsistencyAnalysis({ data }) { const analysis = useMemo(() => { if (!data) return null; const scores = []; data.units.forEach(u => u.subUnits.forEach(s => { if (s.overallPct > 0) scores.push(s.overallPct) })); if (scores.length < 2) return null; const avg = scores.reduce((a, b) => a + b, 0) / scores.length; const stdDev = Math.sqrt(scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / scores.length); return { consistency: Math.max(0, Math.round(100 - stdDev * 1.5)), stdDev: Math.round(stdDev), avg: Math.round(avg), maxScore: Math.max(...scores), minScore: Math.min(...scores) } }, [data]); if (!analysis) return <p className="text-gray-400 text-sm italic">Need 2+ attempted topics</p>; const cc = analysis.consistency >= 80 ? C.mcq : analysis.consistency >= 60 ? C.blue : analysis.consistency >= 40 ? C.yellow : C.red; const cl = analysis.consistency >= 80 ? 'Very Consistent' : analysis.consistency >= 60 ? 'Fairly Consistent' : analysis.consistency >= 40 ? 'Inconsistent' : 'Very Inconsistent'; return (<div className="space-y-4"><div className="flex items-center gap-4"><CustomDonutChart percentage={analysis.consistency} color={cc} label="Consistency" size={90} strokeWidth={7} /><div className="flex-1 space-y-2"><div className="text-base font-bold" style={{ color: cc }}>{cl}</div><div className="text-[11px] text-gray-400">Scores vary by ±{analysis.stdDev}%</div><div className="grid grid-cols-3 gap-2 text-center"><div className="p-1.5 rounded-lg bg-white/[0.03]"><div className="text-sm font-bold text-white">{analysis.avg}%</div><div className="text-[7px] text-gray-500">AVG</div></div><div className="p-1.5 rounded-lg bg-emerald-500/[0.04]"><div className="text-sm font-bold text-emerald-400">{analysis.maxScore}%</div><div className="text-[7px] text-gray-500">BEST</div></div><div className="p-1.5 rounded-lg bg-red-500/[0.04]"><div className="text-sm font-bold text-red-400">{analysis.minScore}%</div><div className="text-[7px] text-gray-500">WORST</div></div></div></div></div></div>) }
+function ConsistencyAnalysis({ data }) { const analysis = useMemo(() => { if (!data) return null; const scores = []; data.units.forEach(u => u.subUnits.forEach(s => { if (s.overallPct > 0) scores.push(s.overallPct) })); if (scores.length < 2) return null; const avg = scores.reduce((a, b) => a + b, 0) / scores.length; const stdDev = Math.sqrt(scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / scores.length); return { consistency: Math.max(0, Math.round(100 - stdDev * 1.5)), stdDev: Math.round(stdDev), avg: Math.round(avg), maxScore: Math.max(...scores), minScore: Math.min(...scores) } }, [data]); if (!analysis) return <p className="text-gray-400 text-sm italic">Need 2+ attempted topics</p>; const cc = analysis.consistency >= 80 ? C.mcq : analysis.consistency >= 60 ? C.blue : analysis.consistency >= 40 ? C.yellow : C.red; const cl = analysis.consistency >= 80 ? 'Very Consistent' : analysis.consistency >= 60 ? 'Fairly Consistent' : analysis.consistency >= 40 ? 'Inconsistent' : 'Very Inconsistent'; return (<div className="space-y-4"><div className="flex items-center gap-4"><CustomDonutChart percentage={analysis.consistency} color={cc} label="Consistency" size={90} strokeWidth={7} /><div className="flex-1 space-y-2"><div className="text-base font-bold" style={{ color: cc }}>{cl}</div><div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">Scores vary by ±{analysis.stdDev}%</div><div className="grid grid-cols-3 gap-2 text-center"><div className="p-1.5 rounded-lg bg-gray-50 border border-gray-100"><div className="text-sm font-bold text-gray-800">{analysis.avg}%</div><div className="text-[7px] text-gray-500 uppercase">AVG</div></div><div className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-100/50"><div className="text-sm font-bold text-emerald-700">{analysis.maxScore}%</div><div className="text-[7px] text-emerald-600/70 uppercase">BEST</div></div><div className="p-1.5 rounded-lg bg-red-50 border border-red-100/50"><div className="text-sm font-bold text-red-700">{analysis.minScore}%</div><div className="text-[7px] text-red-600/70 uppercase">WORST</div></div></div></div></div></div>) }
 
 /* ═══ STUDY PRIORITY PLANNER ═══ */
-function StudyPriorityPlanner({ data }) { const plan = useMemo(() => { if (!data) return []; const items = []; data.units.forEach(u => u.subUnits.forEach(s => { const m = s.mcqBest?.percentage ?? null; const c = s.codBest?.percentage ?? null; if (m === null && c === null) return; let p = 100 - s.overallPct; if (s.overallPct < 40 && s.overallPct > 0) p += 15; items.push({ name: s.name, unit: u.short, avg: s.overallPct, mcqPct: m, codPct: c, priority: p }) })); return items.sort((a, b) => b.priority - a.priority).slice(0, 10) }, [data]); if (!plan.length) return <p className="text-gray-400 text-sm italic">No attempted topics yet.</p>; const pc = p => p >= 70 ? C.red : p >= 50 ? C.orange : p >= 30 ? C.yellow : C.blue; const pl = p => p >= 70 ? 'URGENT' : p >= 50 ? 'HIGH' : p >= 30 ? 'MEDIUM' : 'LOW'; return (<div className="space-y-2">{plan.map((item, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-all"><div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ backgroundColor: `${pc(item.priority)}12`, color: pc(item.priority) }}>{i + 1}</div><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{item.name}</div><div className="text-[10px] text-gray-400">{item.unit} • {item.avg}%</div></div><span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ backgroundColor: `${pc(item.priority)}12`, color: pc(item.priority) }}>{pl(item.priority)}</span></div>))}</div>) }
+function StudyPriorityPlanner({ data }) { const plan = useMemo(() => { if (!data) return []; const items = []; data.units.forEach(u => u.subUnits.forEach(s => { const m = s.mcqBest?.percentage ?? null; const c = s.codBest?.percentage ?? null; if (m === null && c === null) return; let p = 100 - s.overallPct; if (s.overallPct < 40 && s.overallPct > 0) p += 15; items.push({ name: s.name, unit: u.short, avg: s.overallPct, mcqPct: m, codPct: c, priority: p }) })); return items.sort((a, b) => b.priority - a.priority).slice(0, 10) }, [data]); if (!plan.length) return <p className="text-gray-400 text-sm italic">No attempted topics yet.</p>; const pc = p => p >= 70 ? C.red : p >= 50 ? C.orange : p >= 30 ? C.yellow : C.blue; const pl = p => p >= 70 ? 'URGENT' : p >= 50 ? 'HIGH' : p >= 30 ? 'MEDIUM' : 'LOW'; return (<div className="space-y-2">{plan.map((item, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/50 border border-gray-100 hover:bg-gray-50 transition-all"><div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ backgroundColor: `${pc(item.priority)}15`, color: pc(item.priority) }}>{i + 1}</div><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-gray-800 truncate">{item.name}</div><div className="text-[10px] text-slate-600 dark:text-slate-400 font-medium">{item.unit} • {item.avg}%</div></div><span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ backgroundColor: `${pc(item.priority)}15`, color: pc(item.priority) }}>{pl(item.priority)}</span></div>))}</div>) }
 
 /* ═══ WEAK POINT DEEP DIVE ═══ */
-function WeakPointDeepDive({ data }) { const analysis = useMemo(() => { if (!data) return null; const all = []; data.units.forEach(u => u.subUnits.forEach(s => { const m = s.mcqBest?.percentage ?? null; const c = s.codBest?.percentage ?? null; if (m === null && c === null) return; all.push({ name: s.name, unit: u.name, unitShort: u.short, mcqPct: m, codPct: c, avg: s.overallPct, mcqAttempts: s.mcqAttempts?.length || 0, codAttempts: s.codAttempts?.length || 0, hasMcq: s.hasMcq, hasCoding: s.hasCoding }) })); const critical = all.filter(s => s.avg < 40 && s.avg > 0).sort((a, b) => a.avg - b.avg); const improve = all.filter(s => s.avg >= 40 && s.avg < 60).sort((a, b) => a.avg - b.avg); const mcqW = all.filter(s => s.mcqPct !== null && s.codPct !== null && s.codPct - s.mcqPct > 25); const codW = all.filter(s => s.mcqPct !== null && s.codPct !== null && s.mcqPct - s.codPct > 25); const struggling = all.filter(s => (s.mcqAttempts + s.codAttempts) >= 3 && s.avg < 60).sort((a, b) => (b.mcqAttempts + b.codAttempts) - (a.mcqAttempts + a.codAttempts)); const boost = (() => { if (!critical.length && !improve.length) return 0; let b = 0;[...critical, ...improve].forEach(s => { b += (70 - s.avg) }); return Math.round(b / Math.max(all.length, 1)) })(); return { critical, improve, mcqW, codW, struggling, boost, total: all.length } }, [data]); if (!analysis) return null; const { critical, improve, mcqW, codW, struggling, boost, total } = analysis; if (total === 0) return <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/[0.04] border border-blue-500/10"><BookOpen className="text-blue-400" size={14} /><p className="text-sm text-blue-300">No tests attempted yet.</p></div>; return (<div className="space-y-4">{boost > 0 && <div className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-emerald-500/[0.08] to-transparent border border-emerald-500/15"><div className="w-11 h-11 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 shrink-0"><ArrowUp size={18} /></div><div><div className="text-sm font-bold text-emerald-400">+{boost}% Potential Boost</div><div className="text-[11px] text-gray-400">Improving weak areas to 70% could raise overall by ~{boost}%</div></div></div>}{critical.length > 0 && <div><div className="flex items-center gap-2 mb-2"><XCircle className="text-red-400" size={14} /><span className="text-[13px] font-bold text-red-400">Critical ({critical.length})</span></div><div className="space-y-1.5">{critical.map((s, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-red-500/[0.03] border border-red-500/10"><div className="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center text-red-400 text-[10px] font-bold shrink-0">{s.avg}%</div><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-gray-400">{s.unit}</div></div></div>))}</div></div>}{improve.length > 0 && <div><div className="flex items-center gap-2 mb-2"><AlertCircle className="text-yellow-400" size={14} /><span className="text-[13px] font-bold text-yellow-400">Needs Improvement ({improve.length})</span></div><div className="space-y-1.5">{improve.map((s, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-yellow-500/[0.03] border border-yellow-500/10"><div className="w-7 h-7 rounded-full bg-yellow-500/15 flex items-center justify-center text-yellow-400 text-[10px] font-bold shrink-0">{s.avg}%</div><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-gray-400">{s.unit}</div></div></div>))}</div></div>}{(mcqW.length > 0 || codW.length > 0) && <div><div className="flex items-center gap-2 mb-2"><Crosshair className="text-purple-400" size={14} /><span className="text-[13px] font-bold text-purple-400">Skill Gaps</span></div><div className="space-y-1.5">{mcqW.map((s, i) => (<div key={`m${i}`} className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/[0.03] border border-purple-500/10"><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-gray-400">MCQ {s.codPct - s.mcqPct}% lower than Coding</div></div></div>))}{codW.map((s, i) => (<div key={`c${i}`} className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/[0.03] border border-purple-500/10"><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-gray-400">Coding {s.mcqPct - s.codPct}% lower than MCQ</div></div></div>))}</div></div>}{struggling.length > 0 && <div><div className="flex items-center gap-2 mb-2"><Brain className="text-pink-400" size={14} /><span className="text-[13px] font-bold text-pink-400">Struggling (3+ attempts, {'<'}60%)</span></div><div className="space-y-1.5">{struggling.slice(0, 5).map((s, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-pink-500/[0.03] border border-pink-500/10"><div className="w-7 h-7 rounded-full bg-pink-500/15 flex items-center justify-center text-pink-400 text-[10px] font-bold shrink-0">{s.mcqAttempts + s.codAttempts}x</div><div className="flex-1"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-gray-400">{s.unit} • {s.avg}%</div></div></div>))}</div></div>}{critical.length === 0 && improve.length === 0 && struggling.length === 0 && <div className="flex items-center gap-3 p-4 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15"><CheckCircle2 className="text-emerald-400" size={18} /><p className="text-sm text-emerald-300">No critical weak points!</p></div>}</div>) }
+function WeakPointDeepDive({ data }) { const analysis = useMemo(() => { if (!data) return null; const all = []; data.units.forEach(u => u.subUnits.forEach(s => { const m = s.mcqBest?.percentage ?? null; const c = s.codBest?.percentage ?? null; if (m === null && c === null) return; all.push({ name: s.name, unit: u.name, unitShort: u.short, mcqPct: m, codPct: c, avg: s.overallPct, mcqAttempts: s.mcqAttempts?.length || 0, codAttempts: s.codAttempts?.length || 0, hasMcq: s.hasMcq, hasCoding: s.hasCoding }) })); const critical = all.filter(s => s.avg < 40 && s.avg > 0).sort((a, b) => a.avg - b.avg); const improve = all.filter(s => s.avg >= 40 && s.avg < 60).sort((a, b) => a.avg - b.avg); const mcqW = all.filter(s => s.mcqPct !== null && s.codPct !== null && s.codPct - s.mcqPct > 25); const codW = all.filter(s => s.mcqPct !== null && s.codPct !== null && s.mcqPct - s.codPct > 25); const struggling = all.filter(s => (s.mcqAttempts + s.codAttempts) >= 3 && s.avg < 60).sort((a, b) => (b.mcqAttempts + b.codAttempts) - (a.mcqAttempts + a.codAttempts)); const boost = (() => { if (!critical.length && !improve.length) return 0; let b = 0;[...critical, ...improve].forEach(s => { b += (70 - s.avg) }); return Math.round(b / Math.max(all.length, 1)) })(); return { critical, improve, mcqW, codW, struggling, boost, total: all.length } }, [data]); if (!analysis) return null; const { critical, improve, mcqW, codW, struggling, boost, total } = analysis; if (total === 0) return <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/[0.04] border border-blue-500/10"><BookOpen className="text-blue-400" size={14} /><p className="text-sm text-blue-300">No tests attempted yet.</p></div>; return (<div className="space-y-4">{boost > 0 && <div className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-emerald-500/[0.08] to-transparent border border-emerald-500/15"><div className="w-11 h-11 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 shrink-0"><ArrowUp size={18} /></div><div><div className="text-sm font-bold text-emerald-400">+{boost}% Potential Boost</div><div className="text-[11px] text-gray-400">Improving weak areas to 70% could raise overall by ~{boost}%</div></div></div>}{critical.length > 0 && <div><div className="flex items-center gap-2 mb-2"><XCircle className="text-red-400" size={14} /><span className="text-[13px] font-bold text-red-400">Critical ({critical.length})</span></div><div className="space-y-1.5">{critical.map((s, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-red-500/[0.03] border border-red-500/10"><div className="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center text-red-400 text-[10px] font-bold shrink-0">{s.avg}%</div><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{s.unit}</div></div></div>))}</div></div>}{improve.length > 0 && <div><div className="flex items-center gap-2 mb-2"><AlertCircle className="text-yellow-400" size={14} /><span className="text-[13px] font-bold text-yellow-400">Needs Improvement ({improve.length})</span></div><div className="space-y-1.5">{improve.map((s, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-yellow-500/[0.03] border border-yellow-500/10"><div className="w-7 h-7 rounded-full bg-yellow-500/15 flex items-center justify-center text-yellow-400 text-[10px] font-bold shrink-0">{s.avg}%</div><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{s.unit}</div></div></div>))}</div></div>}{(mcqW.length > 0 || codW.length > 0) && <div><div className="flex items-center gap-2 mb-2"><Crosshair className="text-purple-400" size={14} /><span className="text-[13px] font-bold text-purple-400">Skill Gaps</span></div><div className="space-y-1.5">{mcqW.map((s, i) => (<div key={`m${i}`} className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/[0.03] border border-purple-500/10"><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">MCQ {s.codPct - s.mcqPct}% lower than Coding</div></div></div>))}{codW.map((s, i) => (<div key={`c${i}`} className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/[0.03] border border-purple-500/10"><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Coding {s.mcqPct - s.codPct}% lower than MCQ</div></div></div>))}</div></div>}{struggling.length > 0 && <div><div className="flex items-center gap-2 mb-2"><Brain className="text-pink-400" size={14} /><span className="text-[13px] font-bold text-pink-400">Struggling (3+ attempts, {'<'}60%)</span></div><div className="space-y-1.5">{struggling.slice(0, 5).map((s, i) => (<div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-pink-500/[0.03] border border-pink-500/10"><div className="w-7 h-7 rounded-full bg-pink-500/15 flex items-center justify-center text-pink-400 text-[10px] font-bold shrink-0">{s.mcqAttempts + s.codAttempts}x</div><div className="flex-1"><div className="text-[13px] font-medium text-white truncate">{s.name}</div><div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{s.unit} • {s.avg}%</div></div></div>))}</div></div>}{critical.length === 0 && improve.length === 0 && struggling.length === 0 && <div className="flex items-center gap-3 p-4 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15"><CheckCircle2 className="text-emerald-400" size={18} /><p className="text-sm text-emerald-300">No critical weak points!</p></div>}</div>) }
 
 /* ═══ MAIN PAGE ═══ */
 function StudentAnalyticsView() {
@@ -779,7 +779,7 @@ function StudentAnalyticsView() {
               </button>
               <div>
                 <h1 className="text-sm font-bold text-gray-900 dark:text-white">{apiData?.student?.name || studentName || 'Student'}</h1>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400">{apiData?.student?.reg || ''} &bull; Section {apiData?.student?.section || ''}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400">{apiData?.student?.reg || ''} &bull; Section {apiData?.student?.section || ''}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -805,10 +805,10 @@ function StudentAnalyticsView() {
               { key: 'coding', label: 'Coding', icon: <Code size={14} />, color: C.coding },
             ].map(t => (
               <button key={t.key} onClick={() => { setSection(t.key); setSelectedUnit(null) }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-bold border transition-all duration-200 ${
                   section === t.key
                     ? 'text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                    : 'text-slate-600 dark:text-slate-400 border-transparent bg-slate-50 hover:bg-slate-100 dark:bg-gray-800/50 dark:hover:bg-gray-700 hover:text-slate-900 dark:hover:text-white'
                 }`}
                 style={section === t.key ? { backgroundColor: t.color, borderColor: t.color } : {}}>
                 {t.icon} {t.label}
@@ -832,11 +832,11 @@ function StudentAnalyticsView() {
               {/* Practice Grade */}
               <div className="lg:col-span-3">
                 <GlassCard className="p-5 h-full flex flex-col items-center justify-center">
-                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-2">Practice Grade</span>
+                  <span className="text-[9px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider mb-2">Practice Grade</span>
                   <div className={`w-full rounded-2xl bg-gradient-to-br ${grade.bg} border ${grade.border} p-5 text-center shadow-sm`}>
                     <div className={`text-6xl font-black ${grade.color}`}>{grade.letter}</div>
                     <div className={`text-sm font-semibold ${grade.color} mt-1`}>{grade.desc}</div>
-                    <div className="text-[9px] text-gray-500 mt-2">{gradePct}%</div>
+                    <div className="text-[9px] text-slate-600 dark:text-slate-400 font-medium mt-2">{gradePct}%</div>
                     <div className="w-full h-1.5 bg-gray-200/50 rounded-full mt-2 overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${gradePct}%`, backgroundColor: gradePct >= 80 ? C.mcq : gradePct >= 60 ? C.blue : gradePct >= 40 ? C.orange : C.red }} />
                     </div>
@@ -844,7 +844,7 @@ function StudentAnalyticsView() {
                   <div className="mt-3 w-full space-y-1">
                     {GRADE_CRITERIA.map((g, i) => (
                       <div key={i} className="flex items-center justify-between px-2">
-                        <span className="text-[8px] text-gray-500">{g.range}</span>
+                        <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">{g.range}</span>
                         <span className="text-[9px] font-bold" style={{ color: g.color }}>{g.letter}</span>
                       </div>
                     ))}
@@ -854,17 +854,17 @@ function StudentAnalyticsView() {
               {/* Gauge */}
               <div className="lg:col-span-3">
                 <GlassCard className="p-5 h-full flex flex-col items-center justify-center">
-                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1">Overall Practice Score</span>
+                  <span className="text-[9px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider mb-1">Overall Practice Score</span>
                   <GaugeChart percentage={overall.overallPct} size={200} label="Practice" />
-                  <span className="text-[8px] text-gray-500 mt-1 text-center">Avg of MCQ & Coding % (attempted only)</span>
+                  <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-1 text-center">Avg of MCQ & Coding % (attempted only)</span>
                 </GlassCard>
               </div>
               {/* Concentric Score Rings */}
               <div className="lg:col-span-3">
                 <GlassCard className="p-5 h-full flex flex-col items-center justify-center">
-                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1">Score Rings</span>
+                  <span className="text-[9px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider mb-1">Score Rings</span>
                   <ConcentricRings overall={overall.overallPct} mcq={overall.mcqPct} coding={overall.codPct} size={180} />
-                  <span className="text-[8px] text-gray-500 mt-1">3 concentric donuts showing layered scores</span>
+                  <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-1">3 concentric donuts showing layered scores</span>
                 </GlassCard>
               </div>
               {/* Summary Cards */}
@@ -878,18 +878,18 @@ function StudentAnalyticsView() {
 
             {/* Achievements */}
             <GlassCard className="p-5">
-              <h3 className="text-[13px] font-bold text-gray-700 mb-3 flex items-center gap-2"><Award size={16} className="text-yellow-500" />Achievements</h3>
+              <h3 className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Award size={16} className="text-yellow-500" />Achievements</h3>
               <AchievementBadges data={analyticsData} />
             </GlassCard>
 
             {/* Performance Insights + Improvement Velocity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Brain size={16} className="text-purple-500" />Performance Insights</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Brain size={16} className="text-purple-500" />Performance Insights</h3>
                 <AIInsights data={analyticsData} />
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><TrendingUp size={16} className="text-green-500" />Improvement Velocity</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><TrendingUp size={16} className="text-green-500" />Improvement Velocity</h3>
                 <ImprovementVelocity data={analyticsData} />
               </GlassCard>
             </div>
@@ -897,25 +897,25 @@ function StudentAnalyticsView() {
             {/* Skill Matrix + Funnel + Histogram */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[13px] font-bold text-gray-700 mb-3 flex items-center gap-2"><Layers size={16} className="text-orange-500" />Skill Matrix</h3>
+                <h3 className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Layers size={16} className="text-orange-500" />Skill Matrix</h3>
                 <SkillMatrix units={units} />
-                <p className="text-[8px] text-gray-500 mt-3 text-center">Green = strong, Red = weak, Gray = unattempted</p>
+                <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-3 text-center">Green = strong, Red = weak, Gray = unattempted</p>
               </GlassCard>
               <GlassCard className="p-5 flex flex-col items-center">
-                <h3 className="text-[13px] font-bold text-gray-700 mb-3">Test Funnel</h3>
+                <h3 className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">Test Funnel</h3>
                 <FunnelChart total={funnel.total} attempted={funnel.attempted} passed={funnel.scored50} aced={funnel.scored80} height={180} />
-                <p className="text-[8px] text-gray-500 mt-2 text-center">Progression from total to attempted to scored 50%+ to 80%+</p>
+                <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-2 text-center">Progression from total to attempted to scored 50%+ to 80%+</p>
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[13px] font-bold text-gray-700 mb-3">Score Distribution</h3>
+                <h3 className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">Score Distribution</h3>
                 <HistogramChart data={allScores} color={C.orange} height={165} />
-                <p className="text-[8px] text-gray-500 mt-2 text-center">How scores spread across 5 ranges</p>
+                <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-2 text-center">How scores spread across 5 ranges</p>
               </GlassCard>
             </div>
 
             {/* 3 Bottom Donuts: Overall, MCQ, Coding */}
             <GlassCard className="p-5">
-              <h3 className="text-[13px] font-bold text-gray-700 mb-4 text-center">Score Overview</h3>
+              <h3 className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 mb-4 text-center">Score Overview</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <CustomDonutChart percentage={overall.overallPct} color={C.orange} label="Overall" size={150} strokeWidth={12} />
                 <CustomDonutChart percentage={overall.mcqPct} color={C.mcq} label="MCQ" size={150} strokeWidth={12} />
@@ -926,11 +926,11 @@ function StudentAnalyticsView() {
             {/* Bar + Radar */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><BarChart3 className="text-orange-500" size={16} />Unit Performance</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><BarChart3 className="text-orange-500" size={16} />Unit Performance</h3>
                 <CustomBarChart data={barData} keys={['MCQ', 'Coding']} colors={[C.mcq, C.coding]} />
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Target className="text-orange-500" size={16} />Strength Radar</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Target className="text-orange-500" size={16} />Strength Radar</h3>
                 {radarData.length >= 3 ? <CustomRadarChart data={radarData} size={260} color={C.orange} /> : <div className="h-[200px] flex items-center justify-center text-gray-500 text-sm">Need 3+ units for radar</div>}
               </GlassCard>
             </div>
@@ -938,12 +938,12 @@ function StudentAnalyticsView() {
             {/* Scatter + Butterfly */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-1">MCQ vs Coding Correlation</h3>
-                <p className="text-[10px] text-gray-500 mb-3">Each dot = topic with both scores. Diagonal line = perfectly balanced.</p>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-1">MCQ vs Coding Correlation</h3>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium mb-3">Each dot = topic with both scores. Diagonal line = perfectly balanced.</p>
                 {scatterData.length > 0 ? <ScatterPlot data={scatterData} height={260} /> : <div className="h-[200px] flex items-center justify-center text-gray-500 text-sm">No topics with both scores yet</div>}
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3">MCQ vs Coding</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">MCQ vs Coding</h3>
                 <ButterflyChart data={butterflyData} height={Math.max(200, butterflyData.length * 50)} />
               </GlassCard>
             </div>
@@ -951,18 +951,18 @@ function StudentAnalyticsView() {
             {/* Polar + Histogram */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3">Polar Map</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">Polar Map</h3>
                 <PolarAreaChart data={polarData} size={240} />
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3">Score Spread</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">Score Spread</h3>
                 <HistogramChart data={allScores} color={C.orange} height={190} />
               </GlassCard>
             </div>
 
             {/* Heatmap */}
             <GlassCard className="p-5">
-              <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Flame className="text-orange-500" size={16} />Heatmap</h3>
+              <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Flame className="text-orange-500" size={16} />Heatmap</h3>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {units.flatMap(u => u.subUnits.map(s => <HeatmapTile key={`${u.id}-${s.id}`} name={s.name} pct={s.overallPct} unitShort={u.short} />))}
               </div>
@@ -971,11 +971,11 @@ function StudentAnalyticsView() {
             {/* Strengths & Weaknesses */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Trophy className="text-yellow-500" size={16} />Top Strengths</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Trophy className="text-yellow-500" size={16} />Top Strengths</h3>
                 <div className="space-y-2">{strengths.length ? strengths.map((s, i) => <StrengthItem key={i} rank={i + 1} name={s.name} percentage={s.pct} color={C.mcq} type={`${s.type} | ${s.unit}`} />) : <p className="text-gray-500 text-sm italic">No data</p>}</div>
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><AlertTriangle className="text-red-500" size={16} />Weaknesses</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><AlertTriangle className="text-red-500" size={16} />Weaknesses</h3>
                 <div className="space-y-2">{weaknesses.length ? weaknesses.map((s, i) => <StrengthItem key={i} rank={i + 1} name={s.name} percentage={s.pct} color={C.red} type={`${s.type} | ${s.unit}`} />) : <p className="text-gray-500 text-sm italic">No data</p>}</div>
               </GlassCard>
             </div>
@@ -995,7 +995,7 @@ function StudentAnalyticsView() {
                       <h4 className="text-[13px] font-semibold text-gray-900 mb-3 line-clamp-2">{u.name}</h4>
                       <div className="grid grid-cols-3 gap-1.5">
                         {[{ v: u.overallPct, l: 'All', c: 'text-orange-500' }, { v: u.mcqPct, l: 'MCQ', c: 'text-green-600' }, { v: u.codPct, l: 'Cod', c: 'text-blue-600' }].map(x => (
-                          <div key={x.l} className="text-center p-1.5 rounded-lg bg-gray-50"><div className={`text-base font-bold ${x.c}`}>{x.v}%</div><div className="text-[8px] text-gray-500 uppercase">{x.l}</div></div>
+                          <div key={x.l} className="text-center p-1.5 rounded-lg bg-gray-50"><div className={`text-base font-bold ${x.c}`}>{x.v}%</div><div className="text-[9px] text-slate-500 dark:text-slate-400 font-medium uppercase">{x.l}</div></div>
                         ))}
                       </div>
                       <div className="mt-2 h-0.5 bg-gray-200 rounded-full overflow-hidden">
@@ -1026,7 +1026,7 @@ function StudentAnalyticsView() {
                 </div>
                 {selUnit.subUnits.filter(s => s.mcqAttempts.length > 1 || s.codAttempts.length > 1).length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="text-[13px] font-bold text-gray-700 flex items-center gap-2"><TrendingUp className="text-yellow-500" size={14} />Trends</h4>
+                    <h4 className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2"><TrendingUp className="text-yellow-500" size={14} />Trends</h4>
                     {selUnit.subUnits.filter(s => s.mcqAttempts.length > 1 || s.codAttempts.length > 1).map(s => (
                       <GlassCard key={s.id} className="p-3">
                         <h5 className="text-[13px] font-semibold text-gray-900 mb-2">{s.name}</h5>
@@ -1048,41 +1048,41 @@ function StudentAnalyticsView() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Target className="text-orange-500" size={16} />Consistency Analysis</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Target className="text-orange-500" size={16} />Consistency Analysis</h3>
                 <ConsistencyAnalysis data={analyticsData} />
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Zap size={16} className="text-yellow-400" />Study Priority Planner</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Zap size={16} className="text-yellow-400" />Study Priority Planner</h3>
                 <StudyPriorityPlanner data={analyticsData} />
               </GlassCard>
             </div>
             <GlassCard className="p-5">
-              <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><TrendingUp className="text-green-500" size={16} />Learning Speed</h3>
+              <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><TrendingUp className="text-green-500" size={16} />Learning Speed</h3>
               <ImprovementVelocity data={analyticsData} />
             </GlassCard>
             <GlassCard className="p-5">
-              <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Crosshair className="text-red-400" size={16} />Weak Point Deep Dive</h3>
+              <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Crosshair className="text-red-400" size={16} />Weak Point Deep Dive</h3>
               <WeakPointDeepDive data={analyticsData} />
             </GlassCard>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-1">MCQ vs Coding Balance</h3>
-                <p className="text-[10px] text-gray-400 mb-3">Dots with crosshairs — diagonal = balanced</p>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-1">MCQ vs Coding Balance</h3>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-3">Dots with crosshairs — diagonal = balanced</p>
                 {scatterData.length > 0 ? <ScatterPlot data={scatterData} height={240} /> : <div className="h-[180px] flex items-center justify-center text-gray-500 text-sm">No topics with both scores</div>}
               </GlassCard>
               <GlassCard className="p-5">
-                <h3 className="text-[14px] font-bold mb-3">Score Spread</h3>
+                <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">Score Spread</h3>
                 <HistogramChart data={allScores} color={C.orange} height={190} />
               </GlassCard>
             </div>
             <GlassCard className="p-5">
-              <h3 className="text-[14px] font-bold mb-3"><Flame className="text-red-400 inline mr-2" size={16} />Heatmap</h3>
+              <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3"><Flame className="text-red-400 inline mr-2" size={16} />Heatmap</h3>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {units.flatMap(u => u.subUnits.map(s => <HeatmapTile key={`${u.id}-${s.id}`} name={s.name} pct={s.overallPct} unitShort={u.short} />))}
               </div>
             </GlassCard>
             <GlassCard className="p-5">
-              <h3 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Layers size={16} className="text-orange-400" />Skill Matrix</h3>
+              <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2"><Layers size={16} className="text-orange-400" />Skill Matrix</h3>
               <SkillMatrix units={units} />
             </GlassCard>
           </div>
@@ -1095,15 +1095,15 @@ function StudentAnalyticsView() {
               <SummaryCard title="MCQ Score" value={<AnimatedNumber value={overall.mcqPct} suffix="%" />} subtitle={`${overall.mcqObt}/${overall.mcqMax}`} icon="📝" accentColor={C.mcq} sparkData={units.map(u => u.mcqPct)} calcDesc="Sum of best MCQ marks ÷ sum of MCQ totals × 100" />
               <SummaryCard title="Best Unit" value={<AnimatedNumber value={[...units].sort((a, b) => b.mcqPct - a.mcqPct)[0]?.mcqPct || 0} suffix="%" />} subtitle={[...units].sort((a, b) => b.mcqPct - a.mcqPct)[0]?.name || '—'} icon="🏆" accentColor={C.mcq} calcDesc="Unit with highest MCQ percentage" />
               <SummaryCard title="Weakest" value={<AnimatedNumber value={[...units].filter(u => u.mcqMax > 0).sort((a, b) => a.mcqPct - b.mcqPct)[0]?.mcqPct ?? 0} suffix="%" />} subtitle={[...units].filter(u => u.mcqMax > 0).sort((a, b) => a.mcqPct - b.mcqPct)[0]?.name || '—'} icon="⚠️" accentColor={C.red} calcDesc="Unit with lowest MCQ percentage" />
-              <GlassCard className="p-4"><div className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1.5">Distribution</div><HistogramChart data={allMcqScores} color={C.mcq} height={90} /></GlassCard>
+              <GlassCard className="p-4"><div className="text-[9px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider mb-1.5">Distribution</div><HistogramChart data={allMcqScores} color={C.mcq} height={90} /></GlassCard>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <GlassCard className="p-5"><h3 className="text-[14px] font-bold mb-3"><BarChart3 className="text-green-500 inline mr-2" size={16} />MCQ by Unit</h3><CustomBarChart data={units.map(u => ({ name: u.short, Score: u.mcqPct }))} keys={['Score']} colors={[C.mcq]} showLegend={false} /></GlassCard>
-              <GlassCard className="p-5 flex flex-col items-center justify-center"><span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1">MCQ Accuracy</span><GaugeChart percentage={overall.mcqPct} size={180} label="MCQ Score" /><span className="text-[8px] text-gray-500 mt-1">Total MCQ marks obtained ÷ max × 100</span></GlassCard>
+              <GlassCard className="p-5"><h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3"><BarChart3 className="text-green-500 inline mr-2" size={16} />MCQ by Unit</h3><CustomBarChart data={units.map(u => ({ name: u.short, Score: u.mcqPct }))} keys={['Score']} colors={[C.mcq]} showLegend={false} /></GlassCard>
+              <GlassCard className="p-5 flex flex-col items-center justify-center"><span className="text-[9px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider mb-1">MCQ Accuracy</span><GaugeChart percentage={overall.mcqPct} size={180} label="MCQ Score" /><span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-1">Total MCQ marks obtained ÷ max × 100</span></GlassCard>
             </div>
-            <GlassCard className="p-5"><h3 className="text-[14px] font-bold mb-3">🎯 MCQ Ranking</h3><LollipopChart data={units.flatMap(u => u.subUnits.filter(s => s.hasMcq && s.mcqBest).map(s => ({ name: s.name, value: s.mcqBest.percentage }))).sort((a, b) => b.value - a.value).slice(0, 15)} color={C.mcq} /></GlassCard>
+            <GlassCard className="p-5"><h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">🎯 MCQ Ranking</h3><LollipopChart data={units.flatMap(u => u.subUnits.filter(s => s.hasMcq && s.mcqBest).map(s => ({ name: s.name, value: s.mcqBest.percentage }))).sort((a, b) => b.value - a.value).slice(0, 15)} color={C.mcq} /></GlassCard>
             <GlassCard className="p-5">
-              <h3 className="text-[14px] font-bold mb-3">All MCQ Topics</h3>
+              <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">All MCQ Topics</h3>
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="min-w-full text-[12px] text-gray-700">
                   <thead className="bg-gray-100 text-gray-500">
@@ -1123,16 +1123,16 @@ function StudentAnalyticsView() {
               <SummaryCard title="Coding Score" value={<AnimatedNumber value={overall.codPct} suffix="%" />} subtitle={`${overall.codObt}/${overall.codMax}`} icon="💻" accentColor={C.coding} sparkData={units.map(u => u.codPct)} calcDesc="Sum of best Coding marks ÷ sum of Coding totals × 100" />
               <SummaryCard title="Best Unit" value={<AnimatedNumber value={[...units].sort((a, b) => b.codPct - a.codPct)[0]?.codPct || 0} suffix="%" />} subtitle={[...units].sort((a, b) => b.codPct - a.codPct)[0]?.name || '—'} icon="🏆" accentColor={C.coding} calcDesc="Unit with highest Coding percentage" />
               <SummaryCard title="Weakest" value={<AnimatedNumber value={[...units].filter(u => u.codMax > 0).sort((a, b) => a.codPct - b.codPct)[0]?.codPct ?? 0} suffix="%" />} subtitle={[...units].filter(u => u.codMax > 0).sort((a, b) => a.codPct - b.codPct)[0]?.name || '—'} icon="⚠️" accentColor={C.red} calcDesc="Unit with lowest Coding percentage" />
-              <GlassCard className="p-4"><div className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1.5">Distribution</div><HistogramChart data={allCodScores} color={C.coding} height={90} /></GlassCard>
+              <GlassCard className="p-4"><div className="text-[9px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider mb-1.5">Distribution</div><HistogramChart data={allCodScores} color={C.coding} height={90} /></GlassCard>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <GlassCard className="p-5"><h3 className="text-[14px] font-bold mb-3"><BarChart3 className="text-blue-500 inline mr-2" size={16} />Coding by Unit</h3><CustomBarChart data={units.map(u => ({ name: u.short, Score: u.codPct }))} keys={['Score']} colors={[C.coding]} showLegend={false} /></GlassCard>
-              <GlassCard className="p-5 flex flex-col items-center justify-center"><span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-1">Coding Accuracy</span><GaugeChart percentage={overall.codPct} size={180} label="Coding Score" /><span className="text-[8px] text-gray-500 mt-1">Total Coding marks obtained ÷ max × 100</span></GlassCard>
+              <GlassCard className="p-5"><h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3"><BarChart3 className="text-blue-500 inline mr-2" size={16} />Coding by Unit</h3><CustomBarChart data={units.map(u => ({ name: u.short, Score: u.codPct }))} keys={['Score']} colors={[C.coding]} showLegend={false} /></GlassCard>
+              <GlassCard className="p-5 flex flex-col items-center justify-center"><span className="text-[9px] text-slate-600 dark:text-slate-400 font-medium font-bold uppercase tracking-wider mb-1">Coding Accuracy</span><GaugeChart percentage={overall.codPct} size={180} label="Coding Score" /><span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-1">Total Coding marks obtained ÷ max × 100</span></GlassCard>
             </div>
-            <GlassCard className="p-5"><h3 className="text-[14px] font-bold mb-1">MCQ vs Coding per Topic</h3><p className="text-[10px] text-gray-400 mb-3">Below diagonal = coding weaker than MCQ</p>{scatterData.length > 0 ? <ScatterPlot data={scatterData} height={260} /> : <div className="h-[180px] flex items-center justify-center text-gray-500 text-sm">No topics with both scores</div>}</GlassCard>
-            <GlassCard className="p-5"><h3 className="text-[14px] font-bold mb-3">Coding Ranking</h3><LollipopChart data={units.flatMap(u => u.subUnits.filter(s => s.hasCoding && s.codBest).map(s => ({ name: s.name, value: s.codBest.percentage }))).sort((a, b) => b.value - a.value).slice(0, 15)} color={C.coding} /></GlassCard>
+            <GlassCard className="p-5"><h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-1">MCQ vs Coding per Topic</h3><p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-3">Below diagonal = coding weaker than MCQ</p>{scatterData.length > 0 ? <ScatterPlot data={scatterData} height={260} /> : <div className="h-[180px] flex items-center justify-center text-gray-500 text-sm">No topics with both scores</div>}</GlassCard>
+            <GlassCard className="p-5"><h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">Coding Ranking</h3><LollipopChart data={units.flatMap(u => u.subUnits.filter(s => s.hasCoding && s.codBest).map(s => ({ name: s.name, value: s.codBest.percentage }))).sort((a, b) => b.value - a.value).slice(0, 15)} color={C.coding} /></GlassCard>
             <GlassCard className="p-5">
-              <h3 className="text-[14px] font-bold mb-3">All Coding Topics</h3>
+              <h3 className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 mb-3">All Coding Topics</h3>
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="min-w-full text-[12px] text-gray-700">
                   <thead className="bg-gray-100 text-gray-500">
