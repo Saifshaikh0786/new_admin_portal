@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Download, FileText, FileSpreadsheet, LayoutGrid, AlertCircle, TrendingUp, CheckCircle2, Target, Users, BookOpen } from 'lucide-react';
 import { API_CONFIG } from '@/utils/api';
@@ -8,7 +8,7 @@ import { getAdminToken } from '@/utils/cookies';
 import * as XLSX from 'xlsx';
 import PortalWrapper from '@/components/DeepDive/PortalWrapper';
 
-export default function ReportCenterPage() {
+function ReportCenterContent() {
     const searchParams = useSearchParams();
     const batch_id = searchParams.get('batch_id');
     const [analytics, setAnalytics] = useState(null);
@@ -358,5 +358,17 @@ export default function ReportCenterPage() {
                 </main>
             </div>
         </PortalWrapper>
+    );
+}
+
+export default function ReportCenterPage() {
+    return (
+        <Suspense fallback={
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#f8f9fa] dark:bg-gray-900">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+            </div>
+        }>
+            <ReportCenterContent />
+        </Suspense>
     );
 }
