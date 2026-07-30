@@ -941,6 +941,7 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
 }
 
 const CoursesGridView = ({ courses, examCourses = [], loading, onSelect, onExamSelect }) => {
+    const [examFilter, setExamFilter] = useState('attempted');
     if (loading) {
         return (
             <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -992,19 +993,41 @@ const CoursesGridView = ({ courses, examCourses = [], loading, onSelect, onExamS
             {/* Exam Courses */}
             {examCourses.length > 0 && (
                 <div className="mt-10">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
-                        <Trophy className="w-5 h-5 text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)]" />
-                        Exam Courses
-                        <span className="text-sm font-normal text-gray-400 bg-[var(--neu-achieve-soft)] dark:bg-[var(--neu-achieve-soft)] text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)] px-2 py-0.5 rounded-md">{examCourses.length}</span>
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {examCourses.map((course, idx) => {
-                            const myResult = course.examData?.myResult;
-                            const rank = course.examData?.rank;
-                            const totalParticipants = course.examData?.totalParticipants || 0;
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                            <Trophy className="w-5 h-5 text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)]" />
+                            Exam Courses
+                            <span className="text-sm font-normal text-gray-400 bg-[var(--neu-achieve-soft)] dark:bg-[var(--neu-achieve-soft)] text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)] px-2 py-0.5 rounded-md">{examCourses.length}</span>
+                        </h3>
+                        
+                        <div className="flex neu-inset p-1 rounded-lg">
+                            <button onClick={() => setExamFilter('attempted')} className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${examFilter === 'attempted' ? 'neu-raised text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>Attempted</button>
+                            <button onClick={() => setExamFilter('not_attempted')} className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${examFilter === 'not_attempted' ? 'neu-raised text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>Not Attempted</button>
+                        </div>
+                    </div>
+                    {(() => {
+                        const filteredExamCourses = examCourses.filter(course => {
+                            const isAttempted = !!course.examData?.myResult;
+                            return examFilter === 'attempted' ? isAttempted : !isAttempted;
+                        });
 
+                        if (filteredExamCourses.length === 0) {
                             return (
-                                <button
+                                <div className="text-center text-gray-500 py-10 neu-inset rounded-2xl">
+                                    No {examFilter === 'attempted' ? 'attempted' : 'unattempted'} exams found.
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {filteredExamCourses.map((course, idx) => {
+                                    const myResult = course.examData?.myResult;
+                                    const rank = course.examData?.rank;
+                                    const totalParticipants = course.examData?.totalParticipants || 0;
+
+                                    return (
+                                        <button
                                     key={idx}
                                     onClick={() => onExamSelect && onExamSelect(course)}
                                     className="text-left relative overflow-hidden p-6 rounded-2xl neu-raised neu-hover transition-all duration-300 group"
@@ -1084,8 +1107,10 @@ const CoursesGridView = ({ courses, examCourses = [], loading, onSelect, onExamS
                                     </div>
                                 </button>
                             );
-                        })}
-                    </div>
+                                })}
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
         </div>
