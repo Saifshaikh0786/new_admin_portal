@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Layers, Users, TrendingUp, AlertCircle, Search, ArrowRight, FileText } from 'lucide-react';
+import { ArrowLeft, Layers, Users, TrendingUp, AlertCircle, Search, ArrowRight, FileText, Loader2 } from 'lucide-react';
 import { CircularProgress } from './CircularProgress';
 import { Skeleton } from './Skeletons';
 import { API_CONFIG } from '@/utils/api';
@@ -15,6 +15,7 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
     const [courses, setCourses] = useState([]); // Added courses state
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isOpeningReports, setIsOpeningReports] = useState(false);
 
     const secParams = new URLSearchParams({ batch_id: batch.batch_id }).toString();
     const { data: secData, isLoading: isSecLoading } = useSWR(
@@ -127,11 +128,20 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
                         </button>
 
                         <button
-                            onClick={() => window.open(`/dashboard/batch-reports?batch_id=${batch.batch_id}`, '_blank')}
-                            className="w-full mt-3 flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(5,150,105,0.39)] hover:shadow-[0_6px_20px_rgba(5,150,105,0.23)] hover:-translate-y-0.5 transition-all duration-200"
+                            onClick={() => {
+                                setIsOpeningReports(true);
+                                router.push(`/dashboard/batch-reports?batch_id=${batch.batch_id}`);
+                                setTimeout(() => setIsOpeningReports(false), 2000); // Reset after navigation
+                            }}
+                            disabled={isOpeningReports}
+                            className="w-full mt-3 flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(5,150,105,0.39)] hover:shadow-[0_6px_20px_rgba(5,150,105,0.23)] hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-70 disabled:transform-none"
                         >
-                            <FileText className="w-5 h-5" />
-                            Report Center
+                            {isOpeningReports ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <FileText className="w-5 h-5" />
+                            )}
+                            {isOpeningReports ? 'Opening Engine...' : 'Report Center'}
                         </button>
                     </div>
 
