@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Layers, Users, TrendingUp, AlertCircle, Search, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Layers, Users, TrendingUp, AlertCircle, Search, ArrowRight, FileText } from 'lucide-react';
 import { CircularProgress } from './CircularProgress';
 import { Skeleton } from './Skeletons';
 import { API_CONFIG } from '@/utils/api';
@@ -124,6 +124,14 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
                         >
                             <TrendingUp className="w-5 h-5" />
                             View Batch Analytics
+                        </button>
+
+                        <button
+                            onClick={() => window.open(`/dashboard/batch-reports?batch_id=${batch.batch_id}`, '_blank')}
+                            className="w-full mt-3 flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(5,150,105,0.39)] hover:shadow-[0_6px_20px_rgba(5,150,105,0.23)] hover:-translate-y-0.5 transition-all duration-200"
+                        >
+                            <FileText className="w-5 h-5" />
+                            Report Center
                         </button>
                     </div>
 
