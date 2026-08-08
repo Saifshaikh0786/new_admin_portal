@@ -18,6 +18,7 @@ export const API_CONFIG = {
         sectionAnalytics: (sectionName) => `/admin/analytics/section-matrix`, // This will be used as POST
         sectionQuestionReport: '/admin/analytics/section-question-report',
         examQuestionAnalysis: '/admin/analytics/exam-question-analysis',
+        questionAnalysis: '/admin/analytics/question-analysis',
         subUnitDetails: '/admin/analytics/sub-unit-details',
         unitCompletion: '/admin/analytics/unit-completion',
         bulkExportUnits: '/admin/analytics/bulk-export-units',
@@ -92,5 +93,6 @@ export const API_CONFIG = {
         sectionDetail: (batchId, section) => `/admin/analytics/section-detail?batch_id=${batchId}&section=${encodeURIComponent(section)}`,
         studentDetail: (batchId, studentId) => `/admin/analytics/student-detail?batch_id=${batchId}&student_id=${studentId}`,
         studentFullAnalytics: (batchId, studentId) => `/admin/analytics/student-full-analytics?batch_id=${batchId}&student_id=${studentId}`,
+        questionAnalysisLecture: (batchId, courseId, lectureId) => `/admin/analytics/question-analysis/lecture?batch_id=${batchId}&course_id=${courseId}&lecture_id=${lectureId}`,
     }
 };

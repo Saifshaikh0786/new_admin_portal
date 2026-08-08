@@ -128,6 +128,14 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
                         </button>
 
                         <button
+                            onClick={() => router.push(`/dashboard/question-analysis?batch_id=${batch.batch_id}`)}
+                            className="w-full mt-3 flex items-center justify-center gap-2 bg-amber-600 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(217,119,6,0.39)] hover:shadow-[0_6px_20px_rgba(217,119,6,0.23)] hover:-translate-y-0.5 transition-all duration-200"
+                        >
+                            <Layers className="w-5 h-5" />
+                            Question Analysis
+                        </button>
+
+                        <button
                             onClick={() => {
                                 setIsOpeningReports(true);
                                 router.push(`/dashboard/batch-reports?batch_id=${batch.batch_id}`);

@@ -70,7 +70,7 @@ export default function DashboardLayout({ children }) {
     { name: "Live Roster", href: "/dashboard/live-roster", icon: Users },
   ];
 
-  if (pathname && pathname.includes("/details-analysis")) {
+  if (pathname && (pathname.includes("/details-analysis") || pathname.includes("/question-analysis"))) {
     return (
       <DashboardProvider>
         {children}
