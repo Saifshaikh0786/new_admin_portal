@@ -10,7 +10,7 @@ import { BatchSkeleton, TeacherSkeleton, ListSkeleton, Skeleton, SectionSkeleton
 import StudentDetailView from '../../components/DeepDive/StudentDetailView';
 import TeacherDetailView from '../../components/DeepDive/TeacherDetailView';
 import ChangePasswordModal from '../../components/DeepDive/ChangePasswordModal';
-import { Users, LayoutGrid, Layers, GraduationCap, Loader2, LogOut, ChevronRight, Search, FileText, Clock, AlertCircle, Sun, Moon, Key, BookOpen, Trophy, TrendingUp, ArrowLeft } from "lucide-react";
+import { Users, LayoutGrid, Layers, GraduationCap, Loader2, LogOut, ChevronRight, Search, FileText, Clock, AlertCircle, Sun, Moon, Key, BookOpen, Trophy, TrendingUp, ArrowLeft, Download } from "lucide-react";
 import Link from 'next/link';
 import SectionDetailView from '../../components/DeepDive/SectionDetailView';
 import BatchDetailView from '../../components/DeepDive/BatchDetailView';
@@ -119,6 +119,7 @@ export default function DeepDiveDashboard() {
     const [examStudentSearch, setExamStudentSearch] = useState('');     // server-side student search
     const [examStudentsMode, setExamStudentsMode] = useState('attempted'); // 'attempted' | 'not_attempted'
     const [isExportingCSV, setIsExportingCSV] = useState(false);
+    const [isExportingFullReport, setIsExportingFullReport] = useState(false);
 
     // Debounce the student search -> server
     useEffect(() => {
@@ -355,6 +356,127 @@ export default function DeepDiveDashboard() {
             URL.revokeObjectURL(url);
         } catch (e) { console.error('Export error', e); }
         finally { setIsExportingCSV(false); }
+    };
+
+    const downloadFullReport = async (exam) => {
+        setIsExportingFullReport(true);
+        try {
+            const token = getAdminToken();
+            const XLSX = (await import('xlsx'));
+            const analysisRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examQuestionAnalysis}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                credentials: 'include',
+                body: JSON.stringify({ course_id: exam.course_id })
+            });
+            const analysisJson = await analysisRes.json();
+            if (!analysisJson?.success || !analysisJson.data) {
+                alert('Failed to fetch question analysis data.');
+                setIsExportingFullReport(false);
+                return;
+            }
+            const { questions, students } = analysisJson.data;
+            if (!students.length) {
+                alert('No students found for this exam.');
+                setIsExportingFullReport(false);
+                return;
+            }
+            const allProctoring = [];
+            for (const mode of ['attempted', 'not_attempted']) {
+                let page = 1, total = 0;
+                do {
+                    const qs = new URLSearchParams({ course_id: exam.course_id, page, limit: 200, mode, t: Date.now() }).toString();
+                    const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${qs}`, {
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        credentials: 'include', cache: 'no-store'
+                    });
+                    const json = await res.json();
+                    if (!json?.success) break;
+                    allProctoring.push(...(json.data || []));
+                    total = json.pagination?.total || 0;
+                    page++;
+                } while (allProctoring.length < total);
+            }
+            const proctoringMap = Object.fromEntries(allProctoring.map(s => [s.student_id, s]));
+            const safe = (v) => (v === null || v === undefined || v === '') ? '-' : String(v);
+            const fmtMins = (secs) => (!secs || isNaN(secs)) ? '-' : String(Math.round(secs / 60));
+            const fmtTime = (ts) => { if (!ts) return '-'; try { return new Date(ts).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch { return String(ts); } };
+            const summaryRows = students
+                .sort((a, b) => (b.total_marks || 0) - (a.total_marks || 0))
+                .map((s, idx) => {
+                    const p = proctoringMap[s.student_id] || {};
+                    const mcqIds = questions.mcq.map(q => q.question_id);
+                    let mcqAttempted = 0, mcqCorrect = 0;
+                    for (const qid of mcqIds) {
+                        const r = s.mcq_results[qid];
+                        if (r?.answered) { mcqAttempted++; if (r.is_correct) mcqCorrect++; }
+                    }
+                    let codingAttempted = 0, codingFull = 0, codingPartial = 0, totalCompiles = 0, totalPassedCases = 0, totalCases = 0;
+                    let codingDetails = [];
+                    for (const q of questions.coding) {
+                        const r = s.coding_results[q.question_id];
+                        if (r && r.status !== 'not_attempted') {
+                            if (r.status === 'fully_solved') { codingAttempted++; codingFull++; }
+                            else if (r.status === 'partially_solved') { codingAttempted++; codingPartial++; }
+                            else if (r.status === 'not_solved') { codingAttempted++; }
+                            totalCompiles += r.compile_count || 0;
+                            totalPassedCases += r.passed || 0;
+                            totalCases += r.total || 0;
+                            codingDetails.push(`Q${q.question_index}(${r.passed || 0}/${r.total || 0})`);
+                        }
+                    }
+                    return {
+                        'Rank': idx + 1, 'Student Name': safe(s.student_name), 'Reg ID': safe(s.uni_reg_id), 'Section': safe(s.section),
+                        'Total Marks': safe(s.total_marks), 'MCQ Marks': safe(p.mcq_marks ?? mcqCorrect), 'Coding Marks': safe(p.coding_marks ?? codingFull),
+                        'MCQs Attempted': mcqAttempted, 'MCQs Correct': mcqCorrect,
+                        'Coding Attempted': codingAttempted, 'Coding Fully Solved': codingFull, 'Coding Partially Solved': codingPartial,
+                        'Total Test Cases Passed': totalCases > 0 ? `${totalPassedCases}/${totalCases}` : '0/0',
+                        'Coding Details': codingDetails.length > 0 ? codingDetails.join(', ') : '-',
+                        'Total Compile Attempts': totalCompiles,
+                        'Duration (mins)': fmtMins(p.exam_duration_seconds),
+                        'Submitted At': fmtTime(p.exam_submitted_at || p.end_timestamp),
+                        'Started At': fmtTime(p.exam_started_at || p.start_timestamp),
+                        'Lost Focus': safe(p.lost_focus_count ?? 0), 'Face Warnings': safe(p.face_warnings ?? 0),
+                        'Internet Disconnects': safe(p.internet_disconnects ?? 0),
+                    };
+                });
+            const mcqRows = students.sort((a, b) => (b.total_marks || 0) - (a.total_marks || 0)).map(s => {
+                const row = { 'Student Name': safe(s.student_name), 'Reg ID': safe(s.uni_reg_id), 'Section': safe(s.section) };
+                const attemptedMCQs = questions.mcq.filter(q => s.mcq_results[q.question_id]?.answered);
+                attemptedMCQs.forEach((q, i) => { const r = s.mcq_results[q.question_id]; row[`Q${i+1}`] = r.is_correct ? 'Correct' : 'Wrong'; });
+                let correct = 0; for (const q of attemptedMCQs) { if (s.mcq_results[q.question_id]?.is_correct) correct++; }
+                row['Total Attempted'] = attemptedMCQs.length; row['Total Correct'] = correct;
+                row['Accuracy %'] = attemptedMCQs.length > 0 ? Math.round((correct / attemptedMCQs.length) * 100) + '%' : '-';
+                return row;
+            });
+            const codingRows = students.sort((a, b) => (b.total_marks || 0) - (a.total_marks || 0)).map(s => {
+                const row = { 'Student Name': safe(s.student_name), 'Reg ID': safe(s.uni_reg_id), 'Section': safe(s.section) };
+                const statusLabels = { 'fully_solved': 'Fully Solved', 'partially_solved': 'Partially Solved', 'not_solved': 'Not Solved' };
+                const attemptedCoding = questions.coding.filter(q => s.coding_results[q.question_id]?.status && s.coding_results[q.question_id].status !== 'not_attempted');
+                attemptedCoding.forEach((q, i) => { const r = s.coding_results[q.question_id]; const p = `Q${i+1}`; row[`${p} Status`] = statusLabels[r.status] || 'Not Solved'; row[`${p} Passed/Total`] = `${r.passed||0}/${r.total||0}`; row[`${p} Compiles`] = r.compile_count || 0; });
+                return row;
+            });
+            const wb = XLSX.utils.book_new();
+            const ws1 = XLSX.utils.json_to_sheet(summaryRows);
+            ws1['!cols'] = Object.keys(summaryRows[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 12) }));
+            XLSX.utils.book_append_sheet(wb, ws1, 'Student Summary');
+            if (questions.mcq.length > 0 && mcqRows.length > 0) {
+                const ws2 = XLSX.utils.json_to_sheet(mcqRows);
+                ws2['!cols'] = Object.keys(mcqRows[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 10) }));
+                XLSX.utils.book_append_sheet(wb, ws2, 'MCQ Question-Wise');
+            }
+            if (questions.coding.length > 0 && codingRows.length > 0) {
+                const ws3 = XLSX.utils.json_to_sheet(codingRows);
+                ws3['!cols'] = Object.keys(codingRows[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 10) }));
+                XLSX.utils.book_append_sheet(wb, ws3, 'Coding Question-Wise');
+            }
+            const fileName = `${exam.course_name.replace(/[^a-zA-Z0-9]/g, '_')}_Advanced_Report.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        } catch (e) {
+            console.error('Full report export error', e);
+            alert('Failed to generate full report. Please try again.');
+        }
+        finally { setIsExportingFullReport(false); }
     };
 
     const openExamDrilldown = (exam) => {
@@ -743,12 +865,20 @@ export default function DeepDiveDashboard() {
                                 <h2 className="text-xl font-bold text-[#111827] dark:text-white">{inspectingExam.course_name}</h2>
                             </div>
                         </div>
-                        <button onClick={() => downloadExamCSV(inspectingExam)}
-                            disabled={isExportingCSV}
-                            className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-[#6B7280] dark:text-gray-300 hover:text-[#111827] dark:hover:text-white flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed">
-                            {isExportingCSV ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                            {isExportingCSV ? 'Exporting...' : 'Export CSV'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => downloadFullReport(inspectingExam)}
+                                disabled={isExportingFullReport}
+                                className="group flex items-center gap-2 px-5 py-2.5 bg-[var(--neu-accent)] text-white rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:-translate-y-0.5 active:translate-y-0 font-bold text-sm tracking-wide">
+                                {isExportingFullReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 group-hover:animate-bounce" />}
+                                {isExportingFullReport ? 'Generating...' : 'Export Advanced Report'}
+                            </button>
+                            <button onClick={() => downloadExamCSV(inspectingExam)}
+                                disabled={isExportingCSV}
+                                className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-[#6B7280] dark:text-gray-300 hover:text-[#111827] dark:hover:text-white flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed">
+                                {isExportingCSV ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                                {isExportingCSV ? 'Exporting...' : 'Export CSV'}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex-1 p-8 overflow-auto neu-page">

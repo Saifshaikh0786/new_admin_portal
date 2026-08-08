@@ -16,6 +16,8 @@ export const API_CONFIG = {
         courseStructure: (courseId) => `/admin/analytics/course-structure/${courseId}`,
         courseStructureAnalytics: '/admin/analytics/course-structure-analytics',
         sectionAnalytics: (sectionName) => `/admin/analytics/section-matrix`, // This will be used as POST
+        sectionQuestionReport: '/admin/analytics/section-question-report',
+        examQuestionAnalysis: '/admin/analytics/exam-question-analysis',
         subUnitDetails: '/admin/analytics/sub-unit-details',
         unitCompletion: '/admin/analytics/unit-completion',
         bulkExportUnits: '/admin/analytics/bulk-export-units',

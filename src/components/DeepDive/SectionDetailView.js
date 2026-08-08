@@ -289,6 +289,188 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
         }
     };
 
+    
+    const [isExportingQuestionWise, setIsExportingQuestionWise] = useState(false);
+
+    const handleExportQuestionWise = async () => {
+        setIsExportingQuestionWise(true);
+        try {
+            const XLSX = await import('xlsx');
+
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            // Build courses_units from the modal's selected checkboxes
+            const courses_units = {};
+            Object.entries(courseStructures).forEach(([cId, cData]) => {
+                const selectedForCourse = cData.units
+                    .filter(u => exportConfig.selectedUnits.has(`${cId}-${u.unit_id}`))
+                    .map(u => u.unit_id);
+                if (selectedForCourse.length > 0) courses_units[cId] = selectedForCourse;
+            });
+
+            if (Object.keys(courses_units).length === 0) {
+                alert("Please select at least one unit to export.");
+                setIsExportingQuestionWise(false);
+                return;
+            }
+
+            // The backend fetches students internally using section_name
+            const reqBody = {
+                section_name: sectionName,
+                courses_units,
+                student_ids: []
+            };
+
+            const analysisRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.sectionQuestionReport}`, {
+                method: 'POST',
+                headers,
+                credentials: 'include',
+                body: JSON.stringify(reqBody)
+            });
+            
+            if (!analysisRes.ok) {
+                const errText = await analysisRes.text();
+                console.error('Question report error:', analysisRes.status, errText);
+                alert(`Failed to fetch question analysis data (${analysisRes.status}).`);
+                setIsExportingQuestionWise(false);
+                return;
+            }
+
+            const analysisJson = await analysisRes.json();
+            if (!analysisJson?.success || !analysisJson.data) {
+                alert('No question analysis data found for the selected units.');
+                setIsExportingQuestionWise(false);
+                return;
+            }
+
+            const frData = analysisJson.data;
+            const frMeta = analysisJson.questions_meta || {};
+            const qIdList = Object.keys(frMeta);
+
+            const wb = XLSX.utils.book_new();
+
+            // 1. Overall Summary Sheet
+            const overallExportData = frData.map(s => ({
+                'Student Name': s.student_name,
+                'Reg ID': s.uni_reg_id,
+                'Total Assigned Coding Questions': s.total_coding_assigned,
+                'Total Attempted Coding Questions': s.coding_attempted,
+                'Fully Solved Coding Questions': s.coding_fully_solved,
+                'Partially Solved Coding Questions': s.coding_partially_solved,
+                'Not Solved Coding Questions': s.coding_not_solved,
+                'Total Assigned MCQs': s.total_mcq_assigned,
+                'Total Attempted MCQs': s.mcq_attempted,
+                'Correct MCQs': s.mcq_correct,
+                'Incorrect MCQs': s.mcq_incorrect,
+            }));
+            const wsOverall = XLSX.utils.json_to_sheet(overallExportData);
+            const overallColWidths = Object.keys(overallExportData[0] || {}).map(key => ({ wch: Math.max(key.length, 12) }));
+            wsOverall['!cols'] = overallColWidths;
+            XLSX.utils.book_append_sheet(wb, wsOverall, "Overall Summary");
+
+            // 2. Group questions by Sub-Unit (lecture_name)
+            const lectureGroups = {};
+            qIdList.forEach(qid => {
+                const qInfo = frMeta[qid];
+                const lectureName = qInfo.lecture_name || 'Unknown Sub-Unit';
+                
+                // Check if this question was actually assigned to ANY student
+                let wasAssigned = false;
+                for (const s of frData) {
+                    if (s.questions && s.questions[qid] !== undefined) {
+                        wasAssigned = true;
+                        break;
+                    }
+                }
+                
+                // Only include if at least one student got it
+                if (wasAssigned) {
+                    if (!lectureGroups[lectureName]) {
+                        lectureGroups[lectureName] = [];
+                    }
+                    lectureGroups[lectureName].push(qid);
+                }
+            });
+
+            // 3. Create a separate sheet for each Sub-Unit
+            Object.keys(lectureGroups).forEach(lectureName => {
+                const groupQids = lectureGroups[lectureName];
+                
+                // First pass: extract all student attempts for this sub-unit and categorize by type
+                const rowData = frData.map(s => {
+                    const row = {
+                        'Student Name': s.student_name,
+                        'Reg ID': s.uni_reg_id,
+                    };
+                    const codingAttempts = [];
+                    const mcqAttempts = [];
+                    
+                    groupQids.forEach(qid => {
+                        const score = s.questions?.[qid];
+                        if (score !== undefined) {
+                            const qType = frMeta[qid]?.type || 'coding';
+                            const title = frMeta[qid]?.title || 'Unknown';
+                            const cellValue = `${score} (${title})`;
+                            
+                            if (qType === 'mcq') mcqAttempts.push(cellValue);
+                            else codingAttempts.push(cellValue);
+                        }
+                    });
+                    
+                    return { row, codingAttempts, mcqAttempts };
+                });
+
+                // Find max columns needed
+                const maxCoding = Math.max(...rowData.map(r => r.codingAttempts.length), 0);
+                const maxMcq = Math.max(...rowData.map(r => r.mcqAttempts.length), 0);
+
+                // Build the final dense export data
+                const groupExportData = rowData.map(r => {
+                    const finalRow = { ...r.row };
+                    
+                    for (let i = 0; i < maxCoding; i++) {
+                        finalRow[`Coding Q${i+1}`] = r.codingAttempts[i] || '-';
+                    }
+                    
+                    for (let i = 0; i < maxMcq; i++) {
+                        finalRow[`MCQ ${i+1}`] = r.mcqAttempts[i] || '-';
+                    }
+                    
+                    return finalRow;
+                });
+
+                if (groupExportData.length > 0) {
+                    const ws = XLSX.utils.json_to_sheet(groupExportData);
+                    const colWidths = Object.keys(groupExportData[0] || {}).map(key => ({ wch: Math.max(key.length, 12) }));
+                    ws['!cols'] = colWidths;
+                    
+                    // Sheet names in Excel cannot exceed 31 chars and cannot have invalid chars
+                    const safeSheetName = lectureName.replace(/[\\/?*[\]:]/g, ' ').trim().substring(0, 31);
+                    
+                    // Ensure unique sheet name if there's a clash due to truncation
+                    let finalSheetName = safeSheetName;
+                    let counter = 1;
+                    while (wb.SheetNames.includes(finalSheetName)) {
+                        finalSheetName = `${safeSheetName.substring(0, 28)} ${counter}`;
+                        counter++;
+                    }
+
+                    XLSX.utils.book_append_sheet(wb, ws, finalSheetName);
+                }
+            });
+
+            const fileName = `${sectionName.replace(/[^a-zA-Z0-9]/g, '_')}_Question_Analysis.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        } catch (e) {
+            console.error("Export Failed", e);
+            alert("Failed to export Question-Wise Analysis.");
+        } finally {
+            setIsExportingQuestionWise(false);
+        }
+    };
+
     const handleOpenExport = () => {
         setShowExportModal(true);
         if (Object.keys(courseStructures).length === 0) {
@@ -1358,6 +1540,13 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
                                     className="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white neu-inset hover:bg-[var(--neu-dark)] transition-all"
                                 >
                                     Cancel
+                                </button>
+                                <button
+                                    onClick={handleExportQuestionWise}
+                                    disabled={exportConfig.selectedUnits.size === 0 || isExportingQuestionWise}
+                                    className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[var(--neu-accent)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    {isExportingQuestionWise ? 'Generating...' : 'Export Question-Wise'}
                                 </button>
                                 <button
                                     onClick={handleExport}
