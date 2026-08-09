@@ -232,19 +232,36 @@ export default function CourseDetailView({ course, onBack }) {
   );
 
   useEffect(() => {
-    if (!swrData) {
+    if (!swrData && !swrError) {
       if (isValidating && !structure) setLoading(true);
-      if (swrError) setError(swrError.message || "Failed to load course content");
       return;
     }
 
     setLoading(false);
+    
+    // Handle the specific "Course content not found" error from the backend gracefully
+    if (swrError) {
+      setError(swrError.message || "Failed to load course content");
+      return;
+    }
+
+    if (swrData?.success === false && swrData?.message?.includes('Course content not found')) {
+      setError(null);
+      setStructure({ units: [] });
+      return;
+    }
+
+    if (swrData?.success === false) {
+      setError(swrData.message || "Failed to load course content");
+      return;
+    }
+
     setError(null);
     try {
       let units = [];
       const data = swrData;
       if (Array.isArray(data)) units = data;
-      else if (data.units) units = data.units;
+      else if (data?.units) units = data.units;
 
       const newStructure = { units };
       setStructure(newStructure);
@@ -1364,6 +1381,11 @@ export default function CourseDetailView({ course, onBack }) {
             ) : (
               // Normal Tree View
               <div className="space-y-2">
+                {structure?.units?.length === 0 && (
+                  <div className="py-8 text-center text-gray-400 text-sm">
+                    No content added to this course yet.
+                  </div>
+                )}
                 {structure?.units?.map((unit, uIdx) => (
                   <div key={uIdx} className="overflow-hidden">
                     <button
