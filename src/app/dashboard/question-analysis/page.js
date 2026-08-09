@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft, BarChart3, BookOpen, Code, FileText, ChevronDown, ChevronRight,
+  Info, ArrowLeft, BarChart3, BookOpen, Code, FileText, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, AlertTriangle, AlertCircle, HelpCircle, Users, Layers, Target,
-  TrendingUp, Search, RefreshCw, Zap, Award, Activity, Clock, MonitorPlay, Book
+  TrendingUp, Search, RefreshCw, Zap, Award, Activity, Clock, MonitorPlay, Book, BarChart2
 } from 'lucide-react';
 import useSWR from 'swr';
 import { API_CONFIG } from '@/utils/api';
@@ -108,23 +108,16 @@ function StackedBar({ segments, height = 'h-3' }) {
   );
 }
 
-function AnimatedNumber({ value, duration = 800 }) {
-  const [display, setDisplay] = useState(0);
+
+
+function AnimatedNumber({ value, duration = 1200, suffix = '', prefix = '' }) {
+  const [d, setD] = useState(0); const r = React.useRef(null);
   useEffect(() => {
-    let start = 0;
-    const increment = value / (duration / 16);
-    const timer = setInterval(() => {
-      start += increment;
-      if (start >= value) {
-        setDisplay(value);
-        clearInterval(timer);
-      } else {
-        setDisplay(Math.round(start));
-      }
-    }, 16);
-    return () => clearInterval(timer);
+    const e = Number(value) || 0; const s = performance.now();
+    const a = (n) => { const p = Math.min((n - s) / duration, 1); setD(Math.round(e * (1 - Math.pow(1 - p, 3)))); if (p < 1) r.current = requestAnimationFrame(a) };
+    r.current = requestAnimationFrame(a); return () => r.current && cancelAnimationFrame(r.current);
   }, [value, duration]);
-  return <>{display}</>;
+  return <>{prefix}{d}{suffix}</>;
 }
 
 function KPICard({ label, value, icon: Icon, color, subtitle }) {
@@ -638,64 +631,400 @@ function StudentTable({ students }) {
   );
 }
 
-/* =========================================================================
-   COURSE PERFORMANCE OVERVIEW
-   ========================================================================= */
-function CoursePerformanceOverview({ performance }) {
-  if (!performance) return null;
 
-  const { mcq_success_rate, coding_success_rate, overall_success_rate } = performance;
+
+const CHART_PALETTE = ['#f59e0b', '#3b82f6', '#10b981', '#6366f1', '#ec4899', '#14b8a6', '#f43f5e', '#8b5cf6'];
+
+
+
+
+
+/* =========================================================================
+   CLONE COMPONENTS (Exact Screenshot Replicas)
+   ========================================================================= */
+
+// Distinct bright colors from the screenshot (Red, Orange, Blue, Green, Purple, Cyan)
+const CLONE_PALETTE = ['#e11d48', '#ea580c', '#0ea5e9', '#10b981', '#8b5cf6', '#0f766e', '#f43f5e', '#f59e0b', '#3b82f6', '#14b8a6'];
+
+function CloneDonutChart({ title, data, totalLabel, centerValue, colors = CLONE_PALETTE }) {
+  // data: [{ label, value, percentage }]
+  const size = 160;
+  const strokeWidth = 24;
+  const r = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  
+  let currentOffset = 0;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-6 flex flex-col md:flex-row gap-8">
-      {/* Overall Score */}
-      <div className="w-full md:w-1/3 flex flex-col justify-center items-center p-4 rounded-xl bg-gray-50 border border-gray-100">
-        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Overall Success Rate</h3>
-        <div className="flex items-end gap-1">
-          <span className="text-5xl font-black" style={{ color: overall_success_rate >= 75 ? theme.success : overall_success_rate >= 50 ? theme.warning : theme.danger }}>
-            {overall_success_rate}%
-          </span>
+    <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm h-full">
+      <h3 className="text-sm font-bold text-gray-900 mb-6">{title}</h3>
+      <div className="flex items-center gap-6">
+        {/* Donut SVG */}
+        <div className="relative" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="-rotate-90">
+            {data.map((d, i) => {
+              const dashLength = (d.percentage / 100) * circ;
+              const strokeDasharray = `${dashLength} ${circ}`;
+              const offset = currentOffset;
+              currentOffset -= dashLength;
+              // Add a small gap if there are multiple segments, but in the screenshot, 
+              // the red ring is usually solid if it's 100%. We'll just draw them sequentially.
+              return (
+                <circle
+                  key={i}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="transparent"
+                  stroke={colors[i % colors.length]}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={strokeDasharray}
+                  strokeDashoffset={offset}
+                  className="transition-all duration-1000"
+                />
+              );
+            })}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-2xl font-black text-gray-900 leading-none">{centerValue}</span>
+            <span className="text-[10px] text-gray-400 font-medium mt-1">{totalLabel}</span>
+          </div>
         </div>
-        <p className="text-xs text-gray-400 mt-2 font-medium">Aggregated across all assessments</p>
-      </div>
-
-      {/* Breakdown Bars */}
-      <div className="w-full md:w-2/3 flex flex-col justify-center gap-6">
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-bold text-gray-800">MCQ Proficiency</span>
+        
+        {/* Legend */}
+        <div className="flex-1 space-y-3">
+          {data.map((d, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: colors[i % colors.length] }} />
+                <span className="text-[11px] text-gray-700 font-medium w-16 truncate" title={d.label}>{d.label}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-gray-400 font-bold w-6 text-right">{d.value}</span>
+                <span className="text-[11px] text-gray-400 w-8 text-right">{d.percentage}%</span>
+              </div>
             </div>
-            <span className="text-sm font-bold text-blue-700">{mcq_success_rate}%</span>
-          </div>
-          <div className="w-full h-3 rounded-full bg-blue-50 overflow-hidden">
-            <div 
-              className="h-full rounded-full transition-all duration-1000"
-              style={{ width: `${mcq_success_rate}%`, background: 'linear-gradient(90deg, #3b82f6, #2563eb)' }}
-            />
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Code className="w-4 h-4 text-purple-600" />
-              <span className="text-sm font-bold text-gray-800">Coding Proficiency</span>
-            </div>
-            <span className="text-sm font-bold text-purple-700">{coding_success_rate}%</span>
-          </div>
-          <div className="w-full h-3 rounded-full bg-purple-50 overflow-hidden">
-            <div 
-              className="h-full rounded-full transition-all duration-1000"
-              style={{ width: `${coding_success_rate}%`, background: 'linear-gradient(90deg, #a855f7, #7e22ce)' }}
-            />
-          </div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
+
+function CloneBarChart({ title, subtitle, data, colors = CLONE_PALETTE }) {
+  // data: [{ label, value }]
+  const height = 200;
+  const pad = { top: 30, bottom: 30 };
+  const maxVal = Math.max(...data.map(d => d.value), 10);
+  
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+        {subtitle && <span className="text-[10px] text-gray-400 font-medium">{subtitle}</span>}
+      </div>
+      <div className="flex-1 w-full overflow-x-auto overflow-y-hidden">
+        <div style={{ minWidth: `${Math.max(data.length * 60, 400)}px`, height: `${height}px` }} className="relative flex items-end justify-between px-2">
+          {data.map((d, i) => {
+            const barH = (d.value / maxVal) * (height - pad.top - pad.bottom);
+            const c = colors[i % colors.length];
+            return (
+              <div key={i} className="flex flex-col items-center justify-end group cursor-pointer" style={{ width: '40px', height: '100%' }}>
+                <span className="text-[11px] font-bold text-gray-900 mb-1 opacity-100 transition-opacity">{d.value}</span>
+                <div 
+                  className="w-full rounded-t-sm transition-all duration-1000 ease-out hover:opacity-80" 
+                  style={{ height: `${barH}px`, backgroundColor: c }}
+                />
+                <span className="text-[9px] text-gray-500 font-medium mt-2 w-14 text-center truncate" title={d.label}>
+                  {d.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CloneLeaderboard({ title, columns, data }) {
+  // columns: [{ key, label, align }]
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm h-full flex flex-col">
+      <h3 className="text-sm font-bold text-gray-900 mb-5">{title}</h3>
+      <div className="w-full overflow-x-auto flex-1">
+        <table className="w-full text-left border-collapse min-w-[400px]">
+          <thead>
+            <tr className="border-b border-gray-100">
+              {columns.map((col, i) => (
+                <th key={i} className={`pb-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, i) => (
+              <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+                {columns.map((col, j) => {
+                  if (col.key === 'rate') {
+                    return (
+                      <td key={j} className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-red-500 rounded-full" style={{ width: `${row[col.key]}%` }} />
+                          </div>
+                          <span className="text-[11px] text-gray-600 font-medium w-6">{row[col.key]}%</span>
+                        </div>
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={j} className={`py-3 text-[12px] font-medium ${j === 0 ? 'text-gray-900' : 'text-gray-600'} ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                      {row[col.key]}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   VISUAL ANALYTICS OVERVIEW
+   ========================================================================= */
+function CourseVisualAnalytics({ data }) {
+  if (!data || !data.units || data.units.length === 0) return null;
+
+  // 1. Data mapping for Donuts
+  let totalMCQ = 0, totalCoding = 0;
+  let perfHigh = 0, perfMed = 0, perfLow = 0;
+  
+  const unitAttempts = [];
+  
+  data.units.forEach(u => {
+    let uMcq = 0, uCoding = 0;
+    (u.sub_units || []).forEach(su => {
+      uMcq += su.total_mcq || 0;
+      uCoding += su.total_coding || 0;
+    });
+    totalMCQ += uMcq;
+    totalCoding += uCoding;
+
+    const sr = u.performance?.success_rate || 0;
+    if (sr >= 75) perfHigh++;
+    else if (sr >= 50) perfMed++;
+    else perfLow++;
+
+    unitAttempts.push({ label: u.unit_name, value: u.performance?.attempted || 0 });
+  });
+
+  const totalContent = totalMCQ + totalCoding;
+  const contentData = [
+    { label: 'MCQ', value: totalMCQ, percentage: totalContent ? Math.round((totalMCQ / totalContent) * 100) : 0 },
+    { label: 'Coding', value: totalCoding, percentage: totalContent ? Math.round((totalCoding / totalContent) * 100) : 0 }
+  ];
+
+  const totalUnits = data.units.length;
+  const perfData = [
+    { label: 'Excellent', value: perfHigh, percentage: totalUnits ? Math.round((perfHigh / totalUnits) * 100) : 0 },
+    { label: 'Average', value: perfMed, percentage: totalUnits ? Math.round((perfMed / totalUnits) * 100) : 0 },
+    { label: 'Needs Help', value: perfLow, percentage: totalUnits ? Math.round((perfLow / totalUnits) * 100) : 0 }
+  ];
+
+  const totalAttempts = unitAttempts.reduce((acc, curr) => acc + curr.value, 0);
+  unitAttempts.sort((a, b) => b.value - a.value);
+  const top4Attempts = unitAttempts.slice(0, 4);
+  const otherAttempts = unitAttempts.slice(4).reduce((acc, curr) => acc + curr.value, 0);
+  const engageData = top4Attempts.map(u => ({
+    label: u.label, value: u.value, percentage: totalAttempts ? Math.round((u.value / totalAttempts) * 100) : 0
+  }));
+  if (otherAttempts > 0) {
+    engageData.push({ label: 'Others', value: otherAttempts, percentage: totalAttempts ? Math.round((otherAttempts / totalAttempts) * 100) : 0 });
+  }
+
+  // 2. Data mapping for Bars
+  const sortedBySuccess = [...data.units].sort((a, b) => (b.performance?.success_rate || 0) - (a.performance?.success_rate || 0));
+  const topUnits = sortedBySuccess.slice(0, 7).map(u => ({ label: u.unit_name, value: u.performance?.success_rate || 0 }));
+  const bottomUnits = [...sortedBySuccess].reverse().slice(0, 7).map(u => ({ label: u.unit_name, value: u.performance?.success_rate || 0 }));
+
+  // 3. Data mapping for Leaderboards
+  const unitLeaderboard = sortedBySuccess.slice(0, 10).map(u => ({
+    unit: u.unit_name,
+    subunits: u.total_sub_units || 0,
+    questions: u.total_questions || 0,
+    rate: u.performance?.success_rate || 0
+  }));
+
+  const contentLeaderboard = [];
+  data.units.slice(0, 5).forEach(u => {
+    (u.sub_units || []).forEach(su => {
+      contentLeaderboard.push({
+        lecture: su.lecture_name,
+        mcq: su.total_mcq || 0,
+        coding: su.total_coding || 0,
+        total: (su.total_mcq || 0) + (su.total_coding || 0)
+      });
+    });
+  });
+  contentLeaderboard.sort((a, b) => b.total - a.total);
+  const finalContentLeaderboard = contentLeaderboard.slice(0, 10);
+
+  // 4. Data mapping for NEW components
+  let totalAssigned = 0;
+  let totalAttempted = 0;
+  let totalSolved = 0;
+  
+  data.units.forEach(u => {
+    totalAssigned += u.total_questions || 0;
+    totalAttempted += u.performance?.attempted || 0;
+    totalSolved += u.performance?.solved || 0;
+  });
+
+  const funnelData = [
+    { label: 'Assigned', value: totalAssigned },
+    { label: 'Attempted', value: totalAttempted },
+    { label: 'Solved', value: totalSolved }
+  ];
+
+  const highestTrafficUnits = [...unitAttempts].slice(0, 7);
+
+  const dropOffLeaderboard = [...data.units].map(u => {
+    const attempts = u.performance?.attempted || 0;
+    const solved = u.performance?.solved || 0;
+    const dropOff = attempts > 0 ? Math.round(((attempts - solved) / attempts) * 100) : 0;
+    return {
+      unit: u.unit_name,
+      attempts: attempts,
+      solves: solved,
+      rate: dropOff
+    };
+  }).sort((a, b) => b.rate - a.rate).slice(0, 10);
+
+  const contentHeavyLeaderboard = [...data.units].map(u => {
+    let mcq = 0, coding = 0;
+    (u.sub_units || []).forEach(su => {
+      mcq += su.total_mcq || 0;
+      coding += su.total_coding || 0;
+    });
+    return {
+      unit: u.unit_name,
+      questions: u.total_questions || 0,
+      mcq: mcq,
+      coding: coding
+    };
+  }).sort((a, b) => b.questions - a.questions).slice(0, 10);
+
+
+  return (
+    <div className="space-y-6 mb-10 bg-gray-50/30 p-2 sm:p-4 rounded-3xl">
+      
+      {/* ROW 1: Donut Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <CloneDonutChart 
+          title="Content Distribution" 
+          data={contentData} 
+          totalLabel="questions" 
+          centerValue={totalContent} 
+          colors={['#e11d48', '#3b82f6']}
+        />
+        <CloneDonutChart 
+          title="Unit Performance" 
+          data={perfData} 
+          totalLabel="units" 
+          centerValue={totalUnits} 
+          colors={['#10b981', '#f59e0b', '#e11d48']}
+        />
+        <CloneDonutChart 
+          title="Unit Engagement" 
+          data={engageData} 
+          totalLabel="attempts" 
+          centerValue={totalAttempts} 
+        />
+      </div>
+
+      {/* ROW 2: Bar Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CloneBarChart 
+          title="Strongest Units" 
+          subtitle="Success rate %" 
+          data={topUnits} 
+        />
+        <CloneBarChart 
+          title="Weakest Units" 
+          subtitle="Success rate %" 
+          data={bottomUnits} 
+        />
+      </div>
+
+      {/* ROW 3: Leaderboards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CloneLeaderboard 
+          title="Unit Leaderboard" 
+          columns={[
+            { key: 'unit', label: 'UNIT' },
+            { key: 'subunits', label: 'SUB-UNITS' },
+            { key: 'questions', label: 'QUESTIONS' },
+            { key: 'rate', label: 'RATE', align: 'right' }
+          ]}
+          data={unitLeaderboard}
+        />
+        <CloneLeaderboard 
+          title="Content Breakdown" 
+          columns={[
+            { key: 'lecture', label: 'LECTURE' },
+            { key: 'mcq', label: 'MCQ' },
+            { key: 'coding', label: 'CODING' },
+            { key: 'total', label: 'TOTAL', align: 'right' }
+          ]}
+          data={finalContentLeaderboard}
+        />
+      </div>
+
+      {/* ROW 4: Engagement (Bar Charts) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <CloneBarChart 
+          title="Highest Traffic Units" 
+          subtitle="Total attempts" 
+          data={highestTrafficUnits} 
+          colors={['#f59e0b', '#e11d48', '#ea580c', '#0ea5e9', '#8b5cf6', '#10b981', '#14b8a6']}
+        />
+      </div>
+
+      {/* ROW 5: Advanced Leaderboards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <CloneLeaderboard 
+          title="High Drop-Off Risk" 
+          columns={[
+            { key: 'unit', label: 'UNIT' },
+            { key: 'attempts', label: 'ATTEMPTS' },
+            { key: 'solves', label: 'SOLVES' },
+            { key: 'rate', label: 'DROP-OFF', align: 'right' }
+          ]}
+          data={dropOffLeaderboard}
+        />
+        <CloneLeaderboard 
+          title="Content Heavyweights" 
+          columns={[
+            { key: 'unit', label: 'UNIT' },
+            { key: 'questions', label: 'QUESTIONS' },
+            { key: 'mcq', label: 'MCQ' },
+            { key: 'coding', label: 'CODING' }
+          ]}
+          data={contentHeavyLeaderboard}
+        />
+      </div>
+
+    </div>
+  );
+}
+
 
 /* =========================================================================
    MAIN CONTENT COMPONENT
@@ -946,7 +1275,7 @@ function QuestionAnalysisContent() {
             <KPICard label="Coding Questions" value={kpis.totalCoding} icon={Code} color={theme.purple} />
           </div>
 
-          <CoursePerformanceOverview performance={analysisData?.course_performance} />
+          <CourseVisualAnalytics data={analysisData} />
 
           {/* ── Error State ───────────────────────────────────────────── */}
           {analysisError && (
