@@ -1,0 +1,776 @@
+Created At: 2026-07-13T05:28:19Z
+Completed At: 2026-07-13T05:28:19Z
+File Path: `file:///c:/Users/Saifs/Educode/new_admin_portal/src/app/dashboard/page.js`
+Total Lines: 1038
+Total Bytes: 66316
+Showing lines 1 to 800
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: 'use client';
+2: 
+3: import React, { useState, useEffect } from 'react';
+4: import { useAuth } from '@/context/AuthContext';
+5: import { API_CONFIG } from '@/utils/api';
+6: import { getAdminToken } from '@/utils/cookies';
+7: import { BatchSkeleton, TeacherSkeleton, ListSkeleton, Skeleton, SectionSkeleton, DashboardSkeleton } from '@/components/Skeletons';
+8: import StudentDetailView from '@/components/StudentDetailView';
+9: import TeacherDetailView from '@/components/TeacherDetailView';
+10: import ChangePasswordModal from '@/components/ChangePasswordModal';
+11: import { Users, LayoutGrid, Layers, GraduationCap, Loader2, LogOut, ChevronRight, Search, FileText, Clock, AlertCircle, Sun, Moon, Key, BookOpen } from "lucide-react";
+12: import Link from 'next/link';
+13: import SectionDetailView from '@/components/SectionDetailView';
+14: import BatchDetailView from '@/components/BatchDetailView';
+15: import CourseDetailView from '@/components/CourseDetailView'; // [NEW]
+16: import { useTheme } from '@/context/ThemeContext';
+17: 
+18: export default function DeepDiveDashboard() {
+19:     const { user, logout, loading: authLoading } = useAuth();
+20:     const { theme, toggleTheme } = useTheme();
+21: 
+22:     const [view, setView] = useState('batches');
+23:     const [searchQuery, setSearchQuery] = useState('');
+24:     const [hasSearched, setHasSearched] = useState(false);
+25:     const [loading, setLoading] = useState(false);
+26:     const [showError, setShowError] = useState(false);
+27:     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+28: 
+29:     // Primary Data Lists
+30:     const [batches, setBatches] = useState([]);
+31:     const [sections, setSections] = useState([]);
+32:     const [masterSections, setMasterSections] = useState([]); // Cache for client-side search
+33:     const [students, setStudents] = useState([]);
+34:     const [teachers, setTeachers] = useState([]);
+35:     const [masterTeachers, setMasterTeachers] = useState([]); // Cache for client-side search
+36:     const [courses, setCourses] = useState([]); // [NEW] Courses List
+37:     const [masterCourses, setMasterCourses] = useState([]); // [NEW] Cache for search
+38: 
+39:     // --- Deep Dive States ---
+40:     const [inspectingStudent, setInspectingStudent] = useState(null);
+41:     const [inspectingTeacher, setInspectingTeacher] = useState(null);
+42:     const [inspectingSection, setInspectingSection] = useState(null);
+43:     const [inspectingBatch, setInspectingBatch] = useState(null);
+44:     const [inspectingCourse, setInspectingCourse] = useState(null); // [NEW] Deep dive for course
+45: 
+46:     // 1. Batch/Course Navigation
+47:     const [selectedBatch, setSelectedBatch] = useState(null);
+48:     const [batchCourses, setBatchCourses] = useState([]);
+49: 
+50:     // 2. Section Navigation
+51:     const [selectedSection, setSelectedSection] = useState(null);
+52:     const [sectionStudents, setSectionStudents] = useState([]);
+53: 
+54:     // 3. Cache for Section Completion
+55:     const [sectionCompletionCache, setSectionCompletionCache] = useState({}); // { sectionName: { courseId: completion% } }
+56: 
+57:     const updateSectionCache = (sectionName, courseId, completion) => {
+58:         setSectionCompletionCache(prev => ({
+59:             ...prev,
+60:             [sectionName]: {
+61:                 ...(prev[sectionName] || {}),
+62:                 [courseId]: completion
+63:             }
+64:         }));
+65:     };
+66: 
+67: 
+68: 
+69: 
+70: 
+71:     // Initial Data Fetch
+72:     useEffect(() => {
+73:         if (!authLoading && user) {
+74:             // Only fetch if empty to persist data across tab switches (unless explicit refresh needed)
+75:             if (view === 'teachers' && teachers.length === 0) fetchTeachers();
+76:             if (view === 'batches' && batches.length === 0) fetchBatches();
+77:             if (view === 'sections' && sections.length === 0) fetchSections();
+78:             if (view === 'courses' && courses.length === 0) fetchCourses(); // [NEW]
+79:         }
+80:     }, [authLoading, user, view]);
+81: 
+82:     // --- API Helpers ---
+83: 
+84:     const fetchWithAuth = async (url, options = {}) => {
+85:         setLoading(true);
+86:         try {
+87:             const token = getAdminToken();
+88:             const headers = {
+89:                 ...(options.headers || {})
+90:             };
+91:             if (token) {
+92:                 headers['Authorization'] = `Bearer ${token}`;
+93:             }
+94:             const res = await fetch(url, {
+95:                 ...options,
+96:                 credentials: 'include',
+97:                 headers
+98:             });
+99:             const data = await res.json();
+100:             return data.data || data || [];
+101:         } catch (e) {
+102:             console.error("API Error", e);
+103:             return [];
+104:         } finally {
+105:             setLoading(false);
+106:         }
+107:     };
+108: 
+109:     // --- Top Level Fetches ---
+110: 
+111:     const fetchTeachers = async () => {
+112:         const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myTeachers}`);
+113:         const list = Array.isArray(data) ? data : [];
+114:         setTeachers(list);
+115:         setMasterTeachers(list);
+116:     };
+117: 
+118:     const fetchBatches = async () => {
+119:         const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.myBatches}`);
+120:         setBatches(Array.isArray(data) ? data : []);
+121:     };
+122: 
+123:     const fetchSections = async () => {
+124:         const data = await fetchWithAuth(`${API_CONFIG.baseUrl.admin}${API_CONFIG.masters.sections}`);
+125:         const list = Array.isArray(data) ? data : [];
+126:         setSections(list);
+127:         setMasterSections(list);
+128:     };
+129: 
+130:     // [NEW] Fetch Courses
+131:     const fetchCourses = async () => {
+132:         setLoading(true);
+133:         try {
+134:             // Using uni_reg_id as the 'email' payload as per instruction "email is similar to admin registration number"
+135:             // Fallback to actual email if reg_id is missing
+136:             const identifier = user.uni_reg_id || user.email;
+137: 
+138:             const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getAllCourses}`, {
+139:                 method: 'POST',
+140:                 headers: { 'Content-Type': 'application/json' },
+141:                 body: JSON.stringify({ email: identifier }),
+142:                 credentials: 'include'
+143:             });
+144:             const data = await res.json();
+145: 
+146:             // Handle various response structures
+147:             let list = [];
+148:             if (data.data && Array.isArray(data.data.courses)) {
+149:                 // Structure: { data: { courses: [...] } }
+150:                 list = data.data.courses;
+151:             } else if (data.courses && Array.isArray(data.courses)) {
+152:                 // Structure: { courses: [...] }
+153:                 list = data.courses;
+154:             } else if (Array.isArray(data.data)) {
+155:                 // Structure: { data: [...] }
+156:                 list = data.data;
+157:             } else if (Array.isArray(data)) {
+158:                 // Structure: [...]
+159:                 list = data;
+160:             }
+161: 
+162:             setCourses(list);
+163:             setMasterCourses(list);
+164:         } catch (e) {
+165:             console.error("Failed to fetch courses:", e);
+166:         } finally {
+167:             setLoading(false);
+168:         }
+169:     };
+170: 
+171:     // Live Filtering Effect
+172:     useEffect(() => {
+173:         const lowerQuery = searchQuery.toLowerCase().trim();
+174: 
+175:         if (view === 'teachers') {
+176:             if (!lowerQuery) setTeachers(masterTeachers);
+177:             else {
+178:                 const filtered = masterTeachers.filter(t =>
+179:                     (t.teacher_name && t.teacher_name.toLowerCase().includes(lowerQuery)) ||
+180:                     (t.uni_reg_id && String(t.uni_reg_id).toLowerCase().includes(lowerQuery)) ||
+181:                     (t.teacher_email && t.teacher_email.toLowerCase().includes(lowerQuery))
+182:                 );
+183:                 setTeachers(filtered);
+184:             }
+185:         } else if (view === 'sections') {
+186:             if (!lowerQuery) setSections(masterSections);
+187:             else {
+188:                 const filtered = masterSections.filter(s =>
+189:                     String(s).toLowerCase().includes(lowerQuery)
+190:                 );
+191:                 setSections(filtered);
+192:             }
+193:         } else if (view === 'courses') {
+194:             if (!lowerQuery) setCourses(masterCourses);
+195:             else {
+196:                 const filtered = masterCourses.filter(c =>
+197:                     (c.course_name && c.course_name.toLowerCase().includes(lowerQuery)) ||
+198:                     (c.course_code && c.course_code.toLowerCase().includes(lowerQuery))
+199:                 );
+200:                 setCourses(filtered);
+201:             }
+202:         }
+203:     }, [searchQuery, view, masterTeachers, masterSections, masterCourses]);
+204: 
+205:     // --- Auth Loading Guard ---
+206:     if (authLoading) {
+207:         return (
+208:             <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center">
+209:                 <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+210:             </div>
+211:         );
+212:     }
+213: 
+214:     if (!user) {
+215:         return null;
+216:     }
+217: 
+218:     const handleSearch = async (e) => {
+219:         e.preventDefault();
+220: 
+221:         // Only Students require server-side search on Submit
+222:         if (view !== 'students') return;
+223: 
+224:         // Handle Empty Search (Reset)
+225:         if (!searchQuery.trim()) {
+226:             setStudents([]);
+227:             return;
+228:         }
+229: 
+230:         setLoading(true);
+231:         setHasSearched(true);
+232: 
+233:         try {
+234:             const res = await fetch(`${API_CONFIG.baseUrl.student}${API_CONFIG.student.lookup}`, {
+235:                 method: 'POST',
+236:                 headers: { 'Content-Type': 'application/json' },
+237:                 body: JSON.stringify({
+238:                     type: 'uni_reg_id',
+239:                     value: searchQuery,
+240:                     university_id: user.university_id || user.universityId || user.id
+241:                 }),
+242:                 credentials: 'include'
+243:             });
+244:             const data = await res.json();
+245:             const found = data.data || data;
+246: 
+247:             // Normalization Helper
+248:             const normalizeStudent = (s) => {
+249:                 if (!s) return null;
+250:                 return {
+251:                     ...s,
+252:                     student_id: s.student_id || s.uuid || s._id,
+253:                     uni_reg_id: s.uni_reg_id || s.reg_id
+254:                 };
+255:             };
+256: 
+257:             // Strict check: if no ID, it's not a valid student
+258:             if (Array.isArray(found)) {
+259:                 setStudents(found.map(normalizeStudent).filter(s => s && (s.uni_reg_id || s.student_id)));
+260:             } else if (found && (found.uni_reg_id || found.reg_id || found.student_id || found.uuid)) {
+261:                 setStudents([normalizeStudent(found)]);
+262:             } else {
+263:                 setStudents([]);
+264:                 setShowError(true);
+265:             }
+266:         } catch (e) {
+267:             console.error("Search Error", e);
+268:             setShowError(true);
+269:         } finally {
+270:             setLoading(false);
+271:         }
+272:     };
+273: 
+274:     const handleSectionClick = (sectionName) => {
+275:         setInspectingSection({ section_name: sectionName, batch_name: 'Active Sections' });
+276:     };
+277: 
+278:     const handleBatchClick = (batch) => {
+279:         setInspectingBatch(batch);
+280:     };
+281: 
+282:     // --- Deep Dive Actions ---
+283: 
+284:     const loadBatchCourses = async (batchId) => {
+285:         setLoading(true);
+286:         try {
+287:             const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.getPracticeCoursesByBatch}`, {
+288:                 method: 'POST',
+289:                 headers: { 'Content-Type': 'application/json' },
+290:                 body: JSON.stringify({ batch_id: batchId }),
+291:                 credentials: 'include'
+292:             });
+293:             const data = await res.json();
+294: 
+295:             if (data.success && data.data) {
+296:                 if (Array.isArray(data.data)) return data.data;
+297:                 if (data.data.courses) return data.data.courses;
+298:             }
+299:             return [];
+300:         } catch (e) { return []; }
+301:         finally { setLoading(false); }
+302:     };
+303: 
+304:     const openBatchModal = async (batchId) => {
+305:         const courses = await loadBatchCourses(batchId);
+306:         setBatchCourses(courses);
+307:         setSelectedBatch(batchId);
+308:     };
+309: 
+310:     const openSectionModal = async (section) => {
+311:         setLoading(true);
+312:         try {
+313:             const res = await fetch(`${API_CONFIG.baseUrl.student}${API_CONFIG.student.lookup}`, {
+314:                 method: 'POST',
+315:                 headers: { 'Content-Type': 'application/json' },
+316:                 body: JSON.stringify({
+317:                     type: 'section',
+318:                     value: section,
+319:                     university_id: user.university_id || user.universityId || user.id
+320:                 }),
+321:                 credentials: 'include'
+322:             });
+323:             const data = await res.json();
+324:             setSectionStudents(Array.isArray(data.data) ? data.data : [data.data].filter(Boolean));
+325:             setSelectedSection(section);
+326:         } catch (e) { console.error(e); }
+327:         finally { setLoading(false); }
+328:     };
+329: 
+330:     // --- Student Wizard Flow ---
+331: 
+332:     const startStudentInspection = (student) => {
+333:         setInspectingStudent(student);
+334:     };
+335: 
+336:     const closeAll = () => {
+337:         setSelectedBatch(null);
+338:         setSelectedSection(null);
+339:         setInspectingStudent(null);
+340:     };
+341: 
+342:     // --- Render Helpers ---
+343:     const getBatchStatus = (endDate) => {
+344:         const isActive = new Date(endDate) > new Date();
+345:         return isActive ?
+346:             { label: 'Active', color: 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10' } :
+347:             { label: 'Completed', color: 'text-slate-500 border-slate-500/20 bg-slate-500/10' };
+348:     };
+349: 
+350:     if (authLoading) {
+351:         return <DashboardSkeleton />;
+352:     }
+353: 
+354:     if (!user) return null;
+355: 
+356:     // RENDER: Student Detail View Overhead
+357:     if (inspectingStudent) {
+358:         return <StudentDetailView student={inspectingStudent} onBack={() => setInspectingStudent(null)} onStudentSelect={setInspectingStudent} />;
+359:     }
+360: 
+361:     return (
+362:         <div className="min-h-screen bg-slate-200 dark:bg-[#0B0F19] text-gray-900 dark:text-gray-100 font-sans selection:bg-cyan-500/30">
+363:             <ChangePasswordModal
+364:                 isOpen={isPasswordModalOpen}
+365:                 onClose={() => setIsPasswordModalOpen(false)}
+366:             />
+367:             {/* Deep Dive Views (Overlay) */}
+368: 
+369:             {/* LEVEL 1: Batch Detail View */}
+370:             {inspectingBatch && !inspectingSection && !inspectingStudent && (
+371:                 <BatchDetailView
+372:                     batch={inspectingBatch}
+373:                     onBack={() => setInspectingBatch(null)}
+374:                     onSectionSelect={(sectionName) => handleSectionClick(sectionName)}
+375:                 />
+376:             )}
+377: 
+378:             {inspectingTeacher && (
+379:                 <TeacherDetailView
+380:                     teacher={inspectingTeacher}
+381:                     onBack={() => setInspectingTeacher(null)}
+382:                     onSectionSelect={(section) => handleSectionClick(section)}
+383:                     cache={sectionCompletionCache}
+384:                     onUpdateCache={updateSectionCache}
+385:                     user={user}
+386:                 />
+387:             )}
+388: 
+389:             {inspectingStudent && (
+390:                 <StudentDetailView
+391:                     student={inspectingStudent}
+392:                     onBack={() => setInspectingStudent(null)}
+393:                     onStudentSelect={setInspectingStudent}
+394:                 />
+395:             )}
+396: 
+397:             {inspectingSection && !inspectingStudent && (
+398:                 <SectionDetailView
+399:                     section={inspectingSection}
+400:                     teachers={teachers.filter(t =>
+401:                         t.assigned_section?.includes(
+402:                             typeof inspectingSection === 'string' ? inspectingSection : inspectingSection.section_name
+403:                         )
+404:                     )}
+405:                     onBack={() => setInspectingSection(null)}
+406:                     onStudentSelect={setInspectingStudent}
+407:                     user={user}
+408:                     cache={sectionCompletionCache}
+409:                     onUpdateCache={updateSectionCache}
+410:                 />
+411:             )}
+412: 
+413:             {/* [NEW] Course Detail View */}
+414:             {inspectingCourse && (
+415:                 <CourseDetailView
+416:                     course={inspectingCourse}
+417:                     onBack={() => setInspectingCourse(null)}
+418:                 />
+419:             )}
+420: 
+421:             {/* Background Effects */}
+422:             <div className="fixed -top-40 -left-48 h-[38rem] w-[38rem] bg-cyan-500/10 blur-3xl rounded-full pointer-events-none opacity-50 dark:opacity-100" />
+423:             <div className="fixed -bottom-44 -right-40 h-[42rem] w-[42rem] bg-indigo-500/10 blur-3xl rounded-full pointer-events-none opacity-50 dark:opacity-100" />
+424: 
+425:             {/* Main Dashboard Content */}
+426:             <div className={`transition-all duration-300 ${(inspectingStudent || inspectingSection || inspectingCourse) ? 'opacity-0 pointer-events-none scale-95 fixed inset-0' : 'opacity-100 scale-100'}`}>
+427:                 <div className="relative text-gray-900 dark:text-white p-6 md:p-10 font-sans">
+428: 
+429:                     <div className="max-w-7xl mx-auto relative z-10 space-y-8">
+430: 
+431:                         {/* Header */}
+432:                         <div className="glass-panel p-8 rounded-3xl shadow-xl border border-white/10">
+433:                             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+434:                                 {/* Branding Section */}
+435:                                 <div className="flex items-center gap-6">
+436:                                     {/* Animated Logo */}
+437:                                     <div className="relative w-16 h-16 flex-shrink-0">
+438:                                         {/* Rotating Glow */}
+439:                                         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 rounded-full opacity-20 blur-xl animate-spin-slow" />
+440: 
+441:                                         {/* Logo */}
+442:                                         <div className="relative w-full h-full animate-float">
+443:                                             <img
+444:                                                 src="/logo.png"
+445:                                                 alt="TheEduCode"
+446:                                                 className="w-full h-full object-contain drop-shadow-2xl"
+447:                                             />
+448:                                         </div>
+449:                                     </div>
+450: 
+451:                                     {/* Title & Status */}
+452:                                     <div>
+453:                                         <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">
+454:                                             TheEduCode
+455:                                         </h1>
+456:                                         <p className="text-gray-600 dark:text-gray-300 mt-1 flex items-center gap-2.5 text-base font-medium">
+457:                                             <span className="relative flex h-3 w-3">
+458:                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+459:                                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-lg shadow-emerald-500/50"></span>
+460:                                             </span>
+461:                                             {user.name || 'Administrator'} • Admin Portal
+462:                                         </p>
+463:                                     </div>
+464:                                 </div>
+465: 
+466:                                 {/* Action Buttons */}
+467:                                 <div className="flex gap-3 items-center">
+468:                                     {/* Theme Toggle */}
+469:                                     <button
+470:                                         onClick={toggleTheme}
+471:                                         className="group p-3 rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 shadow-sm hover:shadow-md hover:shadow-blue-500/20"
+472:                                         title="Toggle Theme"
+473:                                     >
+474:                                         {theme === 'dark' ?
+475:                                             <Sun className="w-5 h-5 text-amber-500 group-hover:rotate-90 transition-transform duration-300" /> :
+476:                                             <Moon className="w-5 h-5 text-indigo-600 group-hover:-rotate-12 transition-transform duration-300" />
+477:                                         }
+478:                                     </button>
+479: 
+480:                                     {/* Change Password */}
+481:                                     <button
+482:                                         onClick={() => setIsPasswordModalOpen(true)}
+483:                                         className="group px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 font-medium text-sm flex items-center gap-2 shadow-sm hover:shadow-md hover:shadow-blue-500/10"
+484:                                         title="Change Password"
+485:                                     >
+486:                                         <Key className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+487:                                         <span className="hidden sm:inline">Password</span>
+488:                                     </button>
+489: 
+490:                                     {/* Logout */}
+491:                                     <button
+492:                                         onClick={() => {
+493:                                             localStorage.clear();
+494:                                             document.cookie.split(";").forEach((c) => {
+495:                                                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+496:                                             });
+497:                                             logout();
+498:                                         }}
+499:                                         className="group px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-purple-600 text-white border border-red-600/20 hover:shadow-lg hover:shadow-red-500/30 transition-all duration-300 flex items-center gap-2 font-medium"
+500:                                     >
+501:                                         <LogOut className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+502:                                         <span className="hidden sm:inline">Logout</span>
+503:                                     </button>
+504:                                 </div>
+505:                             </div>
+506:                         </div>
+507: 
+508:                         {/* Main Navigation */}
+509:                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+510:                             {[
+511:                                 { id: 'batches', label: 'Batches', icon: LayoutGrid, color: 'violet', gradient: 'from-violet-700 to-indigo-400', count: batches.length },
+512:                                 { id: 'sections', label: 'Sections', icon: Layers, color: 'emerald', gradient: 'from-emerald-700 to-teal-400', count: sections.length },
+513:                                 { id: 'teachers', label: 'Teachers', icon: Users, color: 'cyan', gradient: 'from-cyan-700 to-blue-400', count: teachers.length },
+514:                                 { id: 'students', label: 'Students', icon: GraduationCap, color: 'blue', gradient: 'from-blue-700 to-indigo-400' },
+515:                                 { id: 'courses', label: 'Courses', icon: BookOpen, color: 'amber', gradient: 'from-amber-700 to-yellow-400', count: courses.length },
+516:                             ].map(item => (
+517:                                 <button
+518:                                     key={item.id}
+519:                                     onClick={() => { setView(item.id); setSearchQuery(''); }}
+520:                                     className={`group relative p-6 rounded-2xl border transition-all duration-300 text-left overflow-hidden transform hover:scale-105 hover:-translate-y-1
+521:                                 ${view === item.id
+522:                                             ? 'bg-gradient-to-br ' + item.gradient + ' text-white border-white/20 shadow-2xl shadow-' + item.color + '-500/30'
+523:                                             : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:border-' + item.color + '-400 dark:hover:border-' + item.color + '-500 shadow-md hover:shadow-xl hover:shadow-' + item.color + '-500/20'
+524:                                         }`}
+525:                                 >
+526:                                     {/* Background Glow Effect */}
+527:                                     {view !== item.id && (
+528:                                         <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+529:                                     )}
+530: 
+531:                                     {/* Icon Container */}
+532:                                     <div className={`relative w-14 h-14 rounded-xl mb-4 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-3
+533:                                 ${view === item.id
+534:                                             ? 'bg-white/20 text-white shadow-lg'
+535:                                             : 'bg-gradient-to-br ' + item.gradient + ' text-white shadow-md'
+536:                                         }`}>
+537:                                         <item.icon className="w-7 h-7" />
+538:                                     </div>
+539: 
+540:                                     {/* Label & Count */}
+541:                                     <div className="relative">
+542:                                         <span className={`block text-lg font-bold mb-1 ${view === item.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+543:                                             {item.label}
+544:                                         </span>
+545:                                         {item.count > 0 && (
+546:                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${view === item.id
+547:                                                 ? 'bg-white/20 text-white'
+548:                                                 : 'bg-gradient-to-r ' + item.gradient + ' text-white'
+549:                                                 }`}>
+550:                                                 {item.count} total
+551:                                             </span>
+552:                                         )}
+553:                                     </div>
+554: 
+555:                                     {/* Active Indicator */}
+556:                                     {view === item.id && (
+557:                                         <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/50" />
+558:                                     )}
+559:                                 </button>
+560:                             ))}
+561:                         </div>
+562: 
+563:                         {/* View Content */}
+564:                         <div className="glass-panel rounded-3xl p-8 md:p-10 min-h-[600px] shadow-2xl relative overflow-hidden border border-white/10">
+565:                             {/* Decorative Elements */}
+566:                             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-violet-500/10 rounded-full blur-3xl" />
+567:                             <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-cyan-500/10 to-indigo-500/10 rounded-full blur-3xl" />
+568: 
+569:                             {/* Toolbar */}
+570:                             <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 border-b border-white/10 pb-8">
+571:                                 {/* Title Section */}
+572:                                 <div className="flex items-center gap-4">
+573:                                     <h2 className="text-3xl font-bold capitalize bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">
+574:                                         {view}
+575:                                     </h2>
+576:                                     {view !== 'students' && (
+577:                                         <span className="px-4 py-1.5 rounded-full text-sm font-bold bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30">
+578:                                             {view === 'teachers' && teachers.length}
+579:                                             {view === 'batches' && batches.length}
+580:                                             {view === 'sections' && sections.length}
+581:                                             {view === 'courses' && courses.length}
+582:                                             {' '}total
+583:                                         </span>
+584:                                     )}
+585:                                 </div>
+586: 
+587:                                 {/* Search Bar */}
+588:                                 <div className="flex-1 flex justify-center w-full md:px-8">
+589:                                     {(view === 'students' || view === 'teachers' || view === 'sections' || view === 'courses') && (
+590:                                         <form onSubmit={handleSearch} className="relative w-full max-w-2xl group">
+591:                                             {/* Animated Search Icon */}
+592:                                             <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-300" />
+593: 
+594:                                             <input
+595:                                                 type="text"
+596:                                                 placeholder={
+597:                                                     view === 'teachers' ? "Search by Name or Reg ID..." :
+598:                                                         view === 'sections' ? "Search Section Name..." :
+599:                                                             view === 'courses' ? "Search Course Name..." :
+600:                                                                 "Search by Uni Reg ID..."
+601:                                                 }
+602:                                                 value={searchQuery}
+603:                                                 onChange={(e) => setSearchQuery(e.target.value)}
+604:                                                 className="w-full bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-2xl pl-14 pr-5 py-4 text-base font-medium focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-md focus:shadow-xl focus:shadow-blue-500/20"
+605:                                             />
+606: 
+607:                                             {/* Clear Button */}
+608:                                             {searchQuery && (
+609:                                                 <button
+610:                                                     type="button"
+611:                                                     onClick={() => setSearchQuery('')}
+612:                                                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+613:                                                 >
+614:                                                     <span className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">✕</span>
+615:                                                 </button>
+616:                                             )}
+617:                                         </form>
+618:                                     )}
+619:                                 </div>
+620:                             </div>
+621: 
+622:                             {/* View: Teachers */}
+623:                             {view === 'teachers' && (
+624:                                 <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+625:                                     {loading ? (
+626:                                         <>
+627:                                             <TeacherSkeleton />
+628:                                             <TeacherSkeleton />
+629:                                             <TeacherSkeleton />
+630:                                             <TeacherSkeleton />
+631:                                             <TeacherSkeleton />
+632:                                             <TeacherSkeleton />
+633:                                         </>
+634:                                     ) : (
+635:                                         teachers.map((t, idx) => (
+636:                                             <div key={idx} className="group relative p-6 rounded-2xl bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 flex flex-col justify-between h-full hover:border-cyan-400 dark:hover:border-cyan-500 hover:transform hover:scale-105 hover:-translate-y-2 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-cyan-500/20 overflow-hidden">
+637:                                                 {/* Background Gradient Glow */}
+638:                                                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 to-blue-500/0 group-hover:from-cyan-500/10 group-hover:to-blue-500/10 transition-all duration-300" />
+639: 
+640:                                                 <div className="relative">
+641:                                                     {/* Header with Avatar */}
+642:                                                     <div className="flex items-center gap-4 mb-6">
+643:                                                         <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shrink-0 shadow-xl group-hover:scale-110 transition-transform duration-300 overflow-hidden">
+644:                                                             <div className="absolute inset-0 bg-white/10 rounded-2xl" />
+645:                                                             <span className="relative z-10 text-white font-bold text-2xl">
+646:                                                                 {t.teacher_name
+647:                                                                     ? t.teacher_name
+648:                                                                         .split(' ')
+649:                                                                         .map(word => word[0])
+650:                                                                         .slice(0, 2)
+651:                                                                         .join('')
+652:                                                                         .toUpperCase()
+653:                                                                     : 'T'}
+654:                                                             </span>
+655:                                                         </div>
+656:                                                         <div className="overflow-hidden flex-1">
+657:                                                             <h3 className="font-bold text-lg truncate text-gray-900 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors" title={t.teacher_name}>
+658:                                                                 {t.teacher_name || 'Unknown'}
+659:                                                             </h3>
+660:                                                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate font-mono mt-0.5" title={t.teacher_email}>
+661:                                                                 {t.teacher_email || 'No email'}
+662:                                                             </p>
+663:                                                         </div>
+664:                                                     </div>
+665: 
+666: 
+667:                                                     {/* Info Panel */}
+668:                                                     <div className="space-y-4 mb-6 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900/50 dark:to-slate-900/30 p-5 rounded-xl border border-gray-200 dark:border-slate-700">
+669:                                                         {/* Reg ID */}
+670:                                                         <div className="flex justify-between items-center">
+671:                                                             <span className="text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">Reg ID</span>
+672:                                                             <span className="font-mono text-sm font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+673:                                                                 {t.uni_reg_id || 'N/A'}
+674:                                                             </span>
+675:                                                         </div>
+676: 
+677:                                                         {/* Assigned Sections */}
+678:                                                         <div>
+679:                                                             <div className="text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2.5">Sections</div>
+680:                                                             <div className="flex flex-wrap gap-2">
+681:                                                                 {t.assigned_section && Array.isArray(t.assigned_section) && t.assigned_section.length > 0 ? (
+682:                                                                     t.assigned_section.map((sec, i) => (
+683:                                                                         <span key={i} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold shadow-md hover:shadow-lg transition-shadow">
+684:                                                                             {sec}
+685:                                                                         </span>
+686:                                                                     ))
+687:                                                                 ) : (
+688:                                                                     <span className="text-xs text-gray-400 dark:text-gray-500 italic">No sections assigned</span>
+689:                                                                 )}
+690:                                                             </div>
+691:                                                         </div>
+692:                                                     </div>
+693:                                                 </div>
+694: 
+695:                                                 {/* View Button */}
+696:                                                 <button
+697:                                                     onClick={() => setInspectingTeacher(t)}
+698:                                                     className="relative w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-cyan-500/40 flex items-center justify-center gap-2 group/btn"
+699:                                                 >
+700:                                                     View Details
+701:                                                     <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+702:                                                 </button>
+703:                                             </div>
+704:                                         ))
+705:                                     )}
+706:                                     {!loading && teachers.length === 0 && (
+707:                                         <div className="col-span-full text-center text-gray-500 py-20 flex flex-col items-center">
+708:                                             <Users className="w-12 h-12 mb-4 opacity-20" />
+709:                                             No teachers found.
+710:                                         </div>
+711:                                     )}
+712:                                 </div>
+713:                             )}
+714: 
+715:                             {/* View: Batches */}
+716:                             {view === 'batches' && (
+717:                                 <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+718:                                     {loading ? (
+719:                                         <>
+720:                                             <BatchSkeleton />
+721:                                             <BatchSkeleton />
+722:                                             <BatchSkeleton />
+723:                                             <BatchSkeleton />
+724:                                             <BatchSkeleton />
+725:                                             <BatchSkeleton />
+726:                                         </>
+727:                                     ) : (
+728:                                         batches.map((batch) => {
+729:                                             const status = getBatchStatus(batch.ending_date);
+730:                                             const isActive = status.label === 'Active';
+731:                                             return (
+732:                                                 <button
+733:                                                     key={batch.batch_id}
+734:                                                     onClick={() => handleBatchClick(batch)}
+735:                                                     className="group relative text-left w-full p-6 rounded-2xl bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 hover:border-violet-400 dark:hover:border-violet-500 hover:transform hover:scale-105 hover:-translate-y-2 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-violet-500/20 overflow-hidden"
+736:                                                 >
+737:                                                     {/* Background Gradient Glow */}
+738:                                                     <div className="absolute inset-0 bg-gradient-to-br from-violet-500/0 to-purple-500/0 group-hover:from-violet-500/10 group-hover:to-purple-500/10 transition-all duration-300" />
+739: 
+740:                                                     {/* Decorative Corner */}
+741:                                                     <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-violet-500/10 to-purple-500/10 rounded-bl-[100px] opacity-50 group-hover:opacity-100 transition-opacity" />
+742: 
+743:                                                     <div className="relative">
+744:                                                         {/* Header with Icon and Status */}
+745:                                                         <div className="flex justify-between items-start mb-5">
+746:                                                             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 text-white flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-300">
+747:                                                                 <LayoutGrid className="w-7 h-7" />
+748:                                                             </div>
+749:                                                             <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-md ${isActive
+750:                                                                 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+751:                                                                 : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+752:                                                                 }`}>
+753:                                                                 {status.label}
+754:                                                             </span>
+755:                                                         </div>
+756: 
+757:                                                         {/* Batch Name */}
+758:                                                         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 line-clamp-2 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors" title={batch.batch_name}>
+759:                                                             {batch.batch_name}
+760:                                                         </h3>
+761: 
+762:                                                         {/* Stats Grid */}
+763:                                                         <div className="grid grid-cols-2 gap-3 mb-5">
+764:                                                             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800/30 text-center">
+765:                                                                 <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+766:                                                                     {batch.batch_student_s
+<truncated 3622 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.

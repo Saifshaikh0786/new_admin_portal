@@ -1,0 +1,2361 @@
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, ChevronDown, ChevronRight, BookOpen, Clock, AlertCircle, Award, Activity, Globe, ArrowRight, TrendingUp, Check, X, Trophy, Medal, Star, Calendar, Target, Zap, Timer, Flame, Code, FileText, Eye, EyeOff, Wifi, WifiOff, ShieldAlert, MousePointerClick } from 'lucide-react';
+import { CircularProgress } from './CircularProgress';
+import { API_CONFIG } from '@/utils/api';
+import { getAdminToken } from '@/utils/cookies';
+import { Skeleton } from './Skeletons';
+import { useAuth } from '@/context/AuthContext';
+import PortalWrapper from './PortalWrapper';
+
+export default function StudentDetailView({ student, onBack, onStudentSelect }) {
+    const [viewLink, setViewLink] = useState('courses');
+    const [courses, setCourses] = useState([]);
+    const [examCourses, setExamCourses] = useState([]);
+    const [loadingCourses, setLoadingCourses] = useState(false);
+    const [loadingExamCourses, setLoadingExamCourses] = useState(false);
+    const { user } = useAuth();
+
+    const [selectedCourse, setSelectedCourse] = useState(null);
+    const [selectedExamCourse, setSelectedExamCourse] = useState(null);
+    const [showExamAnalytics, setShowExamAnalytics] = useState(false);
+    const [courseStructure, setCourseStructure] = useState(null);
+    const [loadingStructure, setLoadingStructure] = useState(false);
+
+    const [selectedUnit, setSelectedUnit] = useState(null);
+    const [subUnitHistory, setSubUnitHistory] = useState(null);
+    const [inspectingSubUnit, setInspectingSubUnit] = useState(null);
+
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [resultType, setResultType] = useState('mcq');
+    const [fullStudent, setFullStudent] = useState(student);
+
+    const [unitCompletions, setUnitCompletions] = useState({}); // { unitId: progress_percentage }
+    const [unitBreakdowns, setUnitBreakdowns] = useState({}); // { unitId: sub_unit_breakdown[] }
+    const [overallCourseProgress, setOverallCourseProgress] = useState(0);
+    const [progressMode, setProgressMode] = useState('attempts');
+
+    useEffect(() => {
+        if (!courseStructure || !Array.isArray(courseStructure)) return;
+
+        let totalCompletion = 0;
+        const newUnitCompletions = {};
+        const newUnitBreakdowns = {};
+
+        courseStructure.forEach(unit => {
+            let unitTotalProgress = 0;
+            const subUnitBreakdown = [];
+            
+            unit.sub_units?.forEach(su => {
+                let suProgress = su.progress || 0;
+                
+                if (progressMode === 'attempts' && su.details) {
+                    const { has_mcq, mcq_submitted, has_coding, coding_submitted } = su.details;
+                    if (has_mcq && has_coding) {
+                        suProgress = 0;
+                        if (mcq_submitted) suProgress += 50;
+                        if (coding_submitted) suProgress += 50;
+                    } else if (has_mcq) {
+                        suProgress = mcq_submitted ? 100 : 0;
+                    } else if (has_coding) {
+                        suProgress = coding_submitted ? 100 : 0;
+                    } else {
+                        suProgress = su.progress || 0;
+                    }
+                }
+                
+                unitTotalProgress += suProgress;
+                subUnitBreakdown.push({
+                    sub_unit_id: su.sub_unit_id,
+                    progress_percentage: suProgress,
+                    details: su.details || {}
+                });
+            });
+
+            const unitProgress = unit.sub_units?.length > 0 ? Math.round(unitTotalProgress / unit.sub_units.length) : (progressMode === 'marks' ? (unit.analytics?.completion_rate || 0) : 0);
+            
+            newUnitCompletions[unit.unit_id] = unitProgress;
+            newUnitBreakdowns[unit.unit_id] = subUnitBreakdown;
+            totalCompletion += unitProgress;
+        });
+
+        setUnitCompletions(newUnitCompletions);
+        setUnitBreakdowns(newUnitBreakdowns);
+        setOverallCourseProgress(courseStructure.length > 0 ? Math.round(totalCompletion / courseStructure.length) : 0);
+    }, [courseStructure, progressMode]);
+
+
+    useEffect(() => {
+        const init = async () => {
+            let currentStudent = student;
+
+            const needsLookup = !currentStudent.student_id && !currentStudent.uuid;
+            const needsBatch = !currentStudent.batch_id && !currentStudent.batch;
+
+            if (needsLookup || needsBatch) {
+                try {
+                    const lookupRes = await fetch(`${API_CONFIG.baseUrl.student}${API_CONFIG.student.lookup}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'uni_reg_id',
+                            value: currentStudent.uni_reg_id || currentStudent.reg_id,
+                            university_id: user?.university_id || user?.universityId || user?.id
+                        }),
+                        credentials: 'include'
+                    });
+                    const lookupJson = await lookupRes.json();
+                    const found = Array.isArray(lookupJson.data) ? lookupJson.data[0] : lookupJson.data;
+                    if (found) {
+                        currentStudent = { ...currentStudent, ...found };
+                        setFullStudent(currentStudent);
+                    }
+                } catch (e) {
+                    console.error("Lookup failed", e);
+                }
+            } else {
+                setFullStudent(student);
+            }
+
+            if (currentStudent.batch_id || currentStudent.batch) {
+                const bId = currentStudent.batch_id || currentStudent.batch;
+                fetchStudentOverview(bId, currentStudent);
+            }
+        };
+
+        if (student) init();
+    }, [student]);
+
+    useEffect(() => {
+        if (inspectingSubUnit && selectedCourse) {
+            fetchHistory(inspectingSubUnit.unitId, inspectingSubUnit.subUnitId, resultType);
+        }
+    }, [resultType, inspectingSubUnit]);
+
+    // Auto-select exam course if navigated from exam results table
+    const [autoSelectedExamCourse, setAutoSelectedExamCourse] = useState(false);
+    useEffect(() => {
+        if (autoSelectedExamCourse) return;
+        if (!student?.exam_course_id) return;
+        if (!examCourses || examCourses.length === 0) return;
+
+        const match = examCourses.find(c => c.course_id === student.exam_course_id);
+        if (match) {
+            setAutoSelectedExamCourse(true);
+            handleExamCourseSelect(match);
+        }
+    }, [examCourses, student?.exam_course_id]);
+
+    // Fetch unit completion when a unit is expanded
+    const fetchSingleUnitCompletion = async (unitId) => {
+        if (unitBreakdowns[unitId]) return; // Already fetched
+
+        try {
+            const payload = {
+                student_id: fullStudent.student_id || fullStudent.uuid || fullStudent.uni_reg_id || fullStudent.reg_id,
+                course_id: selectedCourse.course_id,
+                unit_id: unitId
+            };
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.unitCompletion}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+                credentials: 'include'
+            });
+
+            const data = await res.json();
+            if (data.success && data.data) {
+                setUnitCompletions(prev => ({
+                    ...prev,
+                    [unitId]: data.data.overall_unit_completion || 0
+                }));
+                setUnitBreakdowns(prev => ({
+                    ...prev,
+                    [unitId]: data.data.sub_unit_breakdown || []
+                }));
+            }
+        } catch (e) {
+            console.error(`Failed to fetch completion for unit ${unitId}`, e);
+        }
+    };
+
+    // Initial course progress calculation
+    const fetchInitialCourseProgress = async (studentData, courseId, units) => {
+        if (!units || units.length === 0) return;
+
+        let totalCompletion = 0;
+        let fetchedCount = 0;
+
+        await Promise.all(units.map(async (unit) => {
+            try {
+                const payload = {
+                    student_id: studentData.student_id || studentData.uuid || studentData.uni_reg_id || studentData.reg_id,
+                    course_id: courseId,
+                    unit_id: unit.unit_id
+                };
+                const token = getAdminToken();
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.unitCompletion}`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload),
+                    credentials: 'include'
+                });
+
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const progress = data.data.overall_unit_completion || 0;
+                    setUnitCompletions(prev => ({ ...prev, [unit.unit_id]: progress }));
+                    totalCompletion += progress;
+                    fetchedCount++;
+                }
+            } catch (e) {
+                console.error(`Failed to fetch completion for unit ${unit.unit_id}`, e);
+            }
+        }));
+
+        setOverallCourseProgress(units.length > 0 ? Math.round(totalCompletion / units.length) : 0);
+    };
+
+    const fetchStudentOverview = async (batchId, studentData) => {
+        setLoadingCourses(true);
+        setLoadingExamCourses(true);
+        try {
+            if (!batchId) {
+                setCourses([]);
+                setExamCourses([]);
+                return;
+            }
+
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    student_id: studentData.student_id || studentData.uuid,
+                    batch_id: batchId
+                }),
+                credentials: 'include'
+            });
+            const data = await res.json();
+
+            if (data.success && data.data) {
+                setCourses(data.data.practice_courses || []);
+                
+                // Map the new examData structure to what the UI expects for myResult
+                const mappedExamCourses = (data.data.exam_courses || []).map(course => {
+                    if (course.examData) {
+                        return {
+                            ...course,
+                            examData: {
+                                ...course.examData,
+                                myResult: {
+                                    total_marks: course.examData.total_marks,
+                                    marks_breakdown: course.examData.marks_breakdown,
+                                    status: course.examData.status,
+                                    attempt_count: course.examData.attempt_count,
+                                    analytics: course.examData.analytics
+                                }
+                            }
+                        };
+                    }
+                    return course;
+                });
+                
+                setExamCourses(mappedExamCourses);
+            } else {
+                setCourses([]);
+                setExamCourses([]);
+            }
+        } catch (e) {
+            console.error('Failed to fetch student overview:', e);
+            setCourses([]);
+            setExamCourses([]);
+        } finally {
+            setLoadingCourses(false);
+            setLoadingExamCourses(false);
+        }
+    };
+
+    const handleExamCourseSelect = async (examCourse) => {
+        setSelectedExamCourse(examCourse);
+        setSelectedCourse(examCourse); // Reuse selectedCourse for structure loading
+        setViewLink('exam_deep_dive');
+        setLoadingStructure(true);
+        setSubUnitHistory(null);
+        setInspectingSubUnit(null);
+        setUnitCompletions({});
+        setUnitBreakdowns({});
+        setOverallCourseProgress(0);
+
+        try {
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const payload = {
+                student_id: fullStudent.student_id || fullStudent.uuid || fullStudent.uni_reg_id || fullStudent.reg_id,
+                course_id: examCourse.course_id
+            };
+
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}`, {
+                method: 'POST',
+                credentials: 'include',
+                headers,
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            const structure = data.data || [];
+            
+            setCourseStructure(structure);
+        } catch (e) {
+            console.error('Failed to load course structure analytics', e);
+            setCourseStructure([]);
+        } finally {
+            setLoadingStructure(false);
+        }
+    };
+
+    const handleCourseSelect = async (course) => {
+        setSelectedCourse(course);
+        setViewLink('deep_dive');
+        setLoadingStructure(true);
+        setSubUnitHistory(null);
+        setInspectingSubUnit(null);
+        setUnitCompletions({});
+        setUnitBreakdowns({});
+        setOverallCourseProgress(0);
+
+        try {
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const payload = {
+                student_id: fullStudent.student_id || fullStudent.uuid || fullStudent.uni_reg_id || fullStudent.reg_id,
+                course_id: course.course_id
+            };
+
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}`, {
+                method: 'POST',
+                credentials: 'include',
+                headers,
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            const structure = data.data || [];
+            
+            setCourseStructure(structure);
+        } catch (e) {
+            console.error('Failed to load course structure analytics', e);
+            setCourseStructure([]);
+        } finally {
+            setLoadingStructure(false);
+        }
+    };
+
+    const handleBackToCourses = () => {
+        setViewLink('courses');
+        setSelectedCourse(null);
+        setSelectedExamCourse(null);
+        setCourseStructure(null);
+        setSubUnitHistory(null);
+        setSelectedUnit(null);
+    };
+
+    const handleSubUnitClick = (unitId, subUnitId, subUnitData) => {
+        // Get breakdown info for this subunit
+        const breakdown = unitBreakdowns[unitId]?.find(b => b.sub_unit_id === subUnitId);
+        const details = breakdown?.details || subUnitData.details || {};
+
+        // Determine available types
+        const hasMCQ = details.has_mcq === true;
+        const hasCoding = details.has_coding === true || (typeof details.has_coding === 'number' && details.has_coding > 0);
+
+        let nextType = resultType;
+
+        // Auto-switch type if the current one isn't available
+        if (resultType === 'coding' && !hasCoding && hasMCQ) nextType = 'mcq';
+        else if (resultType === 'mcq' && !hasMCQ && hasCoding) nextType = 'coding';
+        else if (!hasMCQ && hasCoding) nextType = 'coding';
+        else if (hasMCQ && !hasCoding) nextType = 'mcq';
+
+        if (nextType !== resultType) setResultType(nextType);
+
+        setInspectingSubUnit({
+            ...subUnitData,
+            unitId,
+            subUnitId,
+            name: subUnitData.title,
+            breakdownDetails: details, // Pass the breakdown details
+            hasMCQ,
+            hasCoding
+        });
+    };
+
+    const handleResultTypeChange = (type) => {
+        if (type !== resultType) setResultType(type);
+    };
+
+    const fetchHistory = async (unitId, subUnitId, type) => {
+        setLoadingHistory(true);
+
+        try {
+            const payload = {
+                student_id: fullStudent.student_id || fullStudent.uuid || fullStudent.uni_reg_id || fullStudent.reg_id,
+                course_id: selectedCourse.course_id,
+                unit_id: unitId,
+                sub_unit_id: subUnitId,
+                result_type: type
+            };
+
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+                credentials: 'include'
+            });
+
+            if (!res.ok) {
+                setSubUnitHistory([]);
+                return;
+            }
+
+            const data = await res.json();
+
+            if (data && data.success && data.data && Array.isArray(data.data)) {
+                setSubUnitHistory(data.data);
+            } else {
+                setSubUnitHistory([]);
+            }
+        } catch (e) {
+            console.error("Failed to fetch history:", e);
+            setSubUnitHistory([]);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    const toggleUnit = (unitId) => {
+        if (selectedUnit === unitId) {
+            setSelectedUnit(null);
+        } else {
+            setSelectedUnit(unitId);
+            // Fetch breakdown when unit is opened
+            fetchSingleUnitCompletion(unitId);
+        }
+    };
+
+    return (
+        <PortalWrapper>
+        <div className="fixed inset-0 z-[120] flex flex-col overflow-hidden animate-in fade-in slide-in-from-right duration-300 bg-gray-50 dark:bg-[#0B0F19]">
+            {/* Background Effects */}
+            <div className="fixed -top-40 -left-48 h-[38rem] w-[38rem] bg-cyan-500/10 blur-3xl rounded-full pointer-events-none opacity-50 dark:opacity-100" />
+            <div className="fixed -bottom-44 -right-40 h-[42rem] w-[42rem] bg-indigo-500/10 blur-3xl rounded-full pointer-events-none opacity-50 dark:opacity-100" />
+
+            {/* Header */}
+            <div className="relative flex items-center gap-6 p-8 border-b border-gray-200 dark:border-slate-700/50 bg-[var(--card)]/80 dark:bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10 shadow-lg overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none opacity-10">
+                    <div className="absolute right-10 top-1/2 -translate-y-1/2 flex items-center gap-1 h-12">
+                        {[60, 40, 75, 50, 90, 30, 80, 55, 70, 45, 85, 65].map((h, i) => (
+                            <div key={i} className="w-1.5 bg-cyan-500 rounded-full animate-pulse" style={{ height: `${h}%`, animationDelay: `${i * 0.1}s` }} />
+                        ))}
+                    </div>
+                </div>
+
+                <button
+                    onClick={(viewLink === 'deep_dive' || viewLink === 'exam_deep_dive') ? handleBackToCourses : onBack}
+                    className="group p-3 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-700 hover:from-blue-500 hover:to-indigo-500 dark:hover:from-blue-600 dark:hover:to-indigo-600 text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/30 hover:scale-110 z-10"
+                >
+                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                </button>
+
+                <div className="flex-1 z-10">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-lg ring-2 ring-white/10">
+                            {(student.name || student.student_name || 'S')[0].toUpperCase()}
+                        </div>
+                        <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 bg-clip-text text-transparent flex items-center gap-3">
+                            {student.name || student.student_name}
+                        </h2>
+                        <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/30 dark:to-blue-900/30 text-cyan-700 dark:text-cyan-400 border-2 border-cyan-500/30 font-mono text-sm font-bold shadow-md">
+                            {student.uni_reg_id || student.reg_id}
+                        </span>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm font-medium flex items-center gap-2">
+                        {((student.batch_name || student.batch) || (student.batch_id && student.batch_id.length < 10)) && (
+                            <>
+                                <span className="px-2 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-xs font-semibold">
+                                    {(student.batch_name || student.batch) ? (student.batch_name || student.batch) : student.batch_id}
+                                </span>
+                                <span className="text-gray-400">•</span>
+                            </>
+                        )}
+                        <span className="font-semibold">{courses.length + examCourses.length} Enrolled Course{(courses.length + examCourses.length) !== 1 ? 's' : ''}</span>
+                        {examCourses.length > 0 && (
+                            <>
+                                <span className="text-gray-400">•</span>
+                                <span className="px-2 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-xs font-bold">
+                                    {examCourses.length} Exam{examCourses.length !== 1 ? 's' : ''}
+                                </span>
+                            </>
+                        )}
+                    </p>
+                </div>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-hidden relative z-10">
+                {viewLink === 'courses' && (
+                    <CoursesGridView
+                        courses={courses}
+                        examCourses={examCourses}
+                        loading={loadingCourses || loadingExamCourses}
+                        onSelect={handleCourseSelect}
+                        onExamSelect={handleExamCourseSelect}
+                    />
+                )}
+
+                {/* Exam Deep Dive View */}
+                {viewLink === 'exam_deep_dive' && selectedExamCourse && (
+                    <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
+                        {/* Compact Exam Score Card */}
+                        {selectedExamCourse.examData?.myResult && (
+                            <div className="shrink-0 mx-8 mt-6 p-4 bg-gradient-to-r from-violet-50 via-white to-purple-50 dark:from-violet-900/20 dark:via-[#1A1F2E] dark:to-purple-900/20 rounded-2xl border border-violet-200 dark:border-violet-500/20 shadow-md">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-6">
+                                        <div className="flex items-center gap-2">
+                                            <Trophy className="w-4 h-4 text-violet-500" />
+                                            <span className="text-xs text-violet-500 uppercase font-bold tracking-wider">Your Exam Performance</span>
+                                        </div>
+                                        <div className="flex items-center gap-6">
+                                            <div className="text-center">
+                                                <div className="text-2xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                                                    {selectedExamCourse.examData.myResult.total_marks}
+                                                </div>
+                                                <div className="text-[9px] text-gray-500 font-bold uppercase">Score</div>
+                                            </div>
+                                            {selectedExamCourse.examData.rank && (
+                                                <div className="text-center">
+                                                    <div className={`text-2xl font-black ${selectedExamCourse.examData.rank <= 3 ? 'bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent' : 'text-gray-700 dark:text-gray-200'}`}>
+                                                        #{selectedExamCourse.examData.rank}
+                                                    </div>
+                                                    <div className="text-[9px] text-gray-500 font-bold uppercase">of {selectedExamCourse.examData.totalParticipants}</div>
+                                                </div>
+                                            )}
+                                            <div className="text-center">
+                                                <div className="text-lg font-black text-cyan-600 dark:text-cyan-400">
+                                                    {selectedExamCourse.examData.myResult.marks_breakdown?.coding_marks || 0}
+                                                </div>
+                                                <div className="text-[9px] text-gray-500 font-bold uppercase">Coding</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-lg font-black text-violet-600 dark:text-violet-400">
+                                                    {selectedExamCourse.examData.myResult.marks_breakdown?.mcq_marks || 0}
+                                                </div>
+                                                <div className="text-[9px] text-gray-500 font-bold uppercase">MCQ</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedExamCourse.examData.myResult.exam_completion_percentage === 100 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300'}`}>
+                                        {selectedExamCourse.examData.myResult.exam_completion_percentage || 0}% Complete
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Analytics Card */}
+                        {selectedExamCourse.examData?.myResult?.analytics && (() => {
+                            const an = selectedExamCourse.examData.myResult.analytics;
+                            return (
+                                <div className="shrink-0 mx-8 mt-4 bg-[var(--card)] dark:bg-[#1A1F2E] rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm overflow-hidden transition-all duration-300">
+                                    <button 
+                                        onClick={() => setShowExamAnalytics(!showExamAnalytics)}
+                                        className="w-full flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-[var(--card)]/5 transition-colors group focus:outline-none"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Activity className="w-4 h-4 text-violet-500 group-hover:scale-110 transition-transform" />
+                                            <span className="text-xs font-extrabold uppercase tracking-widest text-violet-600 dark:text-violet-400">Exam Analytics</span>
+                                        </div>
+                                        <div className="text-gray-400 bg-gray-100 dark:bg-[var(--card)]/5 rounded-full p-1 group-hover:bg-gray-200 dark:group-hover:bg-[var(--card)]/10 transition-colors">
+                                            {showExamAnalytics ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                        </div>
+                                    </button>
+                                    
+                                    {showExamAnalytics && (
+                                        <div className="px-5 pb-5 pt-1 border-t border-gray-100 dark:border-white/5 animate-in slide-in-from-top-2 duration-200">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Starting IP</div>
+                                            <div className="text-sm font-bold text-gray-800 dark:text-gray-200 font-mono">{an.startingIp || '-'}</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Ending IP</div>
+                                            <div className={`text-sm font-bold font-mono ${an.startingIp && an.endingIp && an.startingIp !== an.endingIp ? 'text-red-500' : 'text-gray-800 dark:text-gray-200'}`}>
+                                                {an.endingIp || '-'}
+                                                {an.startingIp && an.endingIp && an.startingIp !== an.endingIp && <span className="ml-1 text-[9px] text-red-400 font-sans">⚠ Changed</span>}
+                                            </div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1"><EyeOff className="w-3 h-3" /> Lost Focus</div>
+                                            <div className={`text-lg font-black ${(an.lostFocusCount || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{an.lostFocusCount ?? 0}</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Face Warnings</div>
+                                            <div className={`text-lg font-black ${(an.faceWarnings || 0) > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                                {an.faceWarnings ?? 0}<span className="text-xs font-medium text-gray-400">/{an.faceWarningsMax ?? '?'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1"><WifiOff className="w-3 h-3" /> Disconnects</div>
+                                            <div className={`text-lg font-black ${(an.internetDisconnects || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{an.internetDisconnects ?? 0}</div>
+                                            {(an.internetOfflineSeconds || 0) > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{an.internetOfflineSeconds}s offline</div>}
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Blocked by Proctor</div>
+                                            <div className={`text-lg font-black ${(an.blockedByProctorCount || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{an.blockedByProctorCount ?? 0}</div>
+                                            {(an.blockedSeconds || 0) > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{an.blockedSeconds}s blocked</div>}
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Compile Clicks</div>
+                                            <div className="text-lg font-black text-cyan-600 dark:text-cyan-400">{an.compileClicks ?? 0}</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Submit Clicks</div>
+                                            <div className="text-lg font-black text-violet-600 dark:text-violet-400">{an.submitClicks ?? 0}</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Continue Clicks</div>
+                                            <div className="text-lg font-black text-gray-700 dark:text-gray-200">{an.continueClicks ?? 0}</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Submit Reason</div>
+                                            <div className={`text-xs font-bold ${an.submitReason?.includes('student') ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                                {an.submitReason || '-'}
+                                            </div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Started At</div>
+                                            <div className="text-xs font-bold text-gray-700 dark:text-gray-200">{an.startedAt ? new Date(an.startedAt).toLocaleString() : '-'}</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Last Updated</div>
+                                            <div className="text-xs font-bold text-gray-700 dark:text-gray-200">{an.lastUpdatedAt ? new Date(an.lastUpdatedAt).toLocaleString() : '-'}</div>
+                                        </div>
+                                    </div>
+                                    {/* Per-Question Clicks */}
+                                    {an.perQuestion && Object.keys(an.perQuestion).length > 0 && (
+                                        <div className="mt-4">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <MousePointerClick className="w-3.5 h-3.5 text-violet-500" />
+                                                <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-600 dark:text-violet-400">Per-Question Clicks</span>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-200 dark:border-white/5 overflow-hidden bg-gray-50 dark:bg-black/20">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-gray-100 dark:bg-black/30 border-b border-gray-200 dark:border-white/5">
+                                                        <tr>
+                                                            <th className="p-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">Question</th>
+                                                            <th className="p-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-cyan-500">Compile</th>
+                                                            <th className="p-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-violet-500">Submit</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                                        {Object.entries(an.perQuestion).map(([qId, qData], qi) => (
+                                                            <tr key={qId} className="hover:bg-[var(--card)]/50 dark:hover:bg-[var(--card)]/5 transition-colors">
+                                                                <td className="p-2.5 font-mono text-gray-600 dark:text-gray-300">Q{qi + 1} <span className="text-[9px] text-gray-400">({qId.slice(-6)})</span></td>
+                                                                <td className="p-2.5 text-center font-bold text-cyan-600 dark:text-cyan-400">{qData.compileClicks ?? 0}</td>
+                                                                <td className="p-2.5 text-center font-bold text-violet-600 dark:text-violet-400">{qData.submitClicks ?? 0}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* Deep Dive Layout (same as practice courses) */}
+                        <div className="flex flex-1 min-h-[800px]">
+                            {/* LEFT COLUMN */}
+                            <div className="w-1/3 min-w-[350px] border-r border-gray-200 dark:border-white/5 overflow-y-auto custom-scrollbar bg-gray-50 dark:bg-black/10 backdrop-blur-md p-6">
+                                <div className="mb-6">
+                                    <div className="text-xs text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Trophy className="w-3 h-3" /> Exam Course</div>
+                                    <h3 className="text-2xl font-bold leading-tight text-gray-900 dark:text-white mb-4">{selectedExamCourse.course_name}</h3>
+                                    <div className="flex items-center gap-3 p-3 bg-[var(--card)] dark:bg-[var(--card)]/5 rounded-xl border border-gray-200 dark:border-white/5 shadow-sm dark:shadow-none">
+                                        <CircularProgress percentage={overallCourseProgress} size={48} strokeWidth={4} />
+                                        <div>
+                                            <div className="text-gray-900 dark:text-white font-bold">Overall Progress</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">Based on completed units</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex bg-gray-100 dark:bg-[var(--card)]/5 p-1 rounded-lg mt-4 w-full">
+                                        <button onClick={() => setProgressMode('attempts')} className={`flex-1 p-2 rounded-md text-xs font-medium transition-colors ${progressMode === 'attempts' ? 'bg-[var(--card)] dark:bg-[var(--card)]/10 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>Completion (Attempted)</button>
+                                        <button onClick={() => setProgressMode('marks')} className={`flex-1 p-2 rounded-md text-xs font-medium transition-colors ${progressMode === 'marks' ? 'bg-[var(--card)] dark:bg-[var(--card)]/10 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>Completion (Marks)</button>
+                                    </div>
+
+                                </div>
+
+                                {loadingStructure ? (
+                                    <div className="space-y-4">
+                                        {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full rounded-xl bg-[var(--card)]/5" />)}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {courseStructure && Array.isArray(courseStructure) && courseStructure.map((unit) => (
+                                            <div key={unit.unit_id} className="rounded-xl border border-gray-200 dark:border-white/5 bg-[var(--card)] dark:bg-[var(--card)]/5 overflow-hidden transition-all shadow-sm dark:shadow-none">
+                                                <button
+                                                    onClick={() => toggleUnit(unit.unit_id)}
+                                                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-[var(--card)]/5 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-2 h-2 rounded-full shadow-[0_0_8px] ${selectedUnit === unit.unit_id ? 'bg-violet-500 shadow-violet-500/60' : 'bg-gray-400 dark:bg-gray-600 shadow-transparent'}`} />
+                                                        <span className={`font-semibold text-sm text-left ${selectedUnit === unit.unit_id ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-300'}`}>{unit.unit_name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <CircularProgress percentage={unitCompletions[unit.unit_id] || 0} size={32} strokeWidth={3} />
+                                                        {selectedUnit === unit.unit_id ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                                                    </div>
+                                                </button>
+
+                                                {selectedUnit === unit.unit_id && (
+                                                    <div className="bg-gray-50 dark:bg-black/20 border-t border-gray-100 dark:border-white/5 p-2 space-y-1">
+                                                        {unit.sub_units && unit.sub_units.map((sub) => {
+                                                            const breakdown = unitBreakdowns[unit.unit_id]?.find(b => b.sub_unit_id === sub.sub_unit_id);
+                                                            const progress = breakdown?.progress_percentage || 0;
+
+                                                            return (
+                                                                <button
+                                                                    key={sub.sub_unit_id}
+                                                                onClick={() => handleSubUnitClick(unit.unit_id, sub.sub_unit_id, sub)}
+                                                                className={`w-full text-left p-3 rounded-lg text-xs transition-all flex justify-between items-center group
+                                                                    ${inspectingSubUnit?.subUnitId === sub.sub_unit_id
+                                                                        ? 'bg-violet-500/20 text-violet-700 dark:text-violet-400 border border-violet-500/70 font-bold shadow-[0_0_15px_rgba(139,92,246,0.15)]'
+                                                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-[var(--card)] dark:hover:bg-[var(--card)]/5 border border-transparent'}`
+                                                                }
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span>{sub.title}</span>
+                                                                    {progress === 100 && (
+                                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    {breakdown && (
+                                                                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{progress}%</span>
+                                                                    )}
+                                                                    {inspectingSubUnit?.subUnitId === sub.sub_unit_id && <div className="w-2 h-2 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />}
+                                                                </div>
+                                                            </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* RIGHT COLUMN */}
+                            <div className="flex-1 p-8 overflow-y-auto custom-scrollbar relative">
+                                {inspectingSubUnit ? (
+                                    <DeepDiveRightPanel
+                                        student={fullStudent}
+                                        courseId={selectedExamCourse.course_id}
+                                        subUnit={inspectingSubUnit}
+                                        history={subUnitHistory}
+                                        loadingHistory={loadingHistory}
+                                        resultType={resultType}
+                                        setResultType={handleResultTypeChange}
+                                        analytics={viewLink === 'exam_deep_dive' ? selectedExamCourse?.examData?.myResult?.analytics : null}
+                                    />
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
+                                        <div className="w-24 h-24 rounded-full bg-violet-100 dark:bg-violet-500/10 flex items-center justify-center mb-6 animate-pulse border border-violet-200 dark:border-violet-500/20">
+                                            <Trophy className="w-10 h-10 opacity-30 text-violet-500" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Exam Detail View</h3>
+                                        <p className="max-w-md mx-auto text-gray-400">Select a subunit from the left panel to view detailed exam submissions, attempt history, and scores.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {viewLink === 'deep_dive' && selectedCourse && (
+                    <div className="flex h-full">
+                        {/* LEFT COLUMN */}
+                        <div className="w-1/3 min-w-[350px] border-r border-gray-200 dark:border-white/5 overflow-y-auto custom-scrollbar bg-gray-50 dark:bg-black/10 backdrop-blur-md p-6">
+                            <div className="mb-6">
+                                <div className="text-xs text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-2">Selected Course</div>
+                                <h3 className="text-2xl font-bold leading-tight text-gray-900 dark:text-white mb-4">{selectedCourse.course_name}</h3>
+                                <div className="flex items-center gap-3 p-3 bg-[var(--card)] dark:bg-[var(--card)]/5 rounded-xl border border-gray-200 dark:border-white/5 shadow-sm dark:shadow-none">
+                                    <div className="relative flex items-center justify-center w-12 h-12">
+                                        <CircularProgress percentage={overallCourseProgress} size={48} strokeWidth={4} color="cyan" trackColor="rgba(6, 182, 212, 0.15)" />
+                                        <span className="absolute text-xs font-bold text-gray-700 dark:text-gray-200">{overallCourseProgress}%</span>
+                                    </div>
+                                    <div>
+                                        <div className="text-gray-900 dark:text-white font-bold">Overall Progress</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">Based on completed units</div>
+                                    </div>
+                                </div>
+                                    <div className="flex bg-gray-100 dark:bg-[var(--card)]/5 p-1 rounded-lg mt-4 w-full">
+                                        <button onClick={() => setProgressMode('attempts')} className={`flex-1 p-2 rounded-md text-xs font-medium transition-colors ${progressMode === 'attempts' ? 'bg-[var(--card)] dark:bg-[var(--card)]/10 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>Completion (Attempted)</button>
+                                        <button onClick={() => setProgressMode('marks')} className={`flex-1 p-2 rounded-md text-xs font-medium transition-colors ${progressMode === 'marks' ? 'bg-[var(--card)] dark:bg-[var(--card)]/10 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>Completion (Marks)</button>
+                                    </div>
+
+                            </div>
+
+                            {loadingStructure ? (
+                                <div className="space-y-4">
+                                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full rounded-xl bg-[var(--card)]/5" />)}
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {courseStructure && Array.isArray(courseStructure) && courseStructure.map((unit) => (
+                                        <div key={unit.unit_id} className="rounded-xl border border-gray-200 dark:border-white/5 bg-[var(--card)] dark:bg-[var(--card)]/5 overflow-hidden transition-all shadow-sm dark:shadow-none">
+                                            <button
+                                                onClick={() => toggleUnit(unit.unit_id)}
+                                                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-[var(--card)]/5 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-2 h-2 rounded-full shadow-[0_0_8px] ${selectedUnit === unit.unit_id ? 'bg-cyan-500 shadow-cyan-500/60' : 'bg-gray-400 dark:bg-gray-600 shadow-transparent'}`} />
+                                                    <span className={`font-semibold text-sm text-left ${selectedUnit === unit.unit_id ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-300'}`}>{unit.unit_name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative flex items-center justify-center w-8 h-8">
+                                                        <CircularProgress percentage={unitCompletions[unit.unit_id] || 0} size={32} strokeWidth={3} color="cyan" trackColor="rgba(6, 182, 212, 0.15)" />
+                                                        <span className="absolute text-[9px] font-bold text-gray-700 dark:text-gray-200">{unitCompletions[unit.unit_id] || 0}%</span>
+                                                    </div>
+                                                    {selectedUnit === unit.unit_id ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                                                </div>
+                                            </button>
+
+                                            {selectedUnit === unit.unit_id && (
+                                                <div className="bg-gray-50 dark:bg-black/20 border-t border-gray-100 dark:border-white/5 p-2 space-y-1">
+                                                    {unit.sub_units && unit.sub_units.map((sub) => {
+                                                        // Get breakdown info for this subunit
+                                                        const breakdown = unitBreakdowns[unit.unit_id]?.find(b => b.sub_unit_id === sub.sub_unit_id);
+                                                        const progress = breakdown?.progress_percentage || 0;
+
+                                                        return (
+                                                            <button
+                                                                key={sub.sub_unit_id}
+                                                                onClick={() => handleSubUnitClick(unit.unit_id, sub.sub_unit_id, sub)}
+                                                                className={`w-full text-left p-3 rounded-lg text-xs transition-all flex justify-between items-center group
+                                                                    ${inspectingSubUnit?.subUnitId === sub.sub_unit_id
+                                                                        ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-500/70 font-bold shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                                                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-[var(--card)] dark:hover:bg-[var(--card)]/5 border border-transparent'}`
+                                                                }
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span>{sub.title}</span>
+                                                                    {progress === 100 && (
+                                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    {breakdown && (
+                                                                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{progress}%</span>
+                                                                    )}
+                                                                    {inspectingSubUnit?.subUnitId === sub.sub_unit_id && <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* RIGHT COLUMN */}
+                        <div className="flex-1 p-8 overflow-y-auto custom-scrollbar relative">
+                            {inspectingSubUnit ? (
+                                <DeepDiveRightPanel
+                                    student={fullStudent}
+                                    courseId={selectedCourse.course_id}
+                                    subUnit={inspectingSubUnit}
+                                    history={subUnitHistory}
+                                    loadingHistory={loadingHistory}
+                                    resultType={resultType}
+                                    setResultType={handleResultTypeChange}
+                                />
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
+                                    <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-[var(--card)]/5 flex items-center justify-center mb-6 animate-pulse border border-gray-200 dark:border-white/5">
+                                        <Award className="w-10 h-10 opacity-20" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Course Overview</h3>
+                                    <p className="max-w-md mx-auto text-gray-400">Select a subunit from the left panel to view detailed performance metrics, attempt history, and scores.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+        </PortalWrapper>
+    );
+}
+
+const CoursesGridView = ({ courses, examCourses = [], loading, onSelect, onExamSelect }) => {
+    if (loading) {
+        return (
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 w-full rounded-2xl bg-[var(--card)]/5" />)}
+            </div>
+        );
+    }
+    return (
+        <div className="p-8 overflow-y-auto h-full custom-scrollbar">
+            {/* Practice Courses */}
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
+                <BookOpen className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                Practice Courses
+                <span className="text-sm font-normal text-gray-400 bg-gray-100 dark:bg-[var(--card)]/5 px-2 py-0.5 rounded-md">{courses.length}</span>
+            </h3>
+            {courses.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {courses.map((course, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => onSelect(course)}
+                            className="text-left group relative overflow-hidden p-6 rounded-2xl bg-[var(--card)] dark:bg-[var(--card)]/5 border border-gray-200 dark:border-white/5 hover:border-cyan-500/30 hover:bg-gray-50 dark:hover:bg-[var(--card)]/10 transition-all duration-300 backdrop-blur-sm shadow-sm dark:shadow-none"
+                        >
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center text-cyan-400 shadow-lg border border-white/5">
+                                    <BookOpen className="w-6 h-6" />
+                                </div>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className="bg-black/20 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-mono text-gray-500 border border-white/5">
+                                        {course.course_code}
+                                    </div>
+                                </div>
+                            </div>
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+                                {course.course_name}
+                            </h4>
+                            <div className="mt-4 flex items-center text-sm text-gray-500 group-hover:text-cyan-500/70 transition-colors">
+                                View Performance <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center text-gray-500 py-10">
+                    No practice courses found for this student.
+                </div>
+            )}
+
+            {/* Exam Courses */}
+            {examCourses.length > 0 && (
+                <div className="mt-10">
+                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
+                        <Trophy className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                        Exam Courses
+                        <span className="text-sm font-normal text-gray-400 bg-violet-100 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-md">{examCourses.length}</span>
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {examCourses.map((course, idx) => {
+                            const myResult = course.examData?.myResult;
+                            const rank = course.examData?.rank;
+                            const totalParticipants = course.examData?.totalParticipants || 0;
+
+                            return (
+                                <button
+                                    key={idx}
+                                    onClick={() => onExamSelect && onExamSelect(course)}
+                                    className="text-left relative overflow-hidden p-6 rounded-2xl bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/10 dark:to-purple-900/10 border border-violet-200 dark:border-violet-500/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-violet-500/10 hover:border-violet-400/50 dark:hover:border-violet-500/40 group hover:scale-[1.02] hover:-translate-y-1"
+                                >
+                                    {/* Decorative Top Corner */}
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full -mr-4 -mt-4 group-hover:scale-110 transition-all" />
+
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                                                <Trophy className="w-6 h-6" />
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <span className="px-2 py-0.5 rounded-full bg-violet-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">Exam</span>
+                                                {course.course_code && (
+                                                    <span className="text-[10px] font-mono text-violet-500 dark:text-violet-400">{course.course_code}</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                                            {course.course_name}
+                                        </h4>
+
+                                        {myResult ? (
+                                            <div className="space-y-3">
+                                                {/* Score + Rank Row */}
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider block">Score</span>
+                                                        <span className="text-2xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                                                            {myResult.total_marks}
+                                                        </span>
+                                                    </div>
+                                                    {rank && (
+                                                        <div className="text-right">
+                                                            <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider block">Rank</span>
+                                                            <span className={`text-xl font-black ${rank <= 3 ? 'bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                                #{rank}
+                                                                <span className="text-xs font-normal text-gray-400">/{totalParticipants}</span>
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Marks Breakdown */}
+                                                <div className="flex gap-3">
+                                                    <div className="flex-1 bg-[var(--card)] dark:bg-[var(--card)]/5 rounded-lg p-2 text-center border border-gray-200 dark:border-white/5">
+                                                        <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold uppercase">Coding</div>
+                                                        <div className="text-sm font-bold text-gray-900 dark:text-white">{myResult.marks_breakdown?.coding_marks || 0}</div>
+                                                    </div>
+                                                    <div className="flex-1 bg-[var(--card)] dark:bg-[var(--card)]/5 rounded-lg p-2 text-center border border-gray-200 dark:border-white/5">
+                                                        <div className="text-[10px] text-violet-600 dark:text-violet-400 font-bold uppercase">MCQ</div>
+                                                        <div className="text-sm font-bold text-gray-900 dark:text-white">{myResult.marks_breakdown?.mcq_marks || 0}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Completion */}
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500">Completion</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${myResult.exam_completion_percentage === 100 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300'}`}>
+                                                        {myResult.exam_completion_percentage || 0}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-sm text-gray-400 bg-[var(--card)]/50 dark:bg-[var(--card)]/5 p-3 rounded-lg">
+                                                <AlertCircle className="w-4 h-4" />
+                                                No exam data available
+                                            </div>
+                                        )}
+
+                                        {/* CTA */}
+                                        <div className="mt-4 pt-3 border-t border-violet-200/50 dark:border-violet-500/10 flex items-center text-sm text-violet-600 dark:text-violet-400 group-hover:text-violet-500 transition-colors">
+                                            View Marks <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Exam Detail View (marks, rank, leaderboard) ────────────────────
+const ExamDetailView = ({ examCourse, studentRegId, sectionName, onBack, onStudentSelect }) => {
+    const examData = examCourse?.examData;
+    const myResult = examData?.myResult;
+
+    const [leaderboard, setLeaderboard] = useState([]);
+    const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+    const [rank, setRank] = useState(null);
+    const [totalParticipants, setTotalParticipants] = useState(0);
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchLeaderboard = async () => {
+            setLoadingLeaderboard(true);
+            try {
+                const token = getAdminToken();
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examDetails}`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        section_name: sectionName,
+                        course_id: examCourse.course_id
+                    }),
+                    credentials: 'include'
+                });
+                const json = await res.json();
+                
+                if (mounted && json.success && json.data && Array.isArray(json.data.students)) {
+                    const sorted = [...json.data.students].sort((a, b) => (b.total_marks || 0) - (a.total_marks || 0));
+                    let currentRank = 1;
+                    const ranked = sorted.map((s, idx) => {
+                        if (idx > 0 && (sorted[idx - 1].total_marks || 0) !== (s.total_marks || 0)) {
+                            currentRank = idx + 1;
+                        }
+                        return { ...s, rank: currentRank };
+                    });
+                    
+                    setLeaderboard(ranked);
+                    setTotalParticipants(ranked.length);
+                    
+                    const myRanked = ranked.find(s => s.uni_reg_id === studentRegId);
+                    if (myRanked) setRank(myRanked.rank);
+                }
+            } catch (e) {
+                console.error('Failed to fetch leaderboard:', e);
+            } finally {
+                if (mounted) setLoadingLeaderboard(false);
+            }
+        };
+
+        if (sectionName) {
+            fetchLeaderboard();
+        } else {
+            setLoadingLeaderboard(false);
+        }
+
+        return () => { mounted = false; };
+    }, [examCourse.course_id, sectionName, studentRegId]);
+
+    // Full leaderboard sorted by marks
+
+    return (
+        <div className="flex flex-col h-full overflow-auto custom-scrollbar">
+            <div className="p-8 space-y-6">
+                {/* Header */}
+                <div className="flex items-center gap-4">
+                    <button onClick={onBack} className="p-2 rounded-xl bg-[var(--card)] dark:bg-[var(--card)]/5 border border-gray-200 dark:border-white/10 hover:border-violet-500/30 text-gray-500 hover:text-violet-600 transition-all shadow-sm">
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <div>
+                        <div className="text-xs text-violet-600 dark:text-violet-400 uppercase tracking-wider font-bold flex items-center gap-1.5"><Trophy className="w-3 h-3" /> Exam Results</div>
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{examCourse.course_name}</h3>
+                    </div>
+                </div>
+
+                {/* Student's Score Card */}
+                {myResult ? (
+                    <div className="bg-gradient-to-br from-violet-50 via-white to-purple-50 dark:from-violet-900/20 dark:via-[#1A1F2E] dark:to-purple-900/20 rounded-3xl border border-violet-200 dark:border-violet-500/20 p-8 shadow-lg">
+                        <div className="text-xs text-violet-500 uppercase font-bold tracking-wider mb-4">Your Performance</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            {/* Score */}
+                            <div className="text-center">
+                                <div className="text-4xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                                    {myResult.total_marks}
+                                </div>
+                                <div className="text-xs text-gray-500 font-bold uppercase mt-1">Total Marks</div>
+                            </div>
+                            {/* Rank */}
+                            <div className="text-center">
+                                <div className={`text-4xl font-black ${rank <= 3 ? 'bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent' : 'text-gray-700 dark:text-gray-200'}`}>
+                                    #{rank}
+                                </div>
+                                <div className="text-xs text-gray-500 font-bold uppercase mt-1">of {totalParticipants}</div>
+                            </div>
+                            {/* Coding */}
+                            <div className="text-center">
+                                <div className="text-3xl font-black text-cyan-600 dark:text-cyan-400">
+                                    {myResult.marks_breakdown?.coding_marks || 0}
+                                </div>
+                                <div className="text-xs text-gray-500 font-bold uppercase mt-1">Coding</div>
+                            </div>
+                            {/* MCQ */}
+                            <div className="text-center">
+                                <div className="text-3xl font-black text-violet-600 dark:text-violet-400">
+                                    {myResult.marks_breakdown?.mcq_marks || 0}
+                                </div>
+                                <div className="text-xs text-gray-500 font-bold uppercase mt-1">MCQ</div>
+                            </div>
+                        </div>
+                        {/* Completion */}
+                        <div className="mt-6 flex items-center gap-4">
+                            <div className="flex-1 h-2 bg-gray-100 dark:bg-[var(--card)]/10 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full transition-all duration-700 ${myResult.exam_completion_percentage === 100 ? 'bg-emerald-500' : 'bg-violet-500'}`} style={{ width: `${myResult.exam_completion_percentage || 0}%` }} />
+                            </div>
+                            <span className={`text-sm font-bold ${myResult.exam_completion_percentage === 100 ? 'text-emerald-600' : 'text-violet-600'}`}>
+                                {myResult.exam_completion_percentage || 0}% Complete
+                            </span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="bg-[var(--card)] dark:bg-[#1A1F2E] rounded-2xl p-8 text-center text-gray-400 border border-gray-200 dark:border-white/5">
+                        <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                        No exam data available for this student
+                    </div>
+                )}
+
+                {leaderboard.length === 0 && loadingLeaderboard && (
+                    <div className="flex justify-center p-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
+                    </div>
+                )}
+
+                {/* Section Leaderboard */}
+                {leaderboard.length > 0 && (
+                    <div className="bg-[var(--card)] dark:bg-[#1A1F2E] rounded-3xl border border-gray-200 dark:border-white/5 overflow-hidden shadow-lg">
+                        <div className="p-5 border-b border-gray-200 dark:border-white/5 flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Trophy className="w-4 h-4 text-amber-500" />
+                                Section Leaderboard
+                                <span className="text-xs font-normal text-gray-400 bg-gray-100 dark:bg-[var(--card)]/5 px-2 py-0.5 rounded-md">{leaderboard.length} participants</span>
+                            </h4>
+                        </div>
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-gray-50 dark:bg-black/20 border-b border-gray-200 dark:border-white/5">
+                                <tr>
+                                    <th className="p-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">Rank</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Total</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Coding</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">MCQ</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                {leaderboard.map((s, i) => {
+                                    const isMe = s.uni_reg_id === studentRegId;
+                                    const maxMarks = leaderboard[0]?.total_marks || 1;
+                                    return (
+                                        <tr key={s.uni_reg_id || i}
+                                            onClick={() => {
+                                                if (!isMe && onStudentSelect && s.student_name) {
+                                                    onStudentSelect(s);
+                                                }
+                                            }}
+                                            className={`transition-colors ${!isMe && onStudentSelect && s.student_name ? 'cursor-pointer' : ''} ${isMe ? 'bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-400/30' : 'hover:bg-gray-50 dark:hover:bg-[var(--card)]/5'}`}
+                                        >
+                                            <td className="p-4 text-center">
+                                                {s.rank === 1 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-xs font-black shadow"><Trophy className="w-3 h-3" /> 1st</span>
+                                                    : s.rank === 2 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-gray-300 to-gray-400 text-gray-800 text-xs font-black"><Medal className="w-3 h-3" /> 2nd</span>
+                                                        : s.rank === 3 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs font-black"><Medal className="w-3 h-3" /> 3rd</span>
+                                                            : <span className="text-sm font-bold text-gray-400">#{s.rank}</span>}
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`font-bold text-sm ${isMe ? 'text-violet-700 dark:text-violet-300' : 'text-gray-700 dark:text-gray-200'}`}>
+                                                        {s.student_name || 'Not Registered'}
+                                                    </span>
+                                                    {isMe && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-violet-500 text-white uppercase">You</span>}
+                                                </div>
+                                                <div className="text-[10px] text-gray-400 font-mono">{s.uni_reg_id}</div>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className={`text-base font-black ${isMe ? 'text-violet-600 dark:text-violet-400' : 'text-gray-900 dark:text-white'}`}>{s.total_marks || 0}</span>
+                                                    <div className="h-1 w-12 bg-gray-100 dark:bg-[var(--card)]/10 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-violet-500 rounded-full" style={{ width: `${Math.round(((s.total_marks || 0) / maxMarks) * 100)}%` }} />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-center text-sm font-bold text-cyan-600 dark:text-cyan-400">{s.marks_breakdown?.coding_marks || 0}</td>
+                                            <td className="p-4 text-center text-sm font-bold text-violet-600 dark:text-violet-400">{s.marks_breakdown?.mcq_marks || 0}</td>
+                                            <td className="p-4 text-center">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.exam_completion_percentage === 100 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : s.exam_completion_percentage > 0 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300' : 'bg-gray-100 text-gray-400 dark:bg-[var(--card)]/10'}`}>
+                                                    {s.exam_completion_percentage || 0}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const DeepDiveRightPanel = ({ student, courseId, subUnit, history, loadingHistory, resultType, setResultType, analytics }) => {
+    const [viewMode, setViewMode] = useState('history');
+    const [selectedAttempt, setSelectedAttempt] = useState(null);
+    const [attemptDetails, setAttemptDetails] = useState(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+
+    // Get available types from subUnit
+    const hasMCQ = subUnit.hasMCQ;
+    const hasCoding = subUnit.hasCoding;
+    const hasOnlyOne = (hasMCQ && !hasCoding) || (!hasMCQ && hasCoding);
+    const hasNeither = !hasMCQ && !hasCoding;
+
+    useEffect(() => {
+        setViewMode('history');
+        setSelectedAttempt(null);
+        setAttemptDetails(null);
+    }, [subUnit.subUnitId, subUnit.unitId]);
+
+    const handleAttemptClick = async (attempt) => {
+        if (attempt.overview && attempt.submissions) {
+            setAttemptDetails(attempt);
+            setViewMode('detail');
+            return;
+        }
+
+        setSelectedAttempt(attempt);
+        setViewMode('detail');
+        setLoadingDetails(true);
+
+        try {
+            const payload = {
+                student_id: student.student_id || student.uuid || student.uni_reg_id || student.reg_id,
+                course_id: courseId,
+                unit_id: subUnit.unitId,
+                sub_unit_id: subUnit.subUnitId,
+                result_type: resultType,
+                attempt: attempt.attempt || attempt.attempt_count
+            };
+
+            const token = getAdminToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.subUnitDetails}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+                credentials: 'include'
+            });
+
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (data.success) setAttemptDetails(data.data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingDetails(false);
+        }
+    };
+
+    const handleExportAttempt = async () => {
+        if (!attemptDetails) return;
+        try {
+            const XLSX = await import('xlsx');
+
+            const overviewData = [
+                { Metric: 'Student Name', Value: student.name || student.student_name },
+                { Metric: 'Reg ID', Value: student.uni_reg_id || student.reg_id },
+                { Metric: 'Sub Unit', Value: subUnit.name || subUnit.title },
+                { Metric: '', Value: '' },
+                { Metric: 'Attempt Number', Value: attemptDetails.overview.attempt_number },
+                { Metric: 'Score', Value: `${attemptDetails.overview.total_score} / ${attemptDetails.overview.max_score}` },
+                { Metric: 'Percentage', Value: `${attemptDetails.overview.percentage}%` },
+                { Metric: 'Status', Value: attemptDetails.overview.status },
+                { Metric: 'Result Type', Value: resultType },
+            ];
+
+            if (attemptDetails.proctoring_metrics) {
+                overviewData.push({ Metric: '', Value: '' });
+                overviewData.push({ Metric: 'PROCTORING METRICS', Value: '' });
+                Object.entries(attemptDetails.proctoring_metrics).forEach(([k, v]) => {
+                    overviewData.push({ Metric: k, Value: v });
+                });
+            }
+
+            const wsOverview = XLSX.utils.json_to_sheet(overviewData);
+
+            let submissionsData = [];
+            if (attemptDetails.submissions) {
+                submissionsData = attemptDetails.submissions.map((sub, i) => {
+                    const row = {
+                        'Q#': i + 1,
+                        'Title': sub.question_title || 'Question',
+                        'Score': sub.score_obtained,
+                    };
+
+                    if (resultType === 'mcq') {
+                        row['Selected Answer'] = sub.submitted_answer_text;
+                        row['Is Correct'] = sub.is_correct ? 'Yes' : 'No';
+                    } else {
+                        row['Test Cases Passed'] = sub.formattedResult?.filter(r => {
+                            const key = Object.keys(r)[0];
+                            return r[key]?.testCasePassed;
+                        }).length || 0;
+                        row['Total Hidden Cases'] = sub.formattedResult?.length || 0;
+                    }
+                    return row;
+                });
+            }
+            const wsSubmissions = XLSX.utils.json_to_sheet(submissionsData);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsOverview, "Overview");
+            XLSX.utils.book_append_sheet(wb, wsSubmissions, "Submissions");
+
+            const safeName = (student.name || 'Student').replace(/[^a-z0-9]/gi, '_');
+            const safeSubUnit = (subUnit.name || 'Unit').replace(/[^a-z0-9]/gi, '_');
+            const fileName = `${safeName}_${safeSubUnit}_Attempt_${attemptDetails.overview.attempt_number}.xlsx`;
+
+            XLSX.writeFile(wb, fileName);
+        } catch (e) {
+            console.error("Export Error", e);
+            alert("Failed to export attempt details.");
+        }
+    };
+
+    // Helper to calculate scores correctly
+    const getQuestionMaxScore = (sub) => {
+        if (resultType === 'mcq') return 1;
+        return sub.formattedResult?.length || sub.test_cases?.filter(tc => tc.name.toLowerCase().includes('hidden')).length || 0;
+    };
+
+    const getQuestionScore = (sub) => {
+        if (resultType === 'mcq') return sub.is_correct ? 1 : 0;
+        return sub.formattedResult?.filter(r => {
+            const key = Object.keys(r)[0];
+            return r[key]?.testCasePassed;
+        }).length || 0;
+    };
+
+    if (viewMode === 'detail') {
+        const isPassed = attemptDetails?.overview?.status?.toLowerCase() === 'passed' ||
+            (attemptDetails?.overview?.percentage >= 60);
+
+        return (
+            <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
+                {/* Navigation Bar */}
+                <div className="sticky top-0 z-30 flex justify-between items-center p-4 rounded-xl bg-[var(--card)]/80 dark:bg-[#0B0F19]/80 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-lg">
+                    <button
+                        onClick={() => setViewMode('history')}
+                        className="group flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-[var(--card)]/5 flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-[var(--card)]/10 transition-colors">
+                            <ArrowLeft className="w-4 h-4" />
+                        </div>
+                        <span className="font-medium">Back to Timeline</span>
+                    </button>
+                    {!loadingDetails && attemptDetails && (
+                        <button
+                            onClick={handleExportAttempt}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 px-5 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105 flex items-center gap-2"
+                        >
+                            <TrendingUp className="w-4 h-4" /> Export Report
+                        </button>
+                    )}
+                </div>
+
+                {loadingDetails ? (
+                    <div className="space-y-6">
+                        <Skeleton className="h-64 w-full rounded-3xl bg-[var(--card)] dark:bg-[var(--card)]/5" />
+                        <div className="grid grid-cols-3 gap-6">
+                            {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 rounded-2xl bg-[var(--card)] dark:bg-[var(--card)]/5" />)}
+                        </div>
+                    </div>
+                ) : attemptDetails ? (
+                    <div className="relative space-y-8">
+                        {/* SCORE CARD - Fixed Layout */}
+                        <div className="relative overflow-hidden rounded-3xl bg-[var(--card)] dark:bg-[#121212] border border-gray-200 dark:border-white/10 shadow-2xl">
+                            {/* Header Band */}
+                            <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 px-8 py-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <h2 className="text-2xl font-black text-white">Attempt Report</h2>
+                                            {attemptDetails.overview.attempt_number === 1 && (
+                                                <span className="px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold uppercase tracking-wider">First Try</span>
+                                            )}
+                                        </div>
+                                        <p className="text-gray-400 text-sm flex items-center gap-2">
+                                            <span className="px-2 py-0.5 rounded bg-[var(--card)]/10 text-xs font-bold uppercase">
+                                                {resultType === 'mcq' ? 'MCQ' : 'Coding'}
+                                            </span>
+                                            <span>•</span>
+                                            <span>Attempt #{attemptDetails.overview.attempt_number}</span>
+                                        </p>
+                                    </div>
+
+                                    {/* Pass/Fail Icon Only */}
+                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isPassed
+                                        ? 'bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
+                                        : 'bg-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
+                                        }`}>
+                                        {isPassed ? (
+                                            <Check className="w-7 h-7 text-emerald-400" />
+                                        ) : (
+                                            <X className="w-7 h-7 text-red-400" />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Content Area */}
+                            <div className="p-8">
+                                <div className="flex flex-col md:flex-row gap-8 items-center">
+                                    {/* Score Circle */}
+                                    <div className="relative shrink-0">
+                                        <div className={`absolute inset-0 rounded-full blur-2xl opacity-30 ${isPassed ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                        <div className="relative bg-gray-50 dark:bg-[#1a1a1a] rounded-full p-3 shadow-xl">
+                                            <CircularProgress
+                                                percentage={attemptDetails.overview.percentage}
+                                                size={160}
+                                                strokeWidth={10}
+                                                color={isPassed ? "emerald" : "red"}
+                                                trackColor="rgba(255,255,255,0.1)"
+                                            />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Score</span>
+                                                <span className={`text-2xl font-black mt-8 ${isPassed ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                    {attemptDetails.overview.total_score}/ {attemptDetails.overview.max_score}
+                                                </span>
+                                                {/* <span className="text-gray-400 text-sm font-medium"></span> */}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Stats Grid */}
+                                    <div className="flex-1 w-full">
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                            <StatCard
+                                                label="Percentage"
+                                                value={`${attemptDetails.overview.percentage}%`}
+                                                color={isPassed ? 'emerald' : 'red'}
+                                            />
+                                            <StatCard
+                                                label={resultType === 'mcq' ? 'MCQ Questions' : 'Coding Problems'}
+                                                value={resultType === 'mcq'
+                                                    ? attemptDetails.completion_stats?.total_mcq_show
+                                                    : attemptDetails.completion_stats?.total_coding_show}
+                                                color="blue"
+                                            />
+                                            <StatCard
+                                                label="Submitted"
+                                                value={attemptDetails.completion_stats?.user_submitted_count}
+                                                color="violet"
+                                            />
+                                            <StatCard
+                                                label="Completion"
+                                                value={`${attemptDetails.completion_stats?.question_completion_percentage}%`}
+                                                color="cyan"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Proctoring Metrics */}
+                        {attemptDetails.proctoring_metrics && (
+                            <div className="rounded-2xl bg-[var(--card)] dark:bg-[var(--card)]/5 border border-gray-200 dark:border-white/5 p-6 mb-4">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                                    <AlertCircle className="w-5 h-5 text-amber-500" /> Proctoring Metrics
+                                </h3>
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    <MetricCard label="Network" value={attemptDetails.proctoring_metrics.network_health} />
+                                    <MetricCard label="Face Warnings" value={attemptDetails.proctoring_metrics.face_warnings} isWarning={attemptDetails.proctoring_metrics.face_warnings > 0} />
+                                    <MetricCard label="Focus Lost" value={attemptDetails.proctoring_metrics.focus_lost_count} isWarning={attemptDetails.proctoring_metrics.focus_lost_count > 0} />
+                                    <MetricCard label="Tab Switches" value={attemptDetails.proctoring_metrics.tab_switches} isWarning={attemptDetails.proctoring_metrics.tab_switches > 0} />
+                                    <MetricCard label="Blocked" value={`${attemptDetails.proctoring_metrics.blocked_seconds}s`} />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Attempt Environment Logs */}
+                        <SubmissionDebugDropdown resultType={resultType} debugConfigs={attemptDetails.debug_configs} />
+
+
+                        {/* Submissions */}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                {resultType === 'mcq' ? (
+                                    <><FileText className="w-5 h-5 text-blue-500" /> MCQ Analysis</>
+                                ) : (
+                                    <><Code className="w-5 h-5 text-emerald-500" /> Coding Analysis</>
+                                )}
+                            </h3>
+                            <div className="rounded-2xl border border-gray-200 dark:border-white/5 overflow-hidden bg-[var(--card)] dark:bg-[var(--card)]/5">
+                                {attemptDetails.submissions && attemptDetails.submissions.map((sub, idx) => (
+                                    <SubmissionCard
+                                        key={idx}
+                                        sub={sub}
+                                        idx={idx}
+                                        resultType={resultType}
+                                        getQuestionScore={getQuestionScore}
+                                        getQuestionMaxScore={getQuestionMaxScore}
+                                        analytics={analytics}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-20">No details found.</div>
+                )}
+            </div>
+        );
+    }
+
+    // HISTORY VIEW
+    return (
+        <div className="h-full flex flex-col relative z-0">
+            <div className="mb-8 flex justify-between items-end">
+                <div>
+                    <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2">{subUnit.name || subUnit.title}</h2>
+                    <p className="text-gray-500 dark:text-gray-400 font-medium">Attempt History & Analytics</p>
+                </div>
+
+                {/* Only show toggle if both types are available */}
+                {!hasNeither && !hasOnlyOne && (
+                    <div className="flex bg-gray-100 dark:bg-black/40 p-1.5 rounded-xl">
+                        {hasMCQ && (
+                            <button
+                                onClick={() => setResultType('mcq')}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${resultType === 'mcq' ? 'bg-[var(--card)] dark:bg-[var(--card)]/10 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                            >
+                                <FileText className="w-4 h-4" /> MCQ
+                            </button>
+                        )}
+                        {hasCoding && (
+                            <button
+                                onClick={() => setResultType('coding')}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${resultType === 'coding' ? 'bg-[var(--card)] dark:bg-[var(--card)]/10 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                            >
+                                <Code className="w-4 h-4" /> Coding
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Show single type badge if only one available */}
+                {hasOnlyOne && (
+                    <div className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-[var(--card)]/5 text-gray-600 dark:text-gray-400 text-sm font-bold flex items-center gap-2">
+                        {hasMCQ ? <><FileText className="w-4 h-4" /> MCQ Only</> : <><Code className="w-4 h-4" /> Coding Only</>}
+                    </div>
+                )}
+            </div>
+
+            {/* No content available message */}
+            {hasNeither ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-gray-200 dark:border-white/5 rounded-3xl bg-gray-50/50 dark:bg-[var(--card)]/[0.02]">
+                    <div className="w-20 h-20 bg-gray-100 dark:bg-[var(--card)]/5 rounded-full flex items-center justify-center mb-6">
+                        <EyeOff className="w-10 h-10 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Content Available</h3>
+                    <p className="text-gray-500 dark:text-gray-400 max-w-sm">This subunit doesn't have any MCQ or Coding questions configured.</p>
+                </div>
+            ) : loadingHistory ? (
+                <div className="space-y-8 pl-8 border-l-2 border-gray-200 dark:border-white/10 ml-4 py-4">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="relative pl-8">
+                            <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-200 dark:bg-[var(--card)]/10" />
+                            <Skeleton className="h-24 w-full rounded-2xl bg-[var(--card)]/5" />
+                        </div>
+                    ))}
+                </div>
+            ) : history && history.length > 0 ? (
+                <div className="relative pl-8 border-l-2 border-dashed border-gray-200 dark:border-white/10 ml-4 py-4 space-y-10">
+                    {history.map((attempt, idx) => {
+                        const maxScore = attempt.max_score || attempt.total_marks || attempt.overview?.max_score || 0;
+                        const score = attempt.score || attempt.marks_obtained || attempt.overview?.total_score || 0;
+                        const isBest = history.length > 0 && score === Math.max(...history.map(p => p.score || p.marks_obtained || p.overview?.total_score || 0));
+                        const isRecent = idx === 0;
+                        const isPassed = attempt.overview?.status?.toLowerCase() === 'passed';
+
+                        return (
+                            <div key={idx} className="relative group perspective-1000">
+                                <div className={`absolute -left-[41px] top-6 z-10 w-6 h-6 rounded-full border-4 border-gray-50 dark:border-[#0B0F19] transition-all duration-300 ${isRecent ? 'bg-blue-500 scale-110 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-300 dark:bg-gray-700 group-hover:bg-blue-400'}`} />
+
+                                <div className="bg-[var(--card)] dark:bg-[var(--card)]/5 border border-gray-200 dark:border-white/5 p-6 rounded-2xl transition-all duration-300 hover:border-blue-500/30 hover:shadow-2xl hover:shadow-blue-900/10 group-hover:-translate-y-1 group-hover:translate-x-1">
+                                    <button
+                                        onClick={() => handleAttemptClick(attempt)}
+                                        className="w-full text-left relative overflow-hidden focus:outline-none"
+                                    >
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none" />
+
+                                        <div className="flex justify-between items-start relative z-10">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-[var(--card)]/5 flex items-center justify-center font-bold text-gray-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                                    #{attempt.attempt || attempt.attempt_count}
+                                                </div>
+                                                <div>
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider mb-0.5">Attempt Score</div>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-3xl font-black text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors">
+                                                            {score}
+                                                        </span>
+                                                        <span className="text-sm text-gray-400">/ {maxScore}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col items-end gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    {isBest && (
+                                                        <span className="px-3 py-1 rounded-full bg-yellow-400/10 border border-yellow-400/20 text-yellow-500 text-xs font-bold uppercase flex items-center gap-1">
+                                                            <Trophy className="w-3 h-3" /> Best
+                                                        </span>
+                                                    )}
+                                                    {isRecent && (
+                                                        <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 text-xs font-bold uppercase flex items-center gap-1">
+                                                            <Zap className="w-3 h-3" /> Latest
+                                                        </span>
+                                                    )}
+                                                    {/* Pass/Fail indicator */}
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isPassed
+                                                        ? 'bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                                                        : 'bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
+                                                        }`}>
+                                                        {isPassed ? (
+                                                            <Check className="w-4 h-4 text-emerald-500" />
+                                                        ) : (
+                                                            <X className="w-4 h-4 text-red-500" />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-gray-200 dark:border-white/5 rounded-3xl bg-gray-50/50 dark:bg-[var(--card)]/[0.02]">
+                    <div className="w-20 h-20 bg-gray-100 dark:bg-[var(--card)]/5 rounded-full flex items-center justify-center mb-6">
+                        <Activity className="w-10 h-10 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Attempts Yet</h3>
+                    <p className="text-gray-500 dark:text-gray-400 max-w-sm">The student hasn't attempted this subunit for {resultType.toUpperCase()} yet.</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Stat Card Component
+const StatCard = ({ label, value, color = 'gray' }) => {
+    const colorClasses = {
+        emerald: 'text-emerald-500',
+        red: 'text-red-500',
+        blue: 'text-blue-500',
+        violet: 'text-violet-500',
+        cyan: 'text-cyan-500',
+        gray: 'text-gray-900 dark:text-white'
+    };
+
+    return (
+        <div className="p-4 rounded-xl bg-gray-50 dark:bg-[var(--card)]/5 border border-gray-100 dark:border-white/5">
+            <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">{label}</div>
+            <div className={`text-2xl font-bold ${colorClasses[color]}`}>{value}</div>
+        </div>
+    );
+};
+
+// Metric Card for Proctoring
+const MetricCard = ({ label, value, isWarning }) => (
+    <div className={`p-3 rounded-xl text-center ${isWarning ? 'bg-red-500/10 border border-red-500/20' : 'bg-gray-50 dark:bg-[var(--card)]/5 border border-gray-100 dark:border-white/5'}`}>
+        <div className={`text-xl font-bold ${isWarning ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>{value}</div>
+        <div className={`text-[10px] font-medium uppercase tracking-wider ${isWarning ? 'text-red-400' : 'text-gray-400'}`}>{label}</div>
+    </div>
+);
+
+// Submission Card Component
+const SubmissionCard = ({ sub, idx, resultType, getQuestionScore, getQuestionMaxScore, analytics }) => {
+    const [expanded, setExpanded] = useState(false);
+
+    const score = getQuestionScore(sub);
+    const maxScore = getQuestionMaxScore(sub);
+    const isCorrect = resultType === 'mcq' ? sub.is_correct : score === maxScore && maxScore > 0;
+
+    return (
+        <div className="border-b last:border-0 border-gray-100 dark:border-white/5">
+            <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full p-4 hover:bg-gray-50 dark:hover:bg-[var(--card)]/5 transition-colors flex justify-between items-start text-left"
+            >
+                <div className="flex items-start gap-3 flex-1">
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isCorrect ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/20 text-red-600 dark:text-red-400'
+                        }`}>
+                        {idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                        <div className="font-bold text-gray-900 dark:text-white mb-1">
+                            {sub.question_title}
+                        </div>
+                        {sub.question_desc && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                                {sub.question_desc}
+                            </p>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 ml-4">
+                    <div className={`px-3 py-1 rounded-lg text-sm font-bold ${isCorrect ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                        {score} / {maxScore}
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                </div>
+            </button>
+
+            {expanded && (
+                <div className="px-4 pb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {resultType === 'mcq' ? (
+                        <MCQSubmissionDetail sub={sub} />
+                    ) : (
+                        <CodingSubmissionDetail sub={sub} analytics={analytics} />
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Environment Debug Config UI Components
+const TerminalDebugView = ({ config }) => {
+    if (!config) return <div className="text-[11px] text-gray-500 font-mono italic">No data collected</div>;
+    return (
+        <div className="flex flex-col font-mono bg-[#0B0F19] rounded-xl overflow-hidden border border-white/5">
+            {/* -- Quick Insights Header -- */}
+            <div className="px-3 py-2 border-b border-white/5 bg-[var(--card)]/[0.02] flex flex-wrap gap-2 shrink-0">
+                {config.os?.platform && (
+                    <span className="px-2 py-1 rounded flex items-center gap-1.5 bg-[var(--card)]/5 border border-white/10 text-[10px] text-gray-300 shadow-sm">
+                        <Activity className="w-3 h-3 text-cyan-400" />
+                        {config.os?.platform === 'win32' ? 'Windows' : config.os?.platform === 'darwin' ? 'macOS' : config.os?.platform} {config.os?.arch ? `(${config.os.arch})` : ''}
+                    </span>
+                )}
+                {config.network?.interfaces?.[0]?.ip && (
+                    <span className="px-2 py-1 rounded flex items-center gap-1.5 bg-[var(--card)]/5 border border-white/10 text-[10px] text-gray-300 shadow-sm">
+                        <Wifi className="w-3 h-3 text-blue-400" />
+                        {config.network.interfaces[0].ip}
+                    </span>
+                )}
+                {config.proxy?.settings && (
+                    <span className={`px-2 py-1 rounded flex items-center gap-1.5 border border-white/10 text-[10px] shadow-sm ${config.proxy.settings === 'DIRECT' ? 'bg-[var(--card)]/5 text-gray-300' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                        <ShieldAlert className="w-3 h-3" />
+                        Proxy: {config.proxy.settings}
+                    </span>
+                )}
+                {(config.timestamp || config.capturedAt) && (
+                    <span className="px-2 py-1 rounded flex items-center gap-1.5 bg-[var(--card)]/5 border border-white/10 text-[10px] text-gray-300 shadow-sm" title={new Date(config.timestamp || config.capturedAt).toLocaleString()}>
+                        <Clock className="w-3 h-3 text-violet-400" />
+                        {new Date(config.timestamp || config.capturedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                )}
+            </div>
+            
+            {/* -- Raw Output -- */}
+            <div className="p-4 space-y-4 text-[11px] text-gray-400 overflow-x-auto">
+                {config.os && (
+                    <div>
+                        <span className="text-cyan-400/70 block mb-1">OS_INFO</span>
+                        <div className="pl-3 grid grid-cols-2 gap-x-4 gap-y-1 text-gray-300">
+                            {Object.entries(config.os).map(([k, v]) => (
+                                <div key={k} className="flex truncate"><span className="text-gray-500 min-w-16">{k}:</span> <span className="text-emerald-400 truncate ml-1" title={v}>{v}</span></div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                
+                {config.network && config.network.interfaces && (
+                    <div>
+                        <span className="text-cyan-400/70 block mb-1">NET_INTERFACES</span>
+                        <div className="pl-3 space-y-2">
+                            {config.network.interfaces.map((intf, i) => (
+                                <div key={i} className="flex flex-col gap-0.5 border-l-2 border-white/5 pl-2">
+                                    {Object.entries(intf).map(([k, v]) => (
+                                        <div key={k} className="flex truncate"><span className="text-gray-500 min-w-16">{k}:</span> <span className="text-violet-400 truncate ml-1">{v}</span></div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {config.proxy && (
+                    <div>
+                        <span className="text-cyan-400/70 block mb-1">PROXY_SETTINGS</span>
+                        <div className="pl-3 grid grid-cols-1 gap-y-1 text-gray-300">
+                            {Object.entries(config.proxy).map(([k, v]) => (
+                                <div key={k} className="flex truncate"><span className="text-gray-500 min-w-16">{k}:</span> <span className="text-amber-300 truncate ml-1">{v}</span></div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="pt-3 border-t border-white/5 mt-3 space-y-1 text-[10px] text-gray-600">
+                    {config.timestamp && <div>TS: <span className="text-gray-400">{config.timestamp}</span></div>}
+                    {config.capturedAt && <div>CAP: <span className="text-gray-400">{config.capturedAt}</span></div>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const DebugConfigCard = ({ title, config }) => {
+    if (!config) return <div className="text-xs text-gray-500 p-4 border border-dashed border-gray-200 dark:border-white/10 rounded-xl">No configuration logged</div>;
+    return (
+        <div className="bg-[var(--card)]/50 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/5 p-5 text-sm hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-colors shadow-sm">
+            <h5 className="font-bold text-gray-800 dark:text-gray-200 mb-5 text-xs uppercase tracking-wider">{title}</h5>
+            <div className="space-y-6">
+                
+                {/* OS Details */}
+                {config.os && (
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-500/20">
+                            <Globe className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div className="w-full min-w-0">
+                            <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-2">Operating System</div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {Object.entries(config.os).map(([k, v]) => (
+                                    <div key={k} className="flex justify-between items-center bg-[var(--card)] dark:bg-black/40 p-2 rounded border border-gray-100 dark:border-white/5 overflow-hidden">
+                                        <span className="text-[10px] text-gray-500 uppercase">{k}</span>
+                                        <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate ml-2" title={v}>{v}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
+                {/* Network Details */}
+                {config.network && config.network.interfaces && config.network.interfaces.length > 0 && (
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-500/20">
+                            <Activity className="w-5 h-5 text-emerald-500" />
+                        </div>
+                        <div className="w-full min-w-0">
+                            <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-2">Network Interfaces</div>
+                            <div className="space-y-3 w-full">
+                                {config.network.interfaces.map((intf, i) => (
+                                    <div key={i} className="flex flex-col bg-[var(--card)] dark:bg-black/40 p-3 rounded-lg border border-gray-100 dark:border-white/5 shadow-sm space-y-2">
+                                         {Object.entries(intf).map(([k, v]) => (
+                                            <div key={k} className="flex justify-between items-center text-xs overflow-hidden">
+                                                <span className="text-[10px] text-gray-500 uppercase">{k}</span>
+                                                <span className={`${k === 'ip' ? 'text-emerald-600 dark:text-emerald-400 font-mono' : 'text-gray-700 dark:text-gray-300'} truncate ml-2`} title={v}>{v}</span>
+                                            </div>
+                                         ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Proxy Details */}
+                {config.proxy && (
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-500/20">
+                            <ShieldAlert className="w-5 h-5 text-amber-500" />
+                        </div>
+                        <div className="w-full min-w-0">
+                            <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-2">Proxy Settings</div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {Object.entries(config.proxy).map(([k, v]) => (
+                                    <div key={k} className="flex justify-between items-center bg-[var(--card)] dark:bg-black/40 p-2 rounded border border-gray-100 dark:border-white/5 overflow-hidden">
+                                        <span className="text-[10px] text-gray-500 uppercase">{k}</span>
+                                        <span className="text-xs font-mono text-amber-600 dark:text-amber-400 truncate ml-2" title={v}>{v}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
+                {/* Timestamp Details */}
+                <div className="flex items-start gap-4 pt-4 border-t border-gray-100 dark:border-white/5">
+                    <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-500/10 flex items-center justify-center shrink-0 border border-violet-100 dark:border-violet-500/20">
+                        <Clock className="w-5 h-5 text-violet-500" />
+                    </div>
+                    <div className="w-full min-w-0">
+                        <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-2">Timestamps</div>
+                        <div className="space-y-2">
+                            {config.timestamp && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-gray-500 uppercase">Timestamp</span>
+                                    <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate ml-2" title={config.timestamp}>{new Date(config.timestamp).toLocaleString()}</span>
+                                </div>
+                            )}
+                            {config.capturedAt && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-gray-500 uppercase">Captured At</span>
+                                    <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate ml-2" title={config.capturedAt}>{new Date(config.capturedAt).toLocaleString()}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SubmissionDebugDropdown = ({ resultType, debugConfigs }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    if (!debugConfigs) return null;
+
+    return (
+        <div className="mt-6 border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-[var(--card)] dark:bg-[#0B0F19]">
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(!isOpen);
+                }}
+                className="w-full flex justify-between items-center p-4 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[var(--card)]/5 transition-colors focus:outline-none"
+            >
+                <div className="flex items-center gap-2">
+                    {resultType === 'mcq' ? <ShieldAlert className="w-4 h-4 text-blue-500" /> : <Code className="w-4 h-4 text-cyan-500" />}
+                    <span>Environment Configuration Logs</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {isOpen && (
+                <div className="p-5 border-t border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-black/20 cursor-default">
+                    {resultType === 'mcq' ? (
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                            <DebugConfigCard title="Start Config" config={debugConfigs.start_config} />
+                            <DebugConfigCard title="End Config" config={debugConfigs.end_config} />
+                        </div>
+                    ) : (
+                        <div className="bg-[#0A0D14] rounded-xl border border-white/10 overflow-hidden shadow-inner flex flex-col xl:flex-row divide-y xl:divide-y-0 xl:divide-x divide-white/10">
+                            <div className="flex-1 p-5 lg:p-6 hover:bg-[var(--card)]/[0.01] transition-colors">
+                                <span className="text-[10px] text-cyan-500 font-mono uppercase font-black tracking-widest flex items-center gap-2 mb-4 bg-cyan-500/10 w-fit px-3 py-1 rounded-full border border-cyan-500/20">
+                                    <Globe className="w-3 h-3" /> Start Config
+                                </span>
+                                <TerminalDebugView config={debugConfigs.start_config} />
+                            </div>
+                            <div className="flex-1 p-5 lg:p-6 bg-[var(--card)]/[0.02] hover:bg-[var(--card)]/[0.03] transition-colors">
+                                <span className="text-[10px] text-violet-500 font-mono uppercase font-black tracking-widest flex items-center gap-2 mb-4 bg-violet-500/10 w-fit px-3 py-1 rounded-full border border-violet-500/20">
+                                    <Activity className="w-3 h-3" /> End Config
+                                </span>
+                                <TerminalDebugView config={debugConfigs.end_config} />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// MCQ Detail Component
+const MCQSubmissionDetail = ({ sub }) => {
+    const hasHistory = sub.history && sub.history.length > 0;
+    const correctCount = hasHistory ? sub.history.filter(h => h.is_correct).length : (sub.is_correct ? 1 : 0);
+    const totalCount = hasHistory ? sub.history.length : 1;
+    const correctPct = Math.round((correctCount / totalCount) * 100);
+
+    return (
+        <div className="space-y-6 pl-11">
+            <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1 space-y-2">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Options</div>
+                    {sub.options && sub.options.map((option, optIdx) => {
+                        const optionText = typeof option === 'object' ? option.option : option;
+                        const isCorrectAnswer = typeof option === 'object' ? option.isAnswer === true : false;
+                        const isSelected = sub.submitted_answer_index === optIdx;
+
+                        let bgClass = 'bg-gray-50 dark:bg-[var(--card)]/5 border-gray-100 dark:border-white/5';
+                        let textClass = 'text-gray-700 dark:text-gray-300';
+
+                        if (isCorrectAnswer) {
+                            bgClass = 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20';
+                            textClass = 'text-emerald-700 dark:text-emerald-400';
+                        } else if (isSelected && !isCorrectAnswer) {
+                            bgClass = 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
+                            textClass = 'text-red-700 dark:text-red-400';
+                        }
+
+                        return (
+                            <div key={optIdx} className={`p-3 rounded-lg border flex items-center justify-between ${bgClass}`}>
+                                <div className="flex flex-col">
+                                    <span className={`font-medium ${textClass}`}>{optionText}</span>
+                                    <div className="flex gap-2 mt-1">
+                                        {isSelected && <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">(Your Answer)</span>}
+                                        {isCorrectAnswer && <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">(Correct Answer)</span>}
+                                    </div>
+                                </div>
+                                {isCorrectAnswer && <Check className="w-5 h-5 text-emerald-500" />}
+                                {!isCorrectAnswer && isSelected && <X className="w-5 h-5 text-red-500" />}
+                            </div>
+                        );
+                    })}
+                </div>
+                
+                <div className="shrink-0 w-full md:w-56 flex flex-col items-center justify-center p-5 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5">
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-4">Submission Accuracy</div>
+                    <div className="relative w-24 h-24 rounded-full" style={{ background: `conic-gradient(#10b981 ${correctPct}%, #ef4444 ${correctPct}%)` }}>
+                        <div className="absolute inset-[6px] bg-gray-50 dark:bg-[#1A1F2E] rounded-full flex flex-col items-center justify-center shadow-inner">
+                            <span className="text-xl font-black text-gray-900 dark:text-white">{correctPct}%</span>
+                            <span className="text-[8px] tracking-widest text-gray-500 uppercase font-bold mt-0.5">Correct</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4 mt-5 text-[10px] font-bold uppercase tracking-wider">
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-emerald-500 shadow-sm shadow-emerald-500/40"/>{correctCount} Right</div>
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-red-500 shadow-sm shadow-red-500/40"/>{totalCount - correctCount} Wrong</div>
+                    </div>
+                </div>
+            </div>
+
+            {hasHistory && (
+                <div className="space-y-4 pt-6 mt-4 border-t border-gray-100 dark:border-white/5">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-violet-500" /> Submission Timeline
+                    </div>
+                    <div className="relative pl-6 space-y-4 before:absolute before:inset-y-2 before:left-2 before:w-[2px] before:bg-gray-200 dark:before:bg-[var(--card)]/10 before:rounded-full">
+                        {sub.history.map((h, i) => {
+                            const isLatest = h.is_latest || i === sub.history.length - 1;
+                            return (
+                                <div key={i} className="relative">
+                                    <div className={`absolute -left-[1.375rem] top-2 w-3.5 h-3.5 rounded-full border-[3px] border-white dark:border-[#1A1F2E] ${h.is_correct ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                    <div className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${isLatest ? 'bg-blue-50/50 dark:bg-blue-500/5 border-blue-200 dark:border-blue-500/20' : 'bg-[var(--card)] dark:bg-[var(--card)]/5 border-gray-100 dark:border-white/5'}`}>
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-1.5">
+                                                <span className={`text-xs font-black uppercase tracking-wider ${h.is_correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                    {h.is_correct ? 'Correct' : 'Incorrect'}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 font-mono tracking-wider">
+                                                    {h.timestamp ? new Date(h.timestamp).toLocaleString() : 'N/A'}
+                                                </span>
+                                                {isLatest && <span className="text-[9px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-widest shadow-sm shadow-blue-500/40 mt-[-1px]">Latest</span>}
+                                            </div>
+                                            <div className="text-sm text-gray-600 dark:text-gray-300">
+                                                Selected Option: <span className="font-bold text-gray-900 dark:text-white">{h.submitted_answer_text || `Option ${h.submitted_answer_index + 1}`}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Coding Detail Component
+const CodingSubmissionDetail = ({ sub, analytics }) => {
+    const sampleCases = sub.test_cases?.filter(tc => !tc.name.toLowerCase().includes('hidden')) || [];
+    const hiddenCases = sub.test_cases?.filter(tc => tc.name.toLowerCase().includes('hidden')) || [];
+    const qData = analytics?.perQuestion?.[sub.question_id] || { compileClicks: 0, submitClicks: 0 };
+    const totalClicks = (qData.compileClicks || 0) + (qData.submitClicks || 0);
+    const compilePct = totalClicks > 0 ? ((qData.compileClicks || 0) / totalClicks) * 100 : 0;
+    const submitPct = totalClicks > 0 ? ((qData.submitClicks || 0) / totalClicks) * 100 : 0;
+    const baseCode = sub.base_code || sub.base_compiler_code;
+    const hasHistory = sub.history && sub.history.length > 0;
+
+    return (
+        <div className="space-y-8 pl-11">
+            {/* Interaction Analytics Bar Chart */}
+            <div className="bg-gray-50 dark:bg-black/20 p-5 rounded-2xl border border-gray-100 dark:border-white/5">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2 mb-4">
+                    <Activity className="w-4 h-4 text-cyan-500" /> Per-Question Interactions
+                </div>
+                {totalClicks > 0 ? (
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            <span className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400"><div className="w-2 h-2 rounded bg-cyan-500" /> Compile Clicks ({qData.compileClicks || 0})</span>
+                            <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400"><div className="w-2 h-2 rounded bg-violet-500" /> Submit Clicks ({qData.submitClicks || 0})</span>
+                        </div>
+                        <div className="flex h-3 text-white text-xs font-bold text-center rounded-full overflow-hidden shadow-inner">
+                            <div style={{ width: `${compilePct}%` }} className="bg-cyan-500 flex items-center justify-center transition-all duration-500 {compilePct > 10 ? 'px-2' : ''}" title={`Compile: ${qData.compileClicks}`} />
+                            <div style={{ width: `${submitPct}%` }} className="bg-violet-500 flex items-center justify-center transition-all duration-500 {submitPct > 10 ? 'px-2' : ''}" title={`Submit: ${qData.submitClicks}`} />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-sm font-medium text-gray-400">No interaction data available for this question.</div>
+                )}
+            </div>
+
+            {/* Base Code */}
+            {baseCode && (
+                <div className="space-y-2">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-amber-500" /> Base Compiler Code
+                    </div>
+                    <div className="bg-[#1A1F2E] p-4 rounded-xl border border-white/5 overflow-x-auto text-[11px] font-mono text-gray-300 whitespace-pre-wrap leading-relaxed">
+                        {baseCode}
+                    </div>
+                </div>
+            )}
+
+            {/* Sample Test Cases */}
+            {sampleCases.length > 0 && (
+                <div className="space-y-2">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-emerald-500" /> Sample Test Cases
+                    </div>
+                    <div className="space-y-2">
+                        {sampleCases.map((tc, i) => (
+                            <div key={i} className="p-3 rounded-lg border bg-gray-50 dark:bg-[var(--card)]/5 border-gray-200 dark:border-white/5 text-xs font-mono">
+                                <div className="font-bold text-gray-700 dark:text-gray-300 mb-2">{tc.name}</div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-[10px] text-gray-400 mb-0.5">Input</div>
+                                        <div className="bg-[var(--card)] dark:bg-black/20 p-2 rounded border border-gray-100 dark:border-white/5 text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                                            {tc.input || '(empty)'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-gray-400 mb-0.5">Expected Output</div>
+                                        <div className="bg-[var(--card)] dark:bg-black/20 p-2 rounded border border-gray-100 dark:border-white/5 text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                                            {tc.expected_output}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Hidden Test Cases with Results */}
+            {hiddenCases.length > 0 && (
+                <div className="space-y-2">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <EyeOff className="w-4 h-4" /> Hidden Test Cases (Evaluation)
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {hiddenCases.map((tc, hiddenIdx) => {
+                            const resultKey = `testCase${hiddenIdx + 1}`;
+                            const executionResult = sub.formattedResult?.find(r => r[resultKey])?.[resultKey];
+                            const isPassed = executionResult?.testCasePassed === true;
+
+                            return (
+                                <div
+                                    key={hiddenIdx}
+                                    className={`p-3 rounded-lg border ${isPassed
+                                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20'
+                                        : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'
+                                        }`}
+                                >
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                            {isPassed ? (
+                                                <Check className="w-4 h-4 text-emerald-500" />
+                                            ) : (
+                                                <X className="w-4 h-4 text-red-500" />
+                                            )}
+                                            <span className={`text-xs font-bold ${isPassed ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                                                {tc.name}
+                                            </span>
+                                        </div>
+                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isPassed ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
+                                            {isPassed ? 'Passed' : 'Failed'}
+                                        </span>
+                                    </div>
+
+                                    {executionResult && (
+                                        <div className="text-[10px] grid grid-cols-2 gap-2 bg-[var(--card)] dark:bg-black/20 p-2 rounded font-mono">
+                                            <div>
+                                                <span className="text-gray-400 block mb-0.5">Expected:</span>
+                                                <span className="text-gray-600 dark:text-gray-300 break-all">
+                                                    {executionResult.expectedOutput}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-400 block mb-0.5">Your Output:</span>
+                                                <span className={`break-all font-bold ${isPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                    {executionResult.userOutput || '(no output)'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+            {/* Submitted Code Timeline */}
+            <div className="space-y-4">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                    <Code className="w-4 h-4 text-blue-500" /> Submission Timeline
+                </div>
+                {hasHistory ? (
+                    <div className="relative pl-6 space-y-6 before:absolute before:inset-y-2 before:left-2 before:w-[2px] before:bg-gray-200 dark:before:bg-[var(--card)]/10 before:rounded-full">
+                        {sub.history.map((h, i) => {
+                            const isLatest = h.is_latest || i === sub.history.length - 1;
+                            const isSuccess = h.status === 'Success' || h.status === 'Passed' || h.is_correct;
+                            return (
+                                <div key={i} className="relative">
+                                    <div className={`absolute -left-[1.375rem] top-2 w-3.5 h-3.5 rounded-full border-[3px] border-white dark:border-[#1A1F2E] ${isSuccess ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                    <div className={`p-4 rounded-xl border transition-colors ${isLatest ? 'bg-blue-50/50 dark:bg-blue-500/5 border-blue-200 dark:border-blue-500/20' : 'bg-[var(--card)] dark:bg-[var(--card)]/5 border-gray-100 dark:border-white/5'}`}>
+                                        <div className="flex items-center justify-between mb-3 border-b border-gray-100 dark:border-white/5 pb-3">
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-xs font-black uppercase tracking-wider ${isSuccess ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                                    {h.status || (isSuccess ? 'Success' : 'Failure')}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 font-mono tracking-wider">
+                                                    {h.timestamp ? new Date(h.timestamp).toLocaleString() : 'N/A'}
+                                                </span>
+                                                {isLatest && <span className="text-[9px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-widest shadow-sm shadow-blue-500/40">Latest Submission</span>}
+                                            </div>
+                                        </div>
+                                        <div className="bg-[#1A1F2E] p-4 rounded-xl border border-white/5 overflow-x-auto text-[11px] font-mono text-emerald-400 whitespace-pre-wrap leading-relaxed shadow-inner">
+                                            {h.code || h.last_submitted_code || '(no code snippet recorded)'}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="p-4 rounded-xl border bg-[var(--card)] dark:bg-[var(--card)]/5 border-gray-100 dark:border-white/5">
+                        <div className="flex items-center gap-3 mb-3 border-b border-gray-100 dark:border-white/5 pb-3">
+                            <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">Latest Submission</span>
+                        </div>
+                        <div className="bg-[#1A1F2E] p-4 rounded-xl border border-white/5 overflow-x-auto text-[11px] font-mono text-emerald-400 whitespace-pre-wrap leading-relaxed shadow-inner">
+                            {sub.last_submitted_code || sub.submitted_code || sub.code || '(no code snippet recorded)'}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Submitted Code */}
+            <div className="space-y-2">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                    <Code className="w-4 h-4" /> Submitted Code
+                </div>
+                <div className="bg-gray-900 rounded-lg overflow-hidden">
+                    <div className="flex justify-between items-center px-4 py-2 bg-gray-800 border-b border-gray-700">
+                        <span className="text-gray-400 text-xs font-mono">C</span>
+                    </div>
+                    <pre className="p-4 text-gray-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-64">
+                        {sub.submitted_answer || sub.submitted_code || '// No code submitted'}
+                    </pre>
+                </div>
+            </div>
+
+            {/* Correct Code Reference */}
+            {sub.correct_code && (
+                <div className="space-y-2">
+                    <div className="text-xs font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-2">
+                        <Check className="w-4 h-4" /> Reference Solution
+                    </div>
+                    <div className="bg-emerald-900/20 rounded-lg overflow-hidden border border-emerald-500/20">
+                        <pre className="p-4 text-emerald-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-64">
+                            {sub.correct_code}
+                        </pre>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const MetricRow = ({ label, value, isWarning, suffix = '' }) => (
+    <div className={`flex items-center justify-between p-3 rounded-lg ${isWarning ? 'bg-red-500/10 border border-red-500/20' : 'bg-transparent border border-gray-100 dark:border-white/5'}`}>
+        <span className={`text-sm font-medium ${isWarning ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`}>{label}</span>
+        <span className={`font-bold ${isWarning ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>{value}{suffix}</span>
+    </div>
+);
+
