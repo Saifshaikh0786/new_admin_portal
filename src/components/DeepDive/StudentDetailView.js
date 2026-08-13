@@ -112,6 +112,13 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
                         }),
                         credentials: 'include'
                     });
+                    if (!lookupRes.ok) {
+                        const errText = await lookupRes.text();
+                        console.error('Lookup failed with status:', lookupRes.status, errText);
+                        setFullStudent(currentStudent);
+                        return;
+                    }
+                    
                     const lookupJson = await lookupRes.json();
                     const found = Array.isArray(lookupJson.data) ? lookupJson.data[0] : lookupJson.data;
                     if (found) {
@@ -226,11 +233,11 @@ export default function StudentDetailView({ student, onBack, onStudentSelect }) 
         setOverallCourseProgress(units.length > 0 ? Math.round(totalCompletion / units.length) : 0);
     };
 
-    const batchId = fullStudent?.batch_id || fullStudent?.batch;
+    const batchId = fullStudent?.batch_id || fullStudent?.batch || 'unassigned';
     const studentIdParam = fullStudent?.student_id || fullStudent?.uuid;
     const qsOverview = new URLSearchParams({ student_id: studentIdParam, batch_id: batchId }).toString();
     const { data: overviewData, isLoading: isOverviewLoading } = useSWR(
-        (batchId && studentIdParam) ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}?${qsOverview}`, 'GET'] : null,
+        (studentIdParam) ? [`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}?${qsOverview}`, 'GET'] : null,
         swrFetcher,
         { revalidateOnFocus: false }
     );
