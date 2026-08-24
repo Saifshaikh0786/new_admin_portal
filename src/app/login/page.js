@@ -38,23 +38,13 @@ function LoginContent() {
     const handleSsoLogin = async () => {
       setSsoLoading(true);
       try {
-        const { API_CONFIG: cfg } = await import('@/utils/api');
-        const verifyUrl = `${cfg.baseUrl.admin}/auth/verify-sso-token`;
-        let verifyRes = await fetch(verifyUrl, {
+        const verifyUrl = 'https://new-edu-code-testing.vercel.app/auth/verify-sso-token';
+        const verifyRes = await fetch(verifyUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sso_token: ssoToken }),
           credentials: 'include',
         });
-
-        if (!verifyRes.ok) {
-          verifyRes = await fetch('https://new-edu-code-testing.vercel.app/auth/verify-sso-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sso_token: ssoToken }),
-            credentials: 'include',
-          });
-        }
 
         const verifyData = await verifyRes.json();
 
