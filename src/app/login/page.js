@@ -104,15 +104,23 @@ function LoginContent() {
   if (user) return null;
 
   // Show loading screen during SSO auto-login
-  if (ssoLoading) {
+  if (ssoLoading || Boolean(searchParams?.get('sso_token'))) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900">
-        <div className="flex flex-col items-center gap-4">
-          <svg className="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="text-lg font-semibold text-slate-700 dark:text-slate-300 animate-pulse">Securely authenticating...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+        <div className="flex flex-col items-center gap-6 p-8 rounded-3xl border border-slate-800 bg-slate-900/80 backdrop-blur-xl shadow-2xl">
+          <div className="relative w-20 h-20">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 rounded-full opacity-30 blur-2xl animate-pulse" />
+            <div className="absolute inset-0 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
+            <div className="absolute inset-2 rounded-full border-4 border-indigo-500/20 border-b-indigo-500 animate-spin animate-spin-reverse" />
+          </div>
+          <div className="text-center">
+            <h3 className="text-xl font-bold text-white tracking-wide mb-1">
+              Connecting to Admin Portal
+            </h3>
+            <p className="text-sm font-medium text-blue-400 animate-pulse">
+              Securely authenticating session...
+            </p>
+          </div>
         </div>
       </div>
     );
