@@ -255,7 +255,16 @@ export default function StudentSearchPage() {
                                         <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 font-medium">
                                             <div className="flex items-center gap-1.5"><GraduationCap className="w-4 h-4"/> Batch: {studentData.batch_name || studentData.batch_id}</div>
                                             <div className="flex items-center gap-1.5"><BookOpen className="w-4 h-4"/> Section: {studentData.section || "N/A"}</div>
-                                            <div className="flex items-center gap-1.5"><Activity className="w-4 h-4"/> Status: Active</div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Activity className="w-4 h-4"/> Status: 
+                                                <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
+                                                    studentData.status === 'suspended' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                    studentData.status === 'alumni' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                    'bg-green-50 text-green-700 border-green-200'
+                                                }`}>
+                                                    {studentData.status ? (studentData.status.charAt(0).toUpperCase() + studentData.status.slice(1)) : 'Active'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

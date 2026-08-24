@@ -19,6 +19,7 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -26,6 +27,53 @@ function LoginContent() {
       router.push('/dashboard');
     }
   }, [authLoading, user, router]);
+
+  // ── SSO Auto-Login ──
+  // If the URL contains ?sso_token=xxx, verify it via backend and auto-login.
+  // This is triggered when the student frontend iframe opens the admin portal.
+  useEffect(() => {
+    const ssoToken = searchParams.get('sso_token');
+    if (!ssoToken) return;
+
+    const handleSsoLogin = async () => {
+      setSsoLoading(true);
+      try {
+        const { API_CONFIG: cfg } = await import('@/utils/api');
+        const verifyUrl = `${cfg.baseUrl.admin}/auth/verify-sso-token`;
+        const verifyRes = await fetch(verifyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sso_token: ssoToken }),
+          credentials: 'include',
+        });
+
+        const verifyData = await verifyRes.json();
+
+        if (verifyRes.ok && verifyData.success && verifyData.token) {
+          // SSO verified — save token and redirect
+          const { setAdminToken } = await import('@/utils/cookies');
+          setAdminToken(verifyData.token);
+          // Store user data in localStorage for AuthContext to pick up
+          if (verifyData.data) {
+            localStorage.setItem('admin_user', JSON.stringify(verifyData.data));
+          }
+          toast.success('Auto-login successful');
+          router.push('/dashboard');
+          return;
+        }
+
+        console.error('SSO verification failed:', verifyData.message);
+        setError('Auto-login failed. Please login manually.');
+      } catch (err) {
+        console.error('SSO auto-login error:', err);
+        setError('Auto-login failed. Please login manually.');
+      } finally {
+        setSsoLoading(false);
+      }
+    };
+
+    handleSsoLogin();
+  }, [searchParams, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,6 +102,21 @@ function LoginContent() {
 
   if (authLoading && !isSubmitting) return null;
   if (user) return null;
+
+  // Show loading screen during SSO auto-login
+  if (ssoLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900">
+        <div className="flex flex-col items-center gap-4">
+          <svg className="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-lg font-semibold text-slate-700 dark:text-slate-300 animate-pulse">Securely authenticating...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 font-sans px-4 relative transition-colors duration-300">

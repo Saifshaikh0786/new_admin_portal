@@ -2725,9 +2725,10 @@ function TeachersTab({ data, batchData, lowestPractice, lowestExams, batch_id, o
                         'px-2.5 py-1 rounded-lg text-[11px] font-bold border',
                         t.status === 'active' ? 'bg-green-50 text-green-800 border-green-200' :
                         t.status === 'suspended' ? 'bg-red-50 text-red-800 border-red-200' :
+                        t.status === 'alumni' ? 'bg-blue-50 text-blue-800 border-blue-200' :
                         'bg-gray-50 text-gray-600 border-gray-200'
                       )}>
-                        {t.status === 'active' ? 'Active' : t.status === 'suspended' ? 'Suspended' : t.status}
+                        {t.status === 'active' ? 'Active' : t.status === 'suspended' ? 'Suspended' : t.status === 'alumni' ? 'Alumni' : t.status}
                       </span>
                     </td>
                   </tr>
@@ -2994,8 +2995,9 @@ function SectionDetailModal({ section, batch_id, onClose }) {
                               'px-2 py-0.5 rounded text-[10px] font-bold border',
                               s.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
                               s.status === 'suspended' ? 'bg-red-50 text-red-700 border-red-200' :
+                              s.status === 'alumni' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                               'bg-gray-50 text-gray-600 border-gray-200'
-                            )}>{s.status}</span>
+                            )}>{s.status === 'active' ? 'Active' : s.status === 'suspended' ? 'Suspended' : s.status === 'alumni' ? 'Alumni' : s.status}</span>
                           </td>
                         </tr>
                       ))}
