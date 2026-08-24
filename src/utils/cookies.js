@@ -36,10 +36,7 @@ export function setAdminToken(token) {
     const d = new Date();
     d.setTime(d.getTime() + (7 * 24 * 60 * 60 * 1000));
     const expires = "expires=" + d.toUTCString();
-    // Secure flag ensures cookie is only sent over HTTPS
-    const isProduction = window.location.protocol === 'https:';
-    const secureFlag = isProduction ? ';Secure' : '';
-    document.cookie = "admin_token=" + token + ";" + expires + ";path=/;SameSite=Strict" + secureFlag;
+    document.cookie = "admin_token=" + token + ";" + expires + ";path=/;SameSite=None;Secure";
 }
 
 /**

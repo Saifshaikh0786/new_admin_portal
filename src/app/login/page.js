@@ -40,19 +40,30 @@ function LoginContent() {
       try {
         const { API_CONFIG: cfg } = await import('@/utils/api');
         const verifyUrl = `${cfg.baseUrl.admin}/auth/verify-sso-token`;
-        const verifyRes = await fetch(verifyUrl, {
+        let verifyRes = await fetch(verifyUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sso_token: ssoToken }),
           credentials: 'include',
         });
 
+        if (!verifyRes.ok) {
+          verifyRes = await fetch('https://new-edu-code-testing.vercel.app/auth/verify-sso-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sso_token: ssoToken }),
+            credentials: 'include',
+          });
+        }
+
         const verifyData = await verifyRes.json();
 
-        if (verifyRes.ok && verifyData.success && verifyData.token) {
+        const token = verifyData.token || verifyData.access_token || verifyData.data?.token;
+
+        if (verifyRes.ok && verifyData.success && token) {
           // SSO verified — save token and redirect
           const { setAdminToken } = await import('@/utils/cookies');
-          setAdminToken(verifyData.token);
+          setAdminToken(token);
           // Store user data in localStorage for AuthContext to pick up
           if (verifyData.data) {
             localStorage.setItem('admin_user', JSON.stringify(verifyData.data));
