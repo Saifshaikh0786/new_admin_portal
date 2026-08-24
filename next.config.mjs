@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    const backendUrl = (process.env.BACKEND_API_URL || 'http://localhost:4001').trim();
+    const backendUrl = (process.env.BACKEND_API_URL || process.env.API_BASE_URL || 'https://new-edu-code-testing.vercel.app').trim();
     return [
       // PROD URL: 'https://new-edu-code-testing.vercel.app/:path*'
       {
@@ -19,6 +19,23 @@ const nextConfig = {
       {
         source: '/api/proxy/teacher/:path*',
         destination: `${backendUrl}/:path*`,
+      },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: 'frame-ancestors *',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+        ],
       },
     ];
   },
