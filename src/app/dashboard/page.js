@@ -1198,115 +1198,239 @@ export default function DeepDiveDashboard() {
 
                     {/* View: Batches */}
                     {view === 'batches' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                            {loading ? (
-                                <>
-                                    <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
-                                    <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
-                                </>
-                            ) : (
-                                batches.map((batch) => {
-                                    const status = getBatchStatus(batch.ending_date);
-                                    const isActive = status.label === 'Active';
-                                    return (
-                                        <button
-                                            key={batch.batch_id}
-                                            onClick={() => handleBatchClick(batch)}
-                                            className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-                                        >
-                                            <div className="p-6">
-                                                <div className="flex items-start justify-between gap-3 mb-4">
-                                                    <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0">
-                                                        <LayoutGrid className="w-6 h-6 neu-accent-text" />
-                                                    </div>
-                                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${isActive
-                                                        ? 'neu-tile text-[#10B981] dark:text-emerald-400'
-                                                        : 'neu-inset text-[#94A3B8] dark:text-gray-400'
-                                                        }`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#10B981] animate-pulse' : 'bg-[#94A3B8]'}`} />
-                                                        {status.label}
-                                                    </span>
-                                                </div>
-
-                                                <h3 className="text-lg font-bold text-[#111827] dark:text-white line-clamp-2 mb-4 group-hover:text-[var(--neu-accent)] transition-colors" title={batch.batch_name}>
-                                                    {batch.batch_name}
-                                                </h3>
-
-                                                <div className="flex gap-3 mb-4">
-                                                    <div className="flex-1 rounded-2xl neu-inset px-4 py-3">
-                                                        <div className="text-xl font-bold tabular-nums text-[#111827] dark:text-white">{batch.batch_student_strength}</div>
-                                                        <div className="text-[11px] font-semibold text-[#94A3B8] dark:text-gray-500 uppercase tracking-wide">Students</div>
-                                                    </div>
-                                                    <div className="flex-1 rounded-2xl neu-inset px-4 py-3">
-                                                        <div className="text-xl font-bold tabular-nums text-[#111827] dark:text-white">{batch.registered_courses_id?.length || 0}</div>
-                                                        <div className="text-[11px] font-semibold text-[#94A3B8] dark:text-gray-500 uppercase tracking-wide">Courses</div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between text-xs text-[#6B7280] dark:text-gray-400 pt-3 border-t border-[var(--neu-dark)] dark:border-white/5">
-                                                    <span className="flex items-center gap-1.5">
-                                                        <Clock className="w-3.5 h-3.5 text-[#94A3B8]" />
-                                                        {new Date(batch.starting_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                        {' - '}
-                                                        {new Date(batch.ending_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                    </span>
-                                                    <ChevronRight className="w-4 h-4 neu-accent-text group-hover:translate-x-1 transition-transform" />
-                                                </div>
-                                            </div>
-                                        </button>
-                                    );
-                                })
-                            )}
-                            {!loading && batches.length === 0 && (
-                                <div className="col-span-full flex flex-col items-center py-24 text-[#94A3B8] dark:text-gray-500">
-                                    <div className="w-16 h-16 rounded-[20px] neu-raised flex items-center justify-center mb-4">
-                                        <LayoutGrid className="w-7 h-7 opacity-40" />
-                                    </div>
-                                    <p className="text-sm font-medium">No batches found</p>
+                        <div className="space-y-8 w-full">
+                            {/* Active Batches */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-success flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Active</h3>
                                 </div>
-                            )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {loading ? (
+                                        <>
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                        </>
+                                    ) : (
+                                        batches.filter(b => getBatchStatus(b.ending_date).label === 'Active').map((batch) => {
+                                            const status = getBatchStatus(batch.ending_date);
+                                            const isActive = status.label === 'Active';
+                                            return (
+                                                <button
+                                                    key={batch.batch_id}
+                                                    onClick={() => handleBatchClick(batch)}
+                                                    className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                                                >
+                                                    <div className="p-6">
+                                                        <div className="flex items-start justify-between gap-3 mb-4">
+                                                            <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0">
+                                                                <LayoutGrid className="w-6 h-6 neu-accent-text" />
+                                                            </div>
+                                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${isActive
+                                                                ? 'neu-tile text-[#10B981] dark:text-emerald-400'
+                                                                : 'neu-inset text-[#94A3B8] dark:text-gray-400'
+                                                                }`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#10B981] animate-pulse' : 'bg-[#94A3B8]'}`} />
+                                                                {status.label}
+                                                            </span>
+                                                        </div>
+                                                        <h3 className="text-lg font-bold text-[#111827] dark:text-white line-clamp-2 mb-4 group-hover:text-[var(--neu-accent)] transition-colors" title={batch.batch_name}>
+                                                            {batch.batch_name}
+                                                        </h3>
+                                                        <div className="flex gap-3 mb-4">
+                                                            <div className="flex-1 rounded-2xl neu-inset px-4 py-3">
+                                                                <div className="text-xl font-bold tabular-nums text-[#111827] dark:text-white">{batch.actual_student_count || 0}</div>
+                                                                <div className="text-[11px] font-semibold text-[#94A3B8] dark:text-gray-500 uppercase tracking-wide">Students</div>
+                                                            </div>
+                                                            <div className="flex-1 rounded-2xl neu-inset px-4 py-3">
+                                                                <div className="text-xl font-bold tabular-nums text-[#111827] dark:text-white">{batch.registered_courses_id?.length || 0}</div>
+                                                                <div className="text-[11px] font-semibold text-[#94A3B8] dark:text-gray-500 uppercase tracking-wide">Courses</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-xs text-[#6B7280] dark:text-gray-400 pt-3 border-t border-[var(--neu-dark)] dark:border-white/5">
+                                                            <span className="flex items-center gap-1.5">
+                                                                <Clock className="w-3.5 h-3.5 text-[#94A3B8]" />
+                                                                {new Date(batch.starting_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                {' - '}
+                                                                {new Date(batch.ending_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                            </span>
+                                                            <ChevronRight className="w-4 h-4 neu-accent-text group-hover:translate-x-1 transition-transform" />
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                    {!loading && batches.filter(b => getBatchStatus(b.ending_date).label === 'Active').length === 0 && (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No active batches</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Completed Batches */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-secondary flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#94A3B8]"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Completed</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {loading ? (
+                                        <>
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                        </>
+                                    ) : (
+                                        batches.filter(b => getBatchStatus(b.ending_date).label !== 'Active').map((batch) => {
+                                            const status = getBatchStatus(batch.ending_date);
+                                            const isActive = status.label === 'Active';
+                                            return (
+                                                <button
+                                                    key={batch.batch_id}
+                                                    onClick={() => handleBatchClick(batch)}
+                                                    className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                                                >
+                                                    <div className="p-6">
+                                                        <div className="flex items-start justify-between gap-3 mb-4">
+                                                            <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0">
+                                                                <LayoutGrid className="w-6 h-6 neu-accent-text" />
+                                                            </div>
+                                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${isActive
+                                                                ? 'neu-tile text-[#10B981] dark:text-emerald-400'
+                                                                : 'neu-inset text-[#94A3B8] dark:text-gray-400'
+                                                                }`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#10B981] animate-pulse' : 'bg-[#94A3B8]'}`} />
+                                                                {status.label}
+                                                            </span>
+                                                        </div>
+                                                        <h3 className="text-lg font-bold text-[#111827] dark:text-white line-clamp-2 mb-4 group-hover:text-[var(--neu-accent)] transition-colors" title={batch.batch_name}>
+                                                            {batch.batch_name}
+                                                        </h3>
+                                                        <div className="flex gap-3 mb-4">
+                                                            <div className="flex-1 rounded-2xl neu-inset px-4 py-3">
+                                                                <div className="text-xl font-bold tabular-nums text-[#111827] dark:text-white">{batch.actual_student_count || 0}</div>
+                                                                <div className="text-[11px] font-semibold text-[#94A3B8] dark:text-gray-500 uppercase tracking-wide">Students</div>
+                                                            </div>
+                                                            <div className="flex-1 rounded-2xl neu-inset px-4 py-3">
+                                                                <div className="text-xl font-bold tabular-nums text-[#111827] dark:text-white">{batch.registered_courses_id?.length || 0}</div>
+                                                                <div className="text-[11px] font-semibold text-[#94A3B8] dark:text-gray-500 uppercase tracking-wide">Courses</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-xs text-[#6B7280] dark:text-gray-400 pt-3 border-t border-[var(--neu-dark)] dark:border-white/5">
+                                                            <span className="flex items-center gap-1.5">
+                                                                <Clock className="w-3.5 h-3.5 text-[#94A3B8]" />
+                                                                {new Date(batch.starting_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                {' - '}
+                                                                {new Date(batch.ending_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                            </span>
+                                                            <ChevronRight className="w-4 h-4 neu-accent-text group-hover:translate-x-1 transition-transform" />
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                    {!loading && batches.filter(b => getBatchStatus(b.ending_date).label !== 'Active').length === 0 && (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No completed batches</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     {/* View: Sections */}
                     {view === 'sections' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
-                            {loading ? (
-                                <>
-                                    <SectionSkeleton /><SectionSkeleton /><SectionSkeleton /><SectionSkeleton />
-                                    <SectionSkeleton /><SectionSkeleton /><SectionSkeleton /><SectionSkeleton />
-                                </>
-                            ) : (
-                                sections.map((sec, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => handleSectionClick(sec)}
-                                        className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-                                    >
-                                        <div className="p-5 flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                                <Layers className="w-6 h-6 text-[#10B981] dark:text-emerald-400" />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="text-base font-bold text-[#111827] dark:text-white truncate group-hover:text-[var(--neu-accent)] transition-colors">{sec}</div>
-                                                <div className="text-xs font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">Section</div>
-                                            </div>
-                                            <ChevronRight className="w-4 h-4 shrink-0 text-[#94A3B8] group-hover:text-[var(--neu-accent)] group-hover:translate-x-1 transition-all" />
-                                        </div>
-                                    </button>
-                                ))
-                            )}
-                            {!loading && sections.length === 0 && (
-                                <div className="col-span-full flex flex-col items-center py-24 text-[#94A3B8] dark:text-gray-500">
-                                    <div className="w-16 h-16 rounded-[20px] neu-raised flex items-center justify-center mb-4">
-                                        <Layers className="w-7 h-7 opacity-40" />
-                                    </div>
-                                    <p className="text-sm font-medium">No sections found</p>
+                        <div className="space-y-8 w-full">
+                            {/* Active Sections */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-success flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Active</h3>
                                 </div>
-                            )}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+                                    {loading ? (
+                                        <>
+                                            <SectionSkeleton /><SectionSkeleton /><SectionSkeleton /><SectionSkeleton />
+                                        </>
+                                    ) : (
+                                        sections.filter(s => getBatchStatus(s.ending_date || new Date(Date.now() + 86400000).toISOString()).label === 'Active').map((sec, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleSectionClick(sec)}
+                                                className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                                            >
+                                                <div className="p-5 flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                        <Layers className="w-6 h-6 text-[#10B981] dark:text-emerald-400" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-base font-bold text-[#111827] dark:text-white truncate group-hover:text-[var(--neu-accent)] transition-colors">{sec.section_name || sec}</div>
+                                                        <div className="text-[10px] font-semibold text-[#94A3B8] dark:text-gray-500 mt-0.5" title={sec.batch_name || ''}>{sec.batch_name || 'Section'}</div>
+                                                    </div>
+                                                    <ChevronRight className="w-4 h-4 shrink-0 text-[#94A3B8] group-hover:text-[var(--neu-accent)] group-hover:translate-x-1 transition-all" />
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                    {!loading && sections.filter(s => getBatchStatus(s.ending_date || new Date(Date.now() + 86400000).toISOString()).label === 'Active').length === 0 && (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No active sections</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Completed Sections */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-secondary flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#94A3B8]"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Completed</h3>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+                                    {loading ? (
+                                        <>
+                                            <SectionSkeleton /><SectionSkeleton /><SectionSkeleton /><SectionSkeleton />
+                                        </>
+                                    ) : (
+                                        sections.filter(s => getBatchStatus(s.ending_date || new Date(Date.now() + 86400000).toISOString()).label !== 'Active').map((sec, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleSectionClick(sec)}
+                                                className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                                            >
+                                                <div className="p-5 flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                        <Layers className="w-6 h-6 text-[#10B981] dark:text-emerald-400" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-base font-bold text-[#111827] dark:text-white truncate group-hover:text-[var(--neu-accent)] transition-colors">{sec.section_name || sec}</div>
+                                                        <div className="text-[10px] font-semibold text-[#94A3B8] dark:text-gray-500 mt-0.5" title={sec.batch_name || ''}>{sec.batch_name || 'Section'}</div>
+                                                    </div>
+                                                    <ChevronRight className="w-4 h-4 shrink-0 text-[#94A3B8] group-hover:text-[var(--neu-accent)] group-hover:translate-x-1 transition-all" />
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                    {!loading && sections.filter(s => getBatchStatus(s.ending_date || new Date(Date.now() + 86400000).toISOString()).label !== 'Active').length === 0 && (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No completed sections</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
-
                     {/* View: Teachers */}
                     {view === 'teachers' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -1428,118 +1552,260 @@ export default function DeepDiveDashboard() {
 
                     {/* View: Courses */}
                     {view === 'courses' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                            {loading ? (
-                                <>
-                                    <BatchSkeleton /><BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
-                                </>
-                            ) : (
-                                courses.map((course, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => handleCourseClick(course)}
-                                        className="group relative flex items-center gap-4 text-left neu-raised rounded-[24px] p-5 neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-                                    >
-                                        <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                            <BookOpen className="w-6 h-6 neu-accent-text" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="text-[15px] font-bold text-[#111827] dark:text-white line-clamp-2 group-hover:text-[var(--neu-accent)] transition-colors" title={course.course_name}>
-                                                {course.course_name || 'Untitled Course'}
-                                            </h3>
-                                            <p className="text-xs font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">Course</p>
-                                        </div>
-                                        <ChevronRight className="w-4 h-4 shrink-0 text-[#94A3B8] group-hover:text-[var(--neu-accent)] group-hover:translate-x-1 transition-all" />
-                                    </button>
-                                ))
-                            )}
-                            {!loading && courses.length === 0 && (
-                                <div className="col-span-full flex flex-col items-center py-24 text-[#94A3B8] dark:text-gray-500">
-                                    <div className="w-16 h-16 rounded-[20px] neu-raised flex items-center justify-center mb-4">
-                                        <BookOpen className="w-7 h-7 opacity-40" />
-                                    </div>
-                                    <p className="text-sm font-medium">No courses found</p>
+                        <div className="space-y-8 w-full">
+                            {/* Ongoing Courses */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-success flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Ongoing</h3>
                                 </div>
-                            )}
-                        </div>
-                    )}
-                    {/* View: Exams */}
-                    {view === 'exams' && (
-                        <>
-                        <div className="flex justify-end mb-4">
-                            <div className="relative w-full lg:w-80">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
-                                <input type="text" placeholder="Search exams..." value={examGridSearch}
-                                    onChange={(e) => setExamGridSearch(e.target.value)}
-                                    className="w-full h-11 neu-inset rounded-[14px] pl-11 pr-9 text-sm text-[#111827] dark:text-white placeholder-[#94A3B8] dark:placeholder-gray-500 outline-none transition" />
-                                {examGridSearch && (
-                                    <button onClick={() => setExamGridSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">×</button>
-                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {loading ? (
+                                        <>
+                                            <CourseSkeleton /><CourseSkeleton /><CourseSkeleton />
+                                            <CourseSkeleton /><CourseSkeleton /><CourseSkeleton />
+                                        </>
+                                    ) : (
+                                        courses.filter(c => getBatchStatus(c.course_ending_date || c.ending_date || new Date(Date.now() + 86400000).toISOString()).label === 'Active').map((course, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleCourseClick(course)}
+                                                className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                                            >
+                                                <div className="p-6">
+                                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                                        <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                            <BookOpen className="w-6 h-6 neu-accent-text" />
+                                                        </div>
+                                                        <span className="px-3 py-1 rounded-full text-xs font-bold neu-inset text-[#94A3B8] dark:text-gray-400 tabular-nums">
+                                                            {course.course_code || 'CODE'}
+                                                        </span>
+                                                    </div>
+
+                                                    <h3 className="text-lg font-bold text-[#111827] dark:text-white line-clamp-2 mb-2 group-hover:text-[var(--neu-accent)] transition-colors" title={course.course_name}>
+                                                        {course.course_name}
+                                                    </h3>
+                                                    <p className="text-xs font-semibold text-[#6B7280] dark:text-gray-400 line-clamp-1 mb-5" title={course.university_name}>
+                                                        {course.university_name || 'EduCode Platform'}
+                                                    </p>
+
+                                                    <div className="flex items-center justify-end pt-4 border-t border-[var(--neu-dark)] dark:border-white/5">
+                                                        <ChevronRight className="w-4 h-4 neu-accent-text group-hover:translate-x-1 transition-transform" />
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                    {!loading && courses.filter(c => getBatchStatus(c.course_ending_date || c.ending_date || new Date(Date.now() + 86400000).toISOString()).label === 'Active').length === 0 && (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No ongoing courses</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Completed Courses */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-secondary flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#94A3B8]"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Completed</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {loading ? (
+                                        <>
+                                            <CourseSkeleton /><CourseSkeleton /><CourseSkeleton />
+                                            <CourseSkeleton /><CourseSkeleton /><CourseSkeleton />
+                                        </>
+                                    ) : (
+                                        courses.filter(c => getBatchStatus(c.course_ending_date || c.ending_date || new Date(Date.now() + 86400000).toISOString()).label !== 'Active').map((course, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleCourseClick(course)}
+                                                className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                                            >
+                                                <div className="p-6">
+                                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                                        <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                            <BookOpen className="w-6 h-6 neu-accent-text" />
+                                                        </div>
+                                                        <span className="px-3 py-1 rounded-full text-xs font-bold neu-inset text-[#94A3B8] dark:text-gray-400 tabular-nums">
+                                                            {course.course_code || 'CODE'}
+                                                        </span>
+                                                    </div>
+
+                                                    <h3 className="text-lg font-bold text-[#111827] dark:text-white line-clamp-2 mb-2 group-hover:text-[var(--neu-accent)] transition-colors" title={course.course_name}>
+                                                        {course.course_name}
+                                                    </h3>
+                                                    <p className="text-xs font-semibold text-[#6B7280] dark:text-gray-400 line-clamp-1 mb-5" title={course.university_name}>
+                                                        {course.university_name || 'EduCode Platform'}
+                                                    </p>
+
+                                                    <div className="flex items-center justify-end pt-4 border-t border-[var(--neu-dark)] dark:border-white/5">
+                                                        <ChevronRight className="w-4 h-4 neu-accent-text group-hover:translate-x-1 transition-transform" />
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                    {!loading && courses.filter(c => getBatchStatus(c.course_ending_date || c.ending_date || new Date(Date.now() + 86400000).toISOString()).label !== 'Active').length === 0 && (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No completed courses</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                            {(examsLoading || examsOverview === null) ? (
-                                <><BatchSkeleton /><BatchSkeleton /><BatchSkeleton /></>
-                            ) : filteredExamsOverview.length === 0 ? (
-                                <div className="col-span-full flex flex-col items-center py-24 text-[#94A3B8] dark:text-gray-500">
-                                    <div className="w-16 h-16 rounded-[20px] neu-raised flex items-center justify-center mb-4">
-                                        <Trophy className="w-7 h-7 opacity-40" />
-                                    </div>
-                                    <p className="text-sm font-medium">{examGridSearch ? `No exams match "${examGridSearch}"` : 'No exam data found'}</p>
-                                </div>
-                            ) : (
-                                filteredExamsOverview.map((exam) => (
-                                    <button
-                                        key={exam.course_id}
-                                        onClick={() => openExamDrilldown(exam)}
-                                        className="group relative text-left neu-raised rounded-[24px] p-6 neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-                                    >
-                                        <div className="flex items-start gap-3 mb-4">
-                                            <div className="w-11 h-11 rounded-2xl neu-tile flex items-center justify-center shrink-0">
-                                                <Trophy className="w-5 h-5 text-amber-500" />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <h3 className="text-[15px] font-bold text-[#111827] dark:text-white line-clamp-2 group-hover:text-[var(--neu-accent)] transition-colors" title={exam.course_name}>
-                                                    {exam.course_name || 'Untitled Exam'}
-                                                </h3>
-                                                <p className="text-xs font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">
-                                                    {exam.attempted} of {exam.enrolled} attempted
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 mb-3">
-                                            <div className="neu-inset rounded-xl px-2 py-2.5 text-center">
-                                                <div className="text-lg font-bold text-[#111827] dark:text-white tabular-nums">{exam.avg_attempted}</div>
-                                                <div className="text-[9px] font-semibold text-[#6B7280] dark:text-gray-400 uppercase tracking-wide">Avg (Attempted)</div>
-                                            </div>
-                                            <div className="neu-inset rounded-xl px-2 py-2.5 text-center">
-                                                <div className="text-lg font-bold text-[#111827] dark:text-white tabular-nums">{exam.avg_all}</div>
-                                                <div className="text-[9px] font-semibold text-[#6B7280] dark:text-gray-400 uppercase tracking-wide">Avg (All)</div>
-                                            </div>
-                                            <div className="neu-inset rounded-xl px-2 py-2.5 text-center">
-                                                <div className="text-lg font-bold text-[#111827] dark:text-white tabular-nums">{exam.highest}</div>
-                                                <div className="text-[9px] font-semibold text-[#6B7280] dark:text-gray-400 uppercase tracking-wide">Highest</div>
-                                            </div>
-                                        </div>
-                                        {exam.sections?.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {exam.sections.slice(0, 4).map(s => (
-                                                    <span key={s.section} className="neu-inset text-[10px] font-semibold text-[#6B7280] dark:text-gray-400 px-2 py-1 rounded-full tabular-nums">
-                                                        {s.section}: {s.avg_attempted} avg · {s.attempted}/{s.enrolled}
-                                                    </span>
-                                                ))}
-                                                {exam.sections.length > 4 && (
-                                                    <span className="text-[10px] font-semibold text-[#94A3B8] px-1 py-1">+{exam.sections.length - 4} more</span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </button>
-                                ))
-                            )}
-                        </div>
-                        </>
                     )}
-                </main>
+
+                    {/* View: Exams */}
+                    {view === 'exams' && (
+                        <div className="space-y-8 w-full">
+                            {/* Ongoing Exams */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-success flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Ongoing</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {(examsLoading || examsOverview === null) ? (
+                                        <>
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                        </>
+                                    ) : filteredExamsOverview.filter(e => getBatchStatus(e.course_ending_date || e.ending_date || e.batch_ending_date || new Date(Date.now() + 86400000).toISOString()).label === 'Active').length === 0 ? (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No ongoing exams match criteria</p>
+                                        </div>
+                                    ) : (
+                                        filteredExamsOverview.filter(e => getBatchStatus(e.course_ending_date || e.ending_date || e.batch_ending_date || new Date(Date.now() + 86400000).toISOString()).label === 'Active').map((exam) => (
+                                            <button
+                                                key={exam.course_id}
+                                                onClick={() => openExamDrilldown(exam)}
+                                                className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-full"
+                                            >
+                                                <div className="p-6 flex-1 flex flex-col">
+                                                    <div className="flex items-start gap-4 mb-4">
+                                                        <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                            <Trophy className="w-6 h-6 neu-accent-text" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className="text-[15px] leading-tight font-bold text-[#111827] dark:text-white line-clamp-2 group-hover:text-[var(--neu-accent)] transition-colors" title={exam.course_name}>
+                                                                {exam.course_name}
+                                                            </h3>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-3 mb-4 mt-auto">
+                                                        <div className="neu-inset rounded-xl p-3">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1.5"><Users className="w-3 h-3" /> Attempted</div>
+                                                            <div className="text-xl font-bold text-[#111827] dark:text-white tabular-nums leading-none">{exam.attempted} <span className="text-xs text-gray-400 font-medium">/ {exam.enrolled}</span></div>
+                                                        </div>
+                                                        <div className="neu-inset rounded-xl p-3">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1.5"><TrendingUp className="w-3 h-3" /> Avg Score</div>
+                                                            <div className="text-xl font-bold text-[#10B981] dark:text-emerald-400 tabular-nums leading-none">{exam.avg_attempted}<span className="text-xs">%</span></div>
+                                                        </div>
+                                                    </div>
+
+                                                    {exam.sections?.length > 0 && (
+                                                        <div className="pt-4 border-t border-[var(--neu-dark)] dark:border-white/5">
+                                                            <div className="text-xs font-semibold text-[#94A3B8] dark:text-gray-500 mb-2">Sections</div>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {exam.sections.slice(0, 3).map(s => (
+                                                                    <span key={s.section} className="px-2 py-0.5 rounded-full neu-inset text-[10px] font-bold text-gray-500 dark:text-gray-400" title={`${s.attempted}/${s.enrolled} attempted, ${s.avg_attempted}% avg`}>
+                                                                        {s.section}
+                                                                    </span>
+                                                                ))}
+                                                                {exam.sections.length > 3 && (
+                                                                    <span className="px-2 py-0.5 rounded-full neu-inset text-[10px] font-bold text-gray-500 dark:text-gray-400">+{exam.sections.length - 3}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Completed Exams */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-8 h-8 rounded-xl neu-chip neu-chip-secondary flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#94A3B8]"></div>
+                                    </span>
+                                    <h3 className="font-bold text-[#111827] dark:text-white text-lg">Completed</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {(examsLoading || examsOverview === null) ? (
+                                        <>
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                            <BatchSkeleton /><BatchSkeleton /><BatchSkeleton />
+                                        </>
+                                    ) : filteredExamsOverview.filter(e => getBatchStatus(e.course_ending_date || e.ending_date || e.batch_ending_date || new Date(Date.now() + 86400000).toISOString()).label !== 'Active').length === 0 ? (
+                                        <div className="col-span-full flex flex-col items-center py-12 text-[#94A3B8] dark:text-gray-500">
+                                            <p className="text-sm font-medium">No completed exams match criteria</p>
+                                        </div>
+                                    ) : (
+                                        filteredExamsOverview.filter(e => getBatchStatus(e.course_ending_date || e.ending_date || e.batch_ending_date || new Date(Date.now() + 86400000).toISOString()).label !== 'Active').map((exam) => (
+                                            <button
+                                                key={exam.course_id}
+                                                onClick={() => openExamDrilldown(exam)}
+                                                className="group relative text-left neu-raised rounded-[24px] neu-hover hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-full"
+                                            >
+                                                <div className="p-6 flex-1 flex flex-col">
+                                                    <div className="flex items-start gap-4 mb-4">
+                                                        <div className="w-12 h-12 rounded-2xl neu-tile flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                            <Trophy className="w-6 h-6 neu-accent-text" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className="text-[15px] leading-tight font-bold text-[#111827] dark:text-white line-clamp-2 group-hover:text-[var(--neu-accent)] transition-colors" title={exam.course_name}>
+                                                                {exam.course_name}
+                                                            </h3>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-3 mb-4 mt-auto">
+                                                        <div className="neu-inset rounded-xl p-3">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1.5"><Users className="w-3 h-3" /> Attempted</div>
+                                                            <div className="text-xl font-bold text-[#111827] dark:text-white tabular-nums leading-none">{exam.attempted} <span className="text-xs text-gray-400 font-medium">/ {exam.enrolled}</span></div>
+                                                        </div>
+                                                        <div className="neu-inset rounded-xl p-3">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1.5"><TrendingUp className="w-3 h-3" /> Avg Score</div>
+                                                            <div className="text-xl font-bold text-[#10B981] dark:text-emerald-400 tabular-nums leading-none">{exam.avg_attempted}<span className="text-xs">%</span></div>
+                                                        </div>
+                                                    </div>
+
+                                                    {exam.sections?.length > 0 && (
+                                                        <div className="pt-4 border-t border-[var(--neu-dark)] dark:border-white/5">
+                                                            <div className="text-xs font-semibold text-[#94A3B8] dark:text-gray-500 mb-2">Sections</div>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {exam.sections.slice(0, 3).map(s => (
+                                                                    <span key={s.section} className="px-2 py-0.5 rounded-full neu-inset text-[10px] font-bold text-gray-500 dark:text-gray-400" title={`${s.attempted}/${s.enrolled} attempted, ${s.avg_attempted}% avg`}>
+                                                                        {s.section}
+                                                                    </span>
+                                                                ))}
+                                                                {exam.sections.length > 3 && (
+                                                                    <span className="px-2 py-0.5 rounded-full neu-inset text-[10px] font-bold text-gray-500 dark:text-gray-400">+{exam.sections.length - 3}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    </main>
 
                 {/* --- MODALS --- */}
 

@@ -64,10 +64,10 @@ export default function DashboardLayout({ children }) {
 
   const navigation = [
     { name: "Overview", href: "/dashboard", icon: LayoutGrid },
-    { name: "Practice Tracking", href: "/dashboard/practice", icon: Code2 },
-    { name: "Exam Results", href: "/dashboard/results", icon: GraduationCap },
-    { name: "Student Search", href: "/dashboard/search", icon: Search },
-    { name: "Live Roster", href: "/dashboard/live-roster", icon: Users },
+    // { name: "Practice Tracking", href: "/dashboard/practice", icon: Code2 },
+    // { name: "Exam Results", href: "/dashboard/results", icon: GraduationCap },
+    // { name: "Student Search", href: "/dashboard/search", icon: Search },
+    // { name: "Live Roster", href: "/dashboard/live-roster", icon: Users },
   ];
 
   if (pathname && (pathname.includes("/details-analysis") || pathname.includes("/question-analysis"))) {
