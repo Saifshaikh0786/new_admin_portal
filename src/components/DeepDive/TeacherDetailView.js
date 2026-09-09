@@ -355,16 +355,17 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
                         {teacher.assigned_section && teacher.assigned_section.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {teacher.assigned_section.map((section, idx) => {
-                                    const progress = getSectionProgress(section);
-                                    const isLoading = loadingProgress[section];
-                                    const sectionDetails = getSectionDetails(section);
+                                    const secName = typeof section === "object" ? (section?.section_name || section?.name || "") : section;
+                                    const progress = getSectionProgress(secName);
+                                    const isLoading = loadingProgress[secName];
+                                    const sectionDetails = getSectionDetails(secName);
                                     const studentCount = sectionDetails?.section_metadata?.total_students;
                                     const courseCount = sectionDetails?.course_performance?.length;
 
                                     return (
                                         <div
                                             key={idx}
-                                            onClick={() => onSectionSelect && onSectionSelect(section)}
+                                            onClick={() => onSectionSelect && onSectionSelect(secName)}
                                             className="p-5 rounded-2xl neu-raised hover:bg-[var(--neu-success-soft)] dark:hover:bg-[var(--card)]/10 hover:border-emerald-500/30 transition-all group cursor-pointer relative overflow-hidden"
                                         >
                                             {/* Loading Overlay */}
@@ -380,7 +381,7 @@ export default function TeacherDetailView({ teacher, onBack, onSectionSelect, ca
                                                         <BookOpen className="w-5 h-5" />
                                                     </div>
                                                     <div>
-                                                        <div className="font-bold text-gray-900 dark:text-white text-lg">{section}</div>
+                                                        <div className="font-bold text-gray-900 dark:text-white text-lg">{typeof section === "object" ? (section?.section_name || section?.name || "Section") : section}</div>
                                                         <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
                                                             {studentCount !== undefined && (
                                                                 <span>{studentCount} students</span>

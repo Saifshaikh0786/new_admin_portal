@@ -656,9 +656,9 @@ function DetailsAnalysisContent() {
                                                 </div>
                                                 <div className="space-y-2">
                                                     {sub.options?.map((opt, i) => {
-                                                        const optText = typeof opt === 'string' ? opt : opt.option;
-                                                        const isCorrectOption = typeof opt === 'string' ? false : opt.isAnswer;
-                                                        const isSelected = sub.submitted_answer_index === i;
+                                                        const optText = typeof opt === 'string' ? opt : (opt?.text ?? opt?.option ?? opt?.label ?? opt?.value ?? '');
+                                                        const isCorrectOption = typeof opt === 'string' ? false : (opt?.is_correct === true || opt?.isAnswer === true || opt?.isCorrect === true || opt?.correct === true);
+                                                        const isSelected = sub.submitted_answer_index === i || (sub.submitted_answer_text && optText && String(sub.submitted_answer_text).trim().toLowerCase() === String(optText).trim().toLowerCase());
 
                                                         let cls = "border-white/5 bg-white/[0.02]";
                                                         let badge = null;

@@ -502,7 +502,7 @@ function ExamResultsContent() {
                 <div className="flex-shrink-0 w-28">
                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Section</label>
                     <select value={selectedSection} onChange={(e) => setSelectedSection(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 truncate">
-                        {sections.map(s => <option key={s} value={s}>{s}</option>)}
+                        {sections.map((s, si) => { const sVal = typeof s === "object" ? s.section_name : s; return <option key={sVal || si} value={sVal}>{sVal}</option>; })}
                     </select>
                 </div>
 

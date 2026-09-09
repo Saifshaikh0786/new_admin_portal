@@ -935,7 +935,7 @@ function BatchAnalyticsContent() {
   useEffect(() => { setPage(1); }, [searchQuery, sectionFilter]);
 
   const allSections = useMemo(() => {
-    const set = new Set((data?.student_lists?.all || []).map(s => s.section || 'Unassigned'));
+    const set = new Set((data?.student_lists?.all || []).map(s => typeof s.section === 'object' ? (s.section?.section_name || 'Unassigned') : (s.section || 'Unassigned')));
     return ['ALL', ...Array.from(set)];
   }, [data]);
 
@@ -2098,7 +2098,7 @@ function LeaderboardTab({
             <select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)}
               className="border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-[#1a73e8] outline-none">
               {allSections.map(sec => (
-                <option key={sec} value={sec}>{sec === 'ALL' ? 'All Sections' : `Section ${sec}`}</option>
+                <option key={typeof sec === 'object' ? sec?.section_name || 'sec' : sec} value={typeof sec === 'object' ? sec?.section_name || '' : sec}>{sec === 'ALL' ? 'All Sections' : `Section ${typeof sec === 'object' ? sec?.section_name || '' : sec}`}</option>
               ))}
             </select>
             <select value={sortBy} onChange={e => setSortBy(e.target.value)}
@@ -2709,7 +2709,7 @@ function TeachersTab({ data, batchData, lowestPractice, lowestExams, batch_id, o
                           const sColor = sScore >= 70 ? theme.success : sScore >= 50 ? theme.warning : theme.danger;
                           return (
                             <span key={si} className="px-2 py-0.5 rounded text-[11px] font-medium border" style={{ backgroundColor: `${sColor}15`, color: sColor, borderColor: `${sColor}30` }}>
-                              {sec} {sScore !== undefined ? `${sScore}%` : ''}
+                              {typeof sec === 'object' ? sec?.section_name || sec?.name || 'Section' : sec} {sScore !== undefined ? `${sScore}%` : ''}
                             </span>
                           );
                         })}

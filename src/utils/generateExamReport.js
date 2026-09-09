@@ -25,8 +25,8 @@ export function generateExamReport(ctx) {
         const esc = (str) => (str || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         const mcqRows = mcqSubs.map((sub, idx) => {
-            const correctOpt = sub.options?.find(o => typeof o !== 'string' && o.isAnswer);
-            const correctText = correctOpt ? esc(correctOpt.option) : '-';
+            const correctOpt = sub.options?.find(o => typeof o !== 'string' && (o.is_correct === true || o.isAnswer === true || o.isCorrect === true || o.correct === true));
+            const correctText = correctOpt ? esc(correctOpt.text ?? correctOpt.option ?? '') : '-';
             const isCorrect = sub.is_correct;
             return `<tr style="${idx % 2 === 0 ? '' : 'background:#f8fafc;'}">
                 <td class="tc">${idx + 1}</td>

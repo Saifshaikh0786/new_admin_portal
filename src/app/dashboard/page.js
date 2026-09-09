@@ -79,17 +79,41 @@ export default function DeepDiveDashboard() {
 
     const recordRecent = (type, label, payload) => {
         try {
+            const safeLabel = typeof label === 'object'
+                ? (label?.section_name || label?.student_name || label?.name || '')
+                : String(label || '');
+            if (!safeLabel || safeLabel === '[object Object]') return;
+
             const key = 'educode_recent_items';
             const prev = JSON.parse(localStorage.getItem(key) || '[]');
-            const next = [{ type, label, payload, ts: Date.now() },
-                ...prev.filter(i => !(i.type === type && i.label === label))].slice(0, 5);
+            const sanitizedPrev = (Array.isArray(prev) ? prev : []).filter(i => {
+                if (!i) return false;
+                const l = typeof i.label === 'object' ? (i.label?.section_name || i.label?.student_name || i.label?.name) : i.label;
+                return typeof l === 'string' && l.trim() !== '' && l !== '[object Object]';
+            }).map(i => ({
+                ...i,
+                label: typeof i.label === 'object' ? (i.label?.section_name || i.label?.student_name || i.label?.name || '') : String(i.label)
+            }));
+
+            const next = [{ type, label: safeLabel, payload, ts: Date.now() },
+                ...sanitizedPrev.filter(i => !(i.type === type && i.label === safeLabel))].slice(0, 5);
             localStorage.setItem(key, JSON.stringify(next));
             setRecentItems(next);
         } catch (e) { /* non-critical */ }
     };
 
     useEffect(() => {
-        try { setRecentItems(JSON.parse(localStorage.getItem('educode_recent_items') || '[]')); } catch (e) { }
+        try {
+            const raw = JSON.parse(localStorage.getItem('educode_recent_items') || '[]');
+            const sanitized = (Array.isArray(raw) ? raw : []).map(i => {
+                if (!i) return null;
+                const label = typeof i.label === 'object' ? (i.label?.section_name || i.label?.student_name || i.label?.name || '') : String(i.label || '');
+                if (!label || label === '[object Object]') return null;
+                return { ...i, label };
+            }).filter(Boolean);
+            setRecentItems(sanitized);
+            localStorage.setItem('educode_recent_items', JSON.stringify(sanitized));
+        } catch (e) { }
     }, []);
 
     // Fetch Today blocks once after auth (non-blocking, independent failures)
@@ -696,10 +720,16 @@ export default function DeepDiveDashboard() {
         }
     };
 
-    const handleSectionClick = (sectionName) => {
+    const handleSectionClick = (section) => {
+        const sectionName = typeof section === 'string' ? section : (section?.section_name || '');
+        if (!sectionName) return;
         recordRecent('section', sectionName, { section_name: sectionName });
         pushOverlayState();
-        setInspectingSection({ section_name: sectionName, batch_name: 'Active Sections' });
+        setInspectingSection({
+            ...(typeof section === 'object' ? section : {}),
+            section_name: sectionName,
+            batch_name: (typeof section === 'object' && section?.batch_name) ? section.batch_name : 'Active Sections'
+        });
     };
 
     const handleBatchClick = (batch) => {
@@ -1125,7 +1155,7 @@ export default function DeepDiveDashboard() {
                                         onClick={() => item.type === 'section' ? handleSectionClick(item.label) : startStudentInspection(item.payload)}
                                         className={`neu-badge ${item.type === 'section' ? 'neu-badge-achieve' : 'neu-badge-info'}`}>
                                         {item.type === 'section' ? <Layers className="w-3 h-3" /> : <GraduationCap className="w-3 h-3" />}
-                                        {item.label}
+                                        {typeof item.label === 'object' ? (item.label?.section_name || item.label?.name || 'Section') : item.label}
                                     </button>
                                 ))}
                             </div>
@@ -1373,7 +1403,7 @@ export default function DeepDiveDashboard() {
                                                         <Layers className="w-6 h-6 text-[#10B981] dark:text-emerald-400" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="text-base font-bold text-[#111827] dark:text-white truncate group-hover:text-[var(--neu-accent)] transition-colors">{sec.section_name || sec}</div>
+                                                        <div className="text-base font-bold text-[#111827] dark:text-white truncate group-hover:text-[var(--neu-accent)] transition-colors">{typeof sec === 'object' ? (sec?.section_name || 'Section') : (sec || 'Section')}</div>
                                                         <div className="text-[10px] font-semibold text-[#94A3B8] dark:text-gray-500 mt-0.5" title={sec.batch_name || ''}>{sec.batch_name || 'Section'}</div>
                                                     </div>
                                                     <ChevronRight className="w-4 h-4 shrink-0 text-[#94A3B8] group-hover:text-[var(--neu-accent)] group-hover:translate-x-1 transition-all" />
@@ -1414,7 +1444,7 @@ export default function DeepDiveDashboard() {
                                                         <Layers className="w-6 h-6 text-[#10B981] dark:text-emerald-400" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="text-base font-bold text-[#111827] dark:text-white truncate group-hover:text-[var(--neu-accent)] transition-colors">{sec.section_name || sec}</div>
+                                                        <div className="text-base font-bold text-[#111827] dark:text-white truncate group-hover:text-[var(--neu-accent)] transition-colors">{typeof sec === 'object' ? (sec?.section_name || 'Section') : (sec || 'Section')}</div>
                                                         <div className="text-[10px] font-semibold text-[#94A3B8] dark:text-gray-500 mt-0.5" title={sec.batch_name || ''}>{sec.batch_name || 'Section'}</div>
                                                     </div>
                                                     <ChevronRight className="w-4 h-4 shrink-0 text-[#94A3B8] group-hover:text-[var(--neu-accent)] group-hover:translate-x-1 transition-all" />
@@ -1470,7 +1500,7 @@ export default function DeepDiveDashboard() {
                                                         {t.assigned_section && Array.isArray(t.assigned_section) && t.assigned_section.length > 0 ? (
                                                             t.assigned_section.map((sec, i) => (
                                                                 <span key={i} className="px-2.5 py-1 rounded-full neu-tile text-[#10B981] dark:text-emerald-400 text-xs font-semibold">
-                                                                    {sec}
+                                                                    {typeof sec === 'object' ? (sec?.section_name || sec?.name || 'Section') : sec}
                                                                 </span>
                                                             ))
                                                         ) : (
@@ -1828,7 +1858,7 @@ export default function DeepDiveDashboard() {
                 {selectedSection && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#0F172A]/30 dark:bg-black/60 backdrop-blur-sm" onClick={closeAll}>
                         <div className="neu-raised rounded-[24px] w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
-                            <h3 className="text-lg font-bold text-[#111827] dark:text-white mb-4">Section {selectedSection}</h3>
+                            <h3 className="text-lg font-bold text-[#111827] dark:text-white mb-4">Section {typeof selectedSection === 'object' ? (selectedSection?.section_name || '') : selectedSection}</h3>
                             <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
                                 {sectionStudents.map((s, i) => (
                                     <div key={i} className="flex justify-between items-center px-4 py-3 neu-inset rounded-2xl">

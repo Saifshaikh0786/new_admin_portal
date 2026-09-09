@@ -575,8 +575,9 @@ function StudentReportContent() {
                                                     
                                                     <div className="space-y-2 mt-4">
                                                         {options.map((opt, oIdx) => {
-                                                            const isSelected = selectedOptionText == oIdx || selectedOptionText === opt.option;
-                                                            const isCorrect = opt.isAnswer;
+                                                            const optText = typeof opt === 'object' && opt !== null ? (opt.text ?? opt.option ?? opt.label ?? opt.value ?? '') : String(opt ?? '');
+                                                            const isSelected = selectedOptionText == oIdx || selectedOptionText === optText || (opt?.option && selectedOptionText === opt.option);
+                                                            const isCorrect = typeof opt === 'object' && opt !== null ? (opt.is_correct === true || opt.isAnswer === true || opt.isCorrect === true || opt.correct === true) : false;
                                                             
                                                             let optClass = "p-3 rounded-xl border ";
                                                             if (isSelected && isCorrect) {
@@ -592,7 +593,7 @@ function StudentReportContent() {
                                                             return (
                                                                 <div key={oIdx} className={optClass}>
                                                                     <div className="flex justify-between items-center">
-                                                                        <span className="font-medium" dangerouslySetInnerHTML={{ __html: opt.option }} />
+                                                                        <span className="font-medium" dangerouslySetInnerHTML={{ __html: optText }} />
                                                                         {isSelected && <span className="text-xs uppercase font-bold tracking-wider">Your Answer</span>}
                                                                         {(!isSelected && isCorrect) && <span className="text-xs uppercase font-bold tracking-wider text-[var(--neu-success)]">Correct Answer</span>}
                                                                     </div>

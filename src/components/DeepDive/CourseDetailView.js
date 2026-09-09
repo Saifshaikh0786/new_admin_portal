@@ -735,7 +735,8 @@ export default function CourseDetailView({ course, onBack }) {
 
             <div className="space-y-3 relative z-10">
               {item.options?.map((opt, idx) => {
-                const isCorrect = opt.isAnswer;
+                const optText = typeof opt === 'object' && opt !== null ? (opt.text ?? opt.option ?? opt.label ?? opt.value ?? '') : String(opt ?? '');
+                const isCorrect = typeof opt === 'object' && opt !== null ? (opt.is_correct === true || opt.isAnswer === true || opt.isCorrect === true || opt.correct === true) : false;
 
                 return (
                   <div
@@ -765,7 +766,7 @@ export default function CourseDetailView({ course, onBack }) {
                           ? 'text-emerald-900 dark:text-emerald-100'
                           : 'text-gray-700 dark:text-gray-300'
                         }`}>
-                        {opt.option}
+                        {optText}
                       </span>
 
                       {isCorrect && (

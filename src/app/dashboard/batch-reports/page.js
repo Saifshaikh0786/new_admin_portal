@@ -47,7 +47,7 @@ function ReportCenterContent() {
                 // Fetch detailed matrix for all sections to build Curriculum Report
                 if (sectionsList.length > 0) {
                     const matrixPromises = sectionsList.map(sec => 
-                        fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/section-matrix?section=${encodeURIComponent(sec)}&limit=1000`, { headers })
+                        fetch(`${API_CONFIG.baseUrl.admin}/admin/analytics/section-matrix?section=${encodeURIComponent(typeof sec === 'object' ? sec?.section_name || sec?.section_id || '' : sec)}&limit=1000`, { headers })
                             .then(r => r.json())
                             .catch(e => null)
                     );

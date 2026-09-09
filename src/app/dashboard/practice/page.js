@@ -294,7 +294,7 @@ function PracticeTrackingContent() {
                         className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-lg p-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
                     >
                         {sections.map(s => (
-                            <option key={s} value={s}>{s}</option>
+                            <option key={typeof s === "object" ? s.section_id || s.section_name : s} value={typeof s === "object" ? s.section_name : s}>{typeof s === "object" ? s.section_name : s}</option>
                         ))}
                     </select>
                 </div>

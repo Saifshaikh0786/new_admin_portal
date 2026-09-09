@@ -2118,9 +2118,20 @@ const MCQSubmissionDetail = ({ sub }) => {
                 <div className="flex-1 space-y-2">
                     <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Options</div>
                     {sub.options && sub.options.map((option, optIdx) => {
-                        const optionText = typeof option === 'object' ? option.option : option;
-                        const isCorrectAnswer = typeof option === 'object' ? option.isAnswer === true : false;
-                        const isSelected = sub.submitted_answer_index === optIdx;
+                        const optionText = typeof option === 'object' && option !== null
+                            ? (option.text ?? option.option ?? option.label ?? option.value ?? '')
+                            : String(option ?? '');
+                        const isCorrectAnswer = typeof option === 'object' && option !== null
+                            ? (option.is_correct === true || option.isAnswer === true || option.isCorrect === true || option.correct === true)
+                            : false;
+                        const isSelected = (
+                            (sub.submitted_answer_index !== null && sub.submitted_answer_index !== undefined && Number(sub.submitted_answer_index) === optIdx) ||
+                            (sub.submitted_answer_text && optionText && String(sub.submitted_answer_text).trim().toLowerCase() === String(optionText).trim().toLowerCase()) ||
+                            (sub.submitted_code !== null && sub.submitted_code !== undefined && (
+                                String(sub.submitted_code).trim() === String(optIdx) ||
+                                (optionText && String(sub.submitted_code).trim().toLowerCase() === String(optionText).trim().toLowerCase())
+                            ))
+                        );
 
                         let bgClass = 'neu-inset border-gray-100 dark:border-white/5';
                         let textClass = 'text-gray-700 dark:text-gray-300';

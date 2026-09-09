@@ -28,7 +28,7 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
     }, [searchQuery]);
 
     const getInitialCompletions = () => {
-        const sectionName = typeof section === 'string' ? section : section.section_name || section;
+        const sectionName = typeof section === 'string' ? section : (typeof section?.section_name === 'string' ? section.section_name : (section?.section_name?.section_name || ''));
         return cache[sectionName] || {};
     };
 
@@ -845,7 +845,7 @@ export default function SectionDetailView({ section, teachers = [], onBack, onSt
 
                     <div className="space-y-1">
                         <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
-                            {section_metadata?.section_name || sectionName}
+                            {typeof (section_metadata?.section_name || sectionName) === 'object' ? (section_metadata?.section_name?.section_name || sectionName?.section_name || 'Section') : (section_metadata?.section_name || sectionName || 'Section')}
                         </h2>
                         <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 font-medium flex-wrap">
                             {/* Total Students */}

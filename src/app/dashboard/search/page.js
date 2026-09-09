@@ -332,7 +332,7 @@ export default function StudentSearchPage() {
                             >
                                 <option value="">Select section...</option>
                                 {sections.map(s => (
-                                    <option key={s} value={s}>{s}</option>
+                                    <option key={typeof s === "object" ? s.section_id || s.section_name : s} value={typeof s === "object" ? s.section_name : s}>{typeof s === "object" ? s.section_name : s}</option>
                                 ))}
                             </select>
                         </div>
