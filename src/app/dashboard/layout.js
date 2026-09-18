@@ -17,7 +17,8 @@ import {
   Settings,
   Save,
   Loader2,
-  User
+  User,
+  Activity
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -64,6 +65,7 @@ export default function DashboardLayout({ children }) {
 
   const navigation = [
     { name: "Overview", href: "/dashboard", icon: LayoutGrid },
+    { name: "Live Exam Command Center", href: "/dashboard/live-exam", icon: Activity },
     // { name: "Practice Tracking", href: "/dashboard/practice", icon: Code2 },
     // { name: "Exam Results", href: "/dashboard/results", icon: GraduationCap },
     // { name: "Student Search", href: "/dashboard/search", icon: Search },
