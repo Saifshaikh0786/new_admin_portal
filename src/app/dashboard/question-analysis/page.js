@@ -547,6 +547,7 @@ function StudentTable({ students }) {
       const term = searchTerm.toLowerCase();
       res = res.filter(s => 
         s.student_name?.toLowerCase().includes(term) ||
+        s.reg_id?.toLowerCase().includes(term) ||
         s.status?.toLowerCase().includes(term)
       );
     }
@@ -601,7 +602,12 @@ function StudentTable({ students }) {
           <tbody className="divide-y divide-gray-50">
             {filtered.map((s, i) => (
               <tr key={i} className="hover:bg-blue-50/30 transition-colors group">
-                <td className="px-5 py-3 font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{s.student_name}</td>
+                <td className="px-5 py-3 font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
+                  <div>{s.student_name && s.student_name !== 'Unknown Student' ? s.student_name : (s.reg_id || 'Student')}</div>
+                  {s.reg_id && s.student_name !== s.reg_id && (
+                    <div className="text-[11px] font-normal text-gray-400">{s.reg_id}</div>
+                  )}
+                </td>
                 <td className="px-5 py-3">
                   <Badge variant={
                     s.status === 'Correct' || s.status === 'Fully Solved' ? 'green' : 
@@ -609,7 +615,7 @@ function StudentTable({ students }) {
                     s.status === 'Not Attempted' ? 'gray' : 'red'
                   }>{s.status}</Badge>
                 </td>
-                <td className="px-5 py-3 text-gray-600 font-medium">{s.score}</td>
+                <td className="px-5 py-3 text-gray-600 font-medium">{s.max_score ? `${s.score} / ${s.max_score}` : s.score}</td>
                 <td className="px-5 py-3 text-gray-500">{s.time_spent}</td>
                 <td className="px-5 py-3 text-right text-gray-500 font-medium">{s.attempts}</td>
               </tr>
@@ -696,14 +702,14 @@ function CloneDonutChart({ title, data, totalLabel, centerValue, colors = CLONE_
         {/* Legend */}
         <div className="flex-1 space-y-3">
           {data.map((d, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: colors[i % colors.length] }} />
-                <span className="text-[11px] text-gray-700 font-medium w-16 truncate" title={d.label}>{d.label}</span>
+            <div key={i} className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
+                <span className="text-[11px] text-gray-700 font-medium truncate max-w-[130px]" title={d.label}>{d.label}</span>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] text-gray-400 font-bold w-6 text-right">{d.value}</span>
-                <span className="text-[11px] text-gray-400 w-8 text-right">{d.percentage}%</span>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-[11px] text-gray-500 font-bold text-right shrink-0">{typeof d.value === 'number' ? d.value.toLocaleString() : d.value}</span>
+                <span className="text-[11px] text-gray-400 min-w-[32px] text-right shrink-0">{d.percentage}%</span>
               </div>
             </div>
           ))}
@@ -717,7 +723,7 @@ function CloneBarChart({ title, subtitle, data, colors = CLONE_PALETTE }) {
   // data: [{ label, value }]
   const height = 200;
   const pad = { top: 30, bottom: 30 };
-  const maxVal = Math.max(...data.map(d => d.value), 10);
+  const maxVal = Math.max(...(data || []).map(d => d.value || 0), 10);
   
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm h-full flex flex-col">
@@ -770,13 +776,18 @@ function CloneLeaderboard({ title, columns, data }) {
               <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
                 {columns.map((col, j) => {
                   if (col.key === 'rate') {
+                    const isDropOff = title.toLowerCase().includes('drop') || col.label.toLowerCase().includes('drop');
+                    const val = Number(row[col.key] || 0);
+                    const barColor = isDropOff
+                      ? (val > 25 ? '#ef4444' : val > 10 ? '#f59e0b' : '#10b981')
+                      : (val >= 75 ? '#10b981' : val >= 50 ? '#f59e0b' : '#ef4444');
                     return (
                       <td key={j} className="py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-red-500 rounded-full" style={{ width: `${row[col.key]}%` }} />
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${val}%`, backgroundColor: barColor }} />
                           </div>
-                          <span className="text-[11px] text-gray-600 font-medium w-6">{row[col.key]}%</span>
+                          <span className="text-[11px] text-gray-600 font-medium min-w-[32px] text-right">{val}%</span>
                         </div>
                       </td>
                     );
@@ -817,10 +828,13 @@ function CourseVisualAnalytics({ data }) {
     totalMCQ += uMcq;
     totalCoding += uCoding;
 
-    const sr = u.performance?.success_rate || 0;
-    if (sr >= 75) perfHigh++;
-    else if (sr >= 50) perfMed++;
-    else perfLow++;
+    const attempts = u.performance?.attempted || 0;
+    if (attempts > 0) {
+      const sr = u.performance?.success_rate || 0;
+      if (sr >= 75) perfHigh++;
+      else if (sr >= 50) perfMed++;
+      else perfLow++;
+    }
 
     unitAttempts.push({ label: u.unit_name, value: u.performance?.attempted || 0 });
   });
@@ -840,9 +854,10 @@ function CourseVisualAnalytics({ data }) {
 
   const totalAttempts = unitAttempts.reduce((acc, curr) => acc + curr.value, 0);
   unitAttempts.sort((a, b) => b.value - a.value);
-  const top4Attempts = unitAttempts.slice(0, 4);
-  const otherAttempts = unitAttempts.slice(4).reduce((acc, curr) => acc + curr.value, 0);
-  const engageData = top4Attempts.map(u => ({
+  const showAllDirectly = unitAttempts.length <= 5;
+  const primaryAttempts = showAllDirectly ? unitAttempts : unitAttempts.slice(0, 4);
+  const otherAttempts = showAllDirectly ? 0 : unitAttempts.slice(4).reduce((acc, curr) => acc + curr.value, 0);
+  const engageData = primaryAttempts.map(u => ({
     label: u.label, value: u.value, percentage: totalAttempts ? Math.round((u.value / totalAttempts) * 100) : 0
   }));
   if (otherAttempts > 0) {
