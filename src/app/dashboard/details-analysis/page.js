@@ -136,13 +136,18 @@ function DetailsAnalysisContent() {
             }
 
             setLoading(false);
-            const { subUnitResults, envJson, telemetry, totalMarks, marksBreakdown, completionPct } = swrData;
+            const { subUnitResults, envJson, overviewJson, telemetry, totalMarks, marksBreakdown, completionPct } = swrData;
+            const studentObj = overviewJson?.data?.student;
 
             setStudentInfo({
-                name: nameParam || "Student",
-                email: emailParam,
-                regNo: regNo || studentId,
-                section: sectionName,
+                name: (nameParam && nameParam !== "Student" && nameParam !== "Unknown Student") 
+                    ? nameParam 
+                    : (studentObj?.student_name || nameParam || "Student"),
+                email: emailParam || studentObj?.email_id || "",
+                regNo: regNo || studentObj?.uni_reg_id || studentId,
+                section: (sectionName && sectionName !== "Section") 
+                    ? sectionName 
+                    : (studentObj?.section || sectionName || "Section"),
                 course: examName,
                 telemetry, totalMarks, marksBreakdown, completionPct
             });

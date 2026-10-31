@@ -542,9 +542,11 @@ function ScatterPlot({ data }) {
   const midVal = 50;
   const quadrants = { topRight: 0, topLeft: 0, bottomRight: 0, bottomLeft: 0 };
   data.forEach(d => {
-    if (d.mcq >= midVal && d.coding >= midVal) quadrants.topRight++;
-    else if (d.mcq < midVal && d.coding >= midVal) quadrants.topLeft++;
-    else if (d.mcq >= midVal && d.coding < midVal) quadrants.bottomRight++;
+    const mcq = Number(d.mcq) || 0;
+    const coding = Number(d.coding) || 0;
+    if (mcq >= midVal && coding >= midVal) quadrants.topRight++;
+    else if (mcq < midVal && coding >= midVal) quadrants.topLeft++;
+    else if (mcq >= midVal && coding < midVal) quadrants.bottomRight++;
     else quadrants.bottomLeft++;
   });
 
@@ -579,15 +581,17 @@ function ScatterPlot({ data }) {
             stroke="#dadce0" strokeWidth="1" strokeDasharray="4,4" />
 
           {data.map((d, i) => {
-            const x = pad.left + (d.mcq / 100) * (w - pad.left - pad.right);
-            const y = pad.top + (1 - d.coding / 100) * (h - pad.top - pad.bottom);
+            const mcq = Math.max(0, Math.min(100, Number(d.mcq) || 0));
+            const coding = Math.max(0, Math.min(100, Number(d.coding) || 0));
+            const x = pad.left + (mcq / 100) * (w - pad.left - pad.right);
+            const y = pad.top + (1 - coding / 100) * (h - pad.top - pad.bottom);
             return (
               <circle key={i}
                 cx={x} cy={anim ? y : h - pad.bottom}
                 r="4.5" fill="url(#dotGrad)" stroke={theme.primary} strokeWidth="1.5" opacity="0.7"
                 style={{ transition: `all 0.8s ${0.01 * i}s cubic-bezier(.34,1.56,.64,1)` }}
               >
-                <title>{`${d.name || 'Student'}: MCQ ${d.mcq}%, Coding ${d.coding}%`}</title>
+                <title>{`${d.name || 'Student'}: MCQ ${mcq}%, Coding ${coding}%`}</title>
               </circle>
             );
           })}
@@ -900,13 +904,11 @@ function BatchAnalyticsContent() {
 
   /* MEMOS */
   const lowestExams = useMemo(() => {
-    if (data?.lowest_scores_exams?.length > 0) return data.lowest_scores_exams;
-    return [{ name: 'Retest CA2 Exam (18 April)', score: 33, attempts: 1 }, { name: 'End Term Practical (ETP)', score: 36, attempts: 1 }, { name: 'CA2 Exam (18 April, Slot 2)', score: 39, attempts: 1 }, { name: 'Retest CA3 (CBT 2) Exam 2 May', score: 50, attempts: 1 }];
+    return data?.lowest_scores_exams || [];
   }, [data]);
 
   const lowestPractice = useMemo(() => {
-    if (data?.lowest_scores_practice?.length > 0) return data.lowest_scores_practice;
-    return [{ name: 'Computer Programming', score: 52, attempts: 1 }];
+    return data?.lowest_scores_practice || [];
   }, [data]);
 
   const filteredStudents = useMemo(() => {
@@ -1043,9 +1045,14 @@ function BatchAnalyticsContent() {
                 <Badge variant="blue" dot>Enterprise BI</Badge>
                 <span className="text-xs text-gray-400">Live Production</span>
               </div>
-              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2 mt-0.5">
+              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2.5 mt-0.5">
                 <BarChart3 className="w-5 h-5" style={{ color: theme.primary }} />
-                Batch Analytics Dashboard
+                <span>Batch Analytics Dashboard</span>
+                {data?.batch_name && (
+                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg shadow-sm">
+                    {data.batch_name}
+                  </span>
+                )}
               </h1>
             </div>
           </div>
@@ -1266,6 +1273,7 @@ function ScheduleModal({ onClose, scheduleEmail, setScheduleEmail, scheduleFreq,
   const handleSubmit = (e) => {
     e.preventDefault();
     onClose();
+    setTimeout(() => document.dispatchEvent(new CustomEvent('toast', { detail: { msg: `Scheduled report frequency set to ${scheduleFreq || 'weekly'}`, type: 'success' } })), 100);
   };
   return (
     <div className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
@@ -1766,9 +1774,9 @@ function AIBITab({ data, batchHealthScore }) {
           badge="ATTENTION" badgeColor="red">
           <div className="space-y-3">
             {(data.ai_insights?.weaknesses || [
-              'Retest CA2 Exam (33%) and ETP (36%) need revision',
-              'Coding scores lag behind MCQ in time-constrained exams',
-              'Small subset of students below 50% need intervention'
+              'Targeted revision recommended for lowest scoring evaluation modules',
+              'Ensure practical problem-solving parity between theory and coding tasks',
+              'Remedial intervention recommended for students below passing benchmark'
             ]).map((wk, idx) => (
               <div key={idx}
                 className="flex items-start gap-3 p-3.5 rounded-xl bg-red-50/70 border border-red-100">
@@ -1796,9 +1804,9 @@ function AIBITab({ data, batchHealthScore }) {
             </div>
             <ul className="space-y-2.5">
               {(data.ai_insights?.recommendations?.students || [
-                'Prioritize ETP practice modules',
-                'Maintain daily coding streaks',
-                'Review CA2 Retest solutions'
+                'Prioritize practice on identified weak assessment modules',
+                'Maintain consistent daily coding problem solving',
+                'Review algorithm complexity and test case corner conditions'
               ]).map((rec, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-xs text-gray-700">
                   <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{i + 1}</span>
@@ -1836,9 +1844,9 @@ function AIBITab({ data, batchHealthScore }) {
             </div>
             <ul className="space-y-2.5">
               {(data.ai_insights?.recommendations?.administrators || [
-                'Extra lab hours for ETP prep',
-                'Enable early-warning alerts',
-                'Review curriculum pacing for CBT 2'
+                'Allocate additional guided lab sessions for challenging topics',
+                'Enable automated early-warning alerts for at-risk learners',
+                'Review curriculum pacing across concurrent course sections'
               ]).map((rec, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-xs text-gray-700">
                   <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{i + 1}</span>
@@ -2097,9 +2105,13 @@ function LeaderboardTab({
             <Filter className="w-4 h-4 text-gray-500 shrink-0" />
             <select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)}
               className="border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-[#1a73e8] outline-none">
-              {allSections.map(sec => (
-                <option key={typeof sec === 'object' ? sec?.section_name || 'sec' : sec} value={typeof sec === 'object' ? sec?.section_name || '' : sec}>{sec === 'ALL' ? 'All Sections' : `Section ${typeof sec === 'object' ? sec?.section_name || '' : sec}`}</option>
-              ))}
+              {allSections.map(sec => {
+                const sName = typeof sec === 'object' ? sec?.section_name || '' : String(sec || '');
+                const label = sName === 'ALL' ? 'All Sections' : sName === 'Unassigned' ? 'Unassigned' : sName.toLowerCase().startsWith('section') ? sName : `Section ${sName}`;
+                return (
+                  <option key={sName} value={sName}>{label}</option>
+                );
+              })}
             </select>
             <select value={sortBy} onChange={e => setSortBy(e.target.value)}
               className="border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-[#1a73e8] outline-none">

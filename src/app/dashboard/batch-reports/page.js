@@ -83,6 +83,17 @@ function ReportCenterContent() {
     };
 
     const getStudents = () => analytics?.student_lists?.all || [];
+    const formatSection = (sec) => typeof sec === 'object' ? sec?.section_name || 'N/A' : sec || 'N/A';
+
+    const handleBack = () => {
+        if (typeof window !== 'undefined' && window.opener) {
+            window.close();
+        } else if (typeof window !== 'undefined' && window.history.length > 1) {
+            window.history.back();
+        } else {
+            window.location.href = `/dashboard/batch-analytics${batch_id ? `?batch_id=${batch_id}` : ''}`;
+        }
+    };
 
     // REPORT 1: Curriculum Vulnerability (Marketing Genius)
     const handleCurriculumExport = () => {
@@ -102,7 +113,7 @@ function ReportCenterContent() {
                 if (type === 'mcq') {
                     topicMap[topicName].mcqSum += c.average_score || 0;
                     topicMap[topicName].mcqCount += 1;
-                } else if (type === 'cod') {
+                } else if (type === 'cod' || type === 'coding') {
                     topicMap[topicName].codSum += c.average_score || 0;
                     topicMap[topicName].codCount += 1;
                 }
@@ -145,7 +156,7 @@ function ReportCenterContent() {
             return {
                 Registration: s.reg,
                 Name: s.name,
-                Section: s.section,
+                Section: formatSection(s.section),
                 OverallScore: s.overall,
                 LogicGap: logicGap,
                 RiskLevel: riskLevel,
@@ -161,7 +172,7 @@ function ReportCenterContent() {
         const students = getStudents().map(s => ({
             Registration: s.reg,
             Name: s.name,
-            Section: s.section,
+            Section: formatSection(s.section),
             Day1Ready: (s.coding > 75 && s.overall > 80) ? 'YES' : 'NO',
             OverallScore: s.overall,
             PracticalCodingScore: s.coding,
@@ -191,7 +202,7 @@ function ReportCenterContent() {
                 
                 // Pipeline
                 const placement = getStudents().map(s => ({
-                    Registration: s.reg, Name: s.name, Section: s.section,
+                    Registration: s.reg, Name: s.name, Section: formatSection(s.section),
                     Day1Ready: (s.coding > 75 && s.overall > 80) ? 'YES' : 'NO',
                     OverallScore: s.overall, PracticalCodingScore: s.coding, LogicReliability: (100 - Math.abs(s.mcq - s.coding))
                 }));
@@ -199,7 +210,7 @@ function ReportCenterContent() {
 
                 // EWS
                 const ews = getStudents().filter(s => s.overall < 60).map(s => ({
-                    Registration: s.reg, Name: s.name, Section: s.section,
+                    Registration: s.reg, Name: s.name, Section: formatSection(s.section),
                     OverallScore: s.overall, RiskLevel: s.overall < 40 ? 'Critical' : 'High Warning'
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ews), "Predictive EWS");
@@ -250,7 +261,7 @@ function ReportCenterContent() {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => window.close()} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                <button onClick={handleBack} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Back to Analytics">
                                     <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
                                 </button>
                                 <div>

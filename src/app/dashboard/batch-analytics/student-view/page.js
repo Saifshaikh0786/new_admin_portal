@@ -677,7 +677,13 @@ function StudentAnalyticsView() {
     }
   }, [apiData, todayIST]);
 
-  const goBack = () => router.push('/dashboard');
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(`/dashboard/batch-analytics${batchId ? `?batch_id=${batchId}` : ''}`);
+    }
+  };
 
   if (!studentId) {
     return (
@@ -779,7 +785,10 @@ function StudentAnalyticsView() {
               </button>
               <div>
                 <h1 className="text-sm font-bold text-gray-900 dark:text-white">{apiData?.student?.name || studentName || 'Student'}</h1>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400">{apiData?.student?.reg || ''} &bull; Section {apiData?.student?.section || ''}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium dark:text-gray-400">
+                  {apiData?.student?.reg || ''}
+                  {apiData?.student?.section ? ` • Section ${apiData.student.section}` : ''}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">

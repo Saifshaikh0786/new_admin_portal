@@ -571,7 +571,7 @@ function StudentReportContent() {
                                             {/* Accordion Body */}
                                             {isExpanded && (
                                                 <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-[var(--neu-divider)]">
-                                                    <div className="mb-4 text-gray-800 dark:text-gray-200 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: sub.question?.question_body }} />
+                                                    <div className="mb-4 text-gray-800 dark:text-gray-200 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: sub.question?.question_body || '' }} />
                                                     
                                                     <div className="space-y-2 mt-4">
                                                         {options.map((opt, oIdx) => {
