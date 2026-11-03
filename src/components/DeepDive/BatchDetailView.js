@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Layers, Users, TrendingUp, AlertCircle, Search, ArrowRight, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Layers, Users, TrendingUp, AlertCircle, Search, ArrowRight, FileText, Loader2, Download } from 'lucide-react';
 import { CircularProgress } from './CircularProgress';
 import { Skeleton } from './Skeletons';
 import { API_CONFIG } from '@/utils/api';
@@ -8,6 +8,7 @@ import { swrFetcher } from '@/utils/fetcher';
 import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import PortalWrapper from './PortalWrapper';
+import BulkExportModal from './BulkExportModal';
 
 export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
     const router = useRouter();
@@ -16,6 +17,7 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpeningReports, setIsOpeningReports] = useState(false);
+    const [isBulkExportOpen, setIsBulkExportOpen] = useState(false);
 
     const secParams = new URLSearchParams({ batch_id: batch.batch_id }).toString();
     const { data: secData, isLoading: isSecLoading } = useSWR(
@@ -179,20 +181,29 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
                 {/* RIGHT: Sections List */}
                 <div className="flex-1 p-8 overflow-y-auto custom-scrollbar neu-page">
                     <div className="max-w-4xl mx-auto">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                 <Layers className="w-5 h-5 text-[var(--neu-achieve)] dark:text-[var(--neu-achieve)]" />
                                 Sections in Batch
                             </h3>
-                            <div className="relative">
-                                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input
-                                    type="text"
-                                    placeholder="Filter sections..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="neu-inset rounded-xl pl-9 pr-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none w-64 transition-all"
-                                />
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsBulkExportOpen(true)}
+                                    className="px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                    title="Institutional Bulk Export"
+                                >
+                                    <Download className="w-4 h-4" /> Bulk Export
+                                </button>
+                                <div className="relative">
+                                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                    <input
+                                        type="text"
+                                        placeholder="Filter sections..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="neu-inset rounded-xl pl-9 pr-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none w-64 transition-all"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -230,8 +241,17 @@ export default function BatchDetailView({ batch, onBack, onSectionSelect }) {
                     </div>
                 </div>
             </div>
+
+            {/* Institutional Bulk Export Modal */}
+            <BulkExportModal
+                isOpen={isBulkExportOpen}
+                onClose={() => setIsBulkExportOpen(false)}
+                batch={batch}
+                courses={courses}
+                sections={sections}
+            />
         </div>
-    )</PortalWrapper>);
+    </PortalWrapper>);
 }
 
 

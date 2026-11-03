@@ -22,6 +22,7 @@ export const API_CONFIG = {
         subUnitDetails: '/admin/analytics/sub-unit-details',
         unitCompletion: '/admin/analytics/unit-completion',
         bulkExportUnits: '/admin/analytics/bulk-export-units',
+        bulkExport: '/admin/analytics/bulk-export',
         sectionCompletion: '/admin/analytics/section-completion',
         getSectionsByBatch: '/admin/dashboard/get-sections-by-batch',
         needsAttention: '/admin/dashboard/attention',
