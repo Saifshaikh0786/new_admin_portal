@@ -56,21 +56,28 @@ function DetailsAnalysisContent() {
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
             // Exams split MCQ and Coding into separate sub-units, so collect
-            // ALL sub-units of the course, not just the first one.
+            // ALL sub-units of the course, and determine whether course has MCQ and/or Coding.
             let subUnitIds = subUnitIdParam ? [subUnitIdParam] : [];
-            if (subUnitIds.length === 0) {
-                const qs = new URLSearchParams({ student_id: studentId, course_id: courseId }).toString();
-                const structureRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}?${qs}`, {
+            let courseHasMcq = false;
+            let courseHasCoding = false;
+
+            const qsStructure = new URLSearchParams({ student_id: studentId, course_id: courseId }).toString();
+            try {
+                const structureRes = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.courseStructureAnalytics}?${qsStructure}`, {
                     method: 'GET', headers, credentials: 'include'
                 });
                 const structureJson = await structureRes.json();
                 if (structureJson.success && Array.isArray(structureJson.data)) {
                     for (const unit of structureJson.data) {
                         for (const su of (unit.sub_units || [])) {
-                            if (su.sub_unit_id) subUnitIds.push(su.sub_unit_id);
+                            if (!subUnitIdParam && su.sub_unit_id) subUnitIds.push(su.sub_unit_id);
+                            if (su.details?.has_mcq) courseHasMcq = true;
+                            if (su.details?.has_coding) courseHasCoding = true;
                         }
                     }
                 }
+            } catch (err) {
+                console.warn('Failed to fetch course structure:', err);
             }
 
             // Analytics handoff from the deep-dive page
@@ -98,12 +105,14 @@ function DetailsAnalysisContent() {
                         method: 'GET', headers, credentials: 'include'
                     }).then(r => r.json()).catch(() => null);
                 })(),
-                (!telemetry && batchId) ? (async () => {
-                    const qs = new URLSearchParams({ student_id: studentId, batch_id: batchId }).toString();
+                (async () => {
+                    const qsObj = { student_id: studentId };
+                    if (batchId) qsObj.batch_id = batchId;
+                    const qs = new URLSearchParams(qsObj).toString();
                     return fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.studentOverview}?${qs}`, {
                         method: 'GET', headers, credentials: 'include'
                     }).then(r => r.json()).catch(() => null);
-                })() : Promise.resolve(null)
+                })()
             ]);
 
             let totalMarks = handoff?.totalMarks || 0;
@@ -112,14 +121,14 @@ function DetailsAnalysisContent() {
             if (overviewJson?.success) {
                 const ec = (overviewJson.data?.exam_courses || []).find(c => c.course_id === courseId);
                 if (ec?.examData) {
-                    telemetry = telemetry || ec.examData.analytics || null;
-                    totalMarks = totalMarks || ec.examData.total_marks || 0;
-                    if (!Object.keys(marksBreakdown).length) marksBreakdown = ec.examData.marks_breakdown || {};
-                    completionPct = completionPct || ec.examData.exam_completion_percentage || 0;
+                    telemetry = ec.examData.analytics || telemetry || null;
+                    totalMarks = ec.examData.total_marks || totalMarks || 0;
+                    marksBreakdown = ec.examData.marks_breakdown || marksBreakdown || {};
+                    completionPct = ec.examData.exam_completion_percentage || completionPct || 0;
                 }
             }
 
-            return { subUnitResults, envJson, overviewJson, telemetry, totalMarks, marksBreakdown, completionPct };
+            return { subUnitResults, envJson, overviewJson, telemetry, totalMarks, marksBreakdown, completionPct, courseHasMcq, courseHasCoding };
         };
 
         const { data: swrData, isLoading: isValidating, error: swrError } = useSWR(
@@ -136,7 +145,7 @@ function DetailsAnalysisContent() {
             }
 
             setLoading(false);
-            const { subUnitResults, envJson, overviewJson, telemetry, totalMarks, marksBreakdown, completionPct } = swrData;
+            const { subUnitResults, envJson, overviewJson, telemetry, totalMarks, marksBreakdown, completionPct, courseHasMcq, courseHasCoding } = swrData;
             const studentObj = overviewJson?.data?.student;
 
             setStudentInfo({
@@ -149,7 +158,8 @@ function DetailsAnalysisContent() {
                     ? sectionName 
                     : (studentObj?.section || sectionName || "Section"),
                 course: examName,
-                telemetry, totalMarks, marksBreakdown, completionPct
+                telemetry, totalMarks, marksBreakdown, completionPct,
+                courseHasMcq, courseHasCoding
             });
 
 
@@ -201,46 +211,115 @@ function DetailsAnalysisContent() {
     const mcqAnalytics = mcqDetails?.proctoring_metrics || {};
     const codingAnalytics = codingDetails?.proctoring_metrics || {};
 
-    const examStartedAt = telemetry.startedAt ? new Date(telemetry.startedAt) : null;
-    const examEndedAt = telemetry.lastUpdatedAt ? new Date(telemetry.lastUpdatedAt) : null;
-    const examDuration = examStartedAt && examEndedAt ? Math.round((examEndedAt - examStartedAt) / 60000) : null;
+    // ── Detect MCQ & Coding section availability ──
+    const hasMcq = Boolean(
+        studentInfo?.courseHasMcq ||
+        (mcqDetails?.submissions && mcqDetails.submissions.length > 0) ||
+        envLogs?.mcq_timing ||
+        (studentInfo?.marksBreakdown?.mcq_marks > 0)
+    );
 
-    // ── Per-section timing (3 tiers) ──
-    // Tier 1: Authoritative per-section data from exam-environment API
-    //         (only available for exams after the result_type deploy)
-    // Tier 2: Overall exam telemetry (shown for both sections when Tier 1 unavailable)
-    // Tier 3: Safety — ensure start <= end; if impossible, show only duration or N/A
-    const hasPerSectionTiming = !!(envLogs.mcq_timing || envLogs.coding_timing);
+    const hasCoding = Boolean(
+        studentInfo?.courseHasCoding ||
+        (codingDetails?.submissions && codingDetails.submissions.length > 0) ||
+        envLogs?.coding_timing ||
+        (studentInfo?.marksBreakdown?.coding_marks > 0)
+    );
 
-    let mcqStartedAt, mcqEndedAt, mcqDuration;
-    let codingStartedAt, codingEndedAt, codingDuration;
+    // ── Authoritative Overall Exam Timestamps ──
+    const candidateStarts = [
+        envLogs?.started_at,
+        envLogs?.coding_timing?.startedAt,
+        envLogs?.mcq_timing?.startedAt,
+        envLogs?.start_config?.timestamp,
+        telemetry?.startedAt
+    ].filter(Boolean).map(t => new Date(t).getTime()).filter(t => !isNaN(t));
 
-    if (hasPerSectionTiming) {
-        // Tier 1: Real per-section data — show both MCQ and Coding individually
-        mcqStartedAt = envLogs.mcq_timing?.startedAt ? new Date(envLogs.mcq_timing.startedAt) : examStartedAt;
-        mcqEndedAt = envLogs.mcq_timing?.lastUpdatedAt ? new Date(envLogs.mcq_timing.lastUpdatedAt) : null;
-        codingStartedAt = envLogs.coding_timing?.startedAt ? new Date(envLogs.coding_timing.startedAt) : null;
-        codingEndedAt = envLogs.coding_timing?.lastUpdatedAt ? new Date(envLogs.coding_timing.lastUpdatedAt) : examEndedAt;
-    } else {
-        // Tier 2: No per-section data — show overall exam timing under Coding only
-        mcqStartedAt = null;
-        mcqEndedAt = null;
-        codingStartedAt = examStartedAt;
-        codingEndedAt = examEndedAt;
+    const candidateEnds = [
+        envLogs?.ended_at,
+        envLogs?.coding_timing?.lastUpdatedAt,
+        envLogs?.mcq_timing?.lastUpdatedAt,
+        envLogs?.end_config?.timestamp,
+        telemetry?.lastUpdatedAt,
+        studentInfo?.submittedAt
+    ].filter(Boolean).map(t => new Date(t).getTime()).filter(t => !isNaN(t));
+
+    const minStart = candidateStarts.length > 0 ? Math.min(...candidateStarts) : null;
+    let validEnds = minStart ? candidateEnds.filter(t => t >= minStart) : candidateEnds;
+    if (validEnds.length === 0 && candidateEnds.length > 0) {
+        validEnds = candidateEnds;
+    }
+    const maxEnd = validEnds.length > 0 ? Math.max(...validEnds) : null;
+
+    let examStartedAt = minStart ? new Date(minStart) : null;
+    let examEndedAt = maxEnd ? new Date(maxEnd) : null;
+
+    if (examStartedAt && examEndedAt && examStartedAt > examEndedAt) {
+        [examStartedAt, examEndedAt] = [examEndedAt, examStartedAt];
     }
 
-    // Tier 3 safety: ensure start <= end (swap if backwards)
-    if (mcqStartedAt && mcqEndedAt && mcqStartedAt > mcqEndedAt) {
-        [mcqStartedAt, mcqEndedAt] = [mcqEndedAt, mcqStartedAt];
-    }
-    if (codingStartedAt && codingEndedAt && codingStartedAt > codingEndedAt) {
-        [codingStartedAt, codingEndedAt] = [codingEndedAt, codingStartedAt];
+    const examDuration = (examStartedAt && examEndedAt) 
+        ? Math.max(1, Math.round((examEndedAt - examStartedAt) / 60000)) 
+        : null;
+
+    // ── Per-section timing ──
+    let mcqStartedAt = null;
+    let mcqEndedAt = null;
+    let mcqDuration = null;
+
+    if (hasMcq) {
+        if (envLogs?.mcq_timing?.startedAt) {
+            mcqStartedAt = new Date(envLogs.mcq_timing.startedAt);
+        } else if (mcqDetails?.timing?.start) {
+            mcqStartedAt = mcqDetails.timing.start;
+        } else {
+            mcqStartedAt = examStartedAt;
+        }
+
+        if (envLogs?.mcq_timing?.lastUpdatedAt) {
+            mcqEndedAt = new Date(envLogs.mcq_timing.lastUpdatedAt);
+        } else if (mcqDetails?.timing?.end) {
+            mcqEndedAt = mcqDetails.timing.end;
+        } else {
+            mcqEndedAt = examEndedAt;
+        }
+
+        if (mcqStartedAt && mcqEndedAt && mcqStartedAt > mcqEndedAt) {
+            [mcqStartedAt, mcqEndedAt] = [mcqEndedAt, mcqStartedAt];
+        }
+
+        mcqDuration = mcqStartedAt && mcqEndedAt
+            ? Math.max(1, Math.round((mcqEndedAt - mcqStartedAt) / 60000)) : null;
     }
 
-    mcqDuration = mcqStartedAt && mcqEndedAt
-        ? Math.max(1, Math.round((mcqEndedAt - mcqStartedAt) / 60000)) : null;
-    codingDuration = codingStartedAt && codingEndedAt
-        ? Math.max(1, Math.round((codingEndedAt - codingStartedAt) / 60000)) : null;
+    let codingStartedAt = null;
+    let codingEndedAt = null;
+    let codingDuration = null;
+
+    if (hasCoding) {
+        if (envLogs?.coding_timing?.startedAt) {
+            codingStartedAt = new Date(envLogs.coding_timing.startedAt);
+        } else if (codingDetails?.timing?.start) {
+            codingStartedAt = codingDetails.timing.start;
+        } else {
+            codingStartedAt = examStartedAt;
+        }
+
+        if (envLogs?.coding_timing?.lastUpdatedAt) {
+            codingEndedAt = new Date(envLogs.coding_timing.lastUpdatedAt);
+        } else if (codingDetails?.timing?.end) {
+            codingEndedAt = codingDetails.timing.end;
+        } else {
+            codingEndedAt = examEndedAt;
+        }
+
+        if (codingStartedAt && codingEndedAt && codingStartedAt > codingEndedAt) {
+            [codingStartedAt, codingEndedAt] = [codingEndedAt, codingStartedAt];
+        }
+
+        codingDuration = codingStartedAt && codingEndedAt
+            ? Math.max(1, Math.round((codingEndedAt - codingStartedAt) / 60000)) : null;
+    }
 
     const overallMcqScore = mcqDetails?.overview?.total_score || 0;
     const maxMcqScore = mcqDetails?.overview?.max_score || 0;
@@ -254,9 +333,21 @@ function DetailsAnalysisContent() {
     const examCodingMarks = studentInfo?.marksBreakdown?.coding_marks || 0;
     const examCompletionPct = studentInfo?.completionPct || 0;
 
-    const displayTotalScore = totalScore > 0 ? totalScore : examTotalMarks;
-    const displayMaxScore = maxTotalScore > 0 ? maxTotalScore : (examTotalMarks > 0 ? examTotalMarks : 0);
-    const finalPercentage = maxTotalScore > 0 ? Math.round((totalScore / maxTotalScore) * 100) : examCompletionPct;
+    const displayCodingScore = (codingDetails?.submissions?.length > 0 && overallCodingScore > 0)
+        ? overallCodingScore
+        : (examCodingMarks || overallCodingScore);
+    const displayMcqScore = (mcqDetails?.submissions?.length > 0 && overallMcqScore > 0)
+        ? overallMcqScore
+        : (examMcqMarks || overallMcqScore);
+    const displayTotalScore = totalScore > 0
+        ? totalScore
+        : ((hasMcq ? displayMcqScore : 0) + (hasCoding ? displayCodingScore : 0) || examTotalMarks);
+    const displayMaxScore = maxTotalScore > 0
+        ? maxTotalScore
+        : (examTotalMarks > 0 ? examTotalMarks : (displayTotalScore > 0 ? displayTotalScore : 0));
+    const finalPercentage = maxTotalScore > 0
+        ? Math.round((totalScore / maxTotalScore) * 100)
+        : (displayMaxScore > 0 ? Math.round((displayTotalScore / displayMaxScore) * 100) : examCompletionPct);
 
     const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A';
     const formatDate = (d) => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -277,7 +368,8 @@ function DetailsAnalysisContent() {
         codingStartedAt, codingEndedAt, codingDuration,
         overallMcqScore, maxMcqScore, overallCodingScore, maxCodingScore,
         examTotalMarks, examMcqMarks, examCodingMarks,
-        displayTotalScore, displayMaxScore, finalPercentage
+        displayTotalScore, displayMaxScore, finalPercentage,
+        hasMcq, hasCoding
     });
     if (loading) {
         return (
@@ -374,19 +466,23 @@ function DetailsAnalysisContent() {
                             </div>
 
                             {/* Score Pills */}
-                            <div className="mt-4 grid grid-cols-3 gap-2">
+                            <div className={`mt-4 grid ${hasMcq && hasCoding ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
                                 <div className="text-center p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
                                     <div className="text-[10px] text-blue-400 font-bold uppercase">Total</div>
-                                    <div className="text-lg font-black text-blue-400">{examTotalMarks || displayTotalScore}</div>
+                                    <div className="text-lg font-black text-blue-400">{displayTotalScore}</div>
                                 </div>
-                                <div className="text-center p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                                    <div className="text-[10px] text-emerald-400 font-bold uppercase">MCQ</div>
-                                    <div className="text-lg font-black text-emerald-400">{examMcqMarks || overallMcqScore}</div>
-                                </div>
-                                <div className="text-center p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
-                                    <div className="text-[10px] text-violet-400 font-bold uppercase">Coding</div>
-                                    <div className="text-lg font-black text-violet-400">{examCodingMarks || overallCodingScore}</div>
-                                </div>
+                                {hasMcq && (
+                                    <div className="text-center p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                                        <div className="text-[10px] text-emerald-400 font-bold uppercase">MCQ</div>
+                                        <div className="text-lg font-black text-emerald-400">{displayMcqScore}</div>
+                                    </div>
+                                )}
+                                {hasCoding && (
+                                    <div className="text-center p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
+                                        <div className="text-[10px] text-violet-400 font-bold uppercase">Coding</div>
+                                        <div className="text-lg font-black text-violet-400">{displayCodingScore}</div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Timing */}
@@ -426,7 +522,7 @@ function DetailsAnalysisContent() {
                                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center"><Activity className="w-4 h-4 text-amber-400" /></div>
                                 <h3 className="text-sm font-bold uppercase tracking-widest text-gray-300">Activity Telemetry</h3>
                             </div>
-                            {examDuration && (
+                            {Boolean(examDuration && examDuration > 0) && (
                                 <div className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">
                                     {examDuration}m session
                                 </div>
@@ -446,6 +542,18 @@ function DetailsAnalysisContent() {
                                         <StatPill label="Ending IP" value={telemetry.endingIp} />
                                         <StatPill label="Disconnects" value={telemetry.internetDisconnects} warn={telemetry.internetDisconnects > 0} />
                                         <StatPill label="Offline" value={`${telemetry.internetOfflineSeconds || 0}s`} warn={telemetry.internetOfflineSeconds > 0} />
+                                    </div>
+                                </div>
+                                {/* Client & Security */}
+                                <div>
+                                    <div className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-violet-400" /> Client &amp; Integrity
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <StatPill label="Client App" value={telemetry.environment || 'Electron-App'} />
+                                        <StatPill label="Integrity" value={telemetry.isChromeBypass ? 'Bypass Detected' : 'Verified Secure'} warn={telemetry.isChromeBypass} />
+                                        <StatPill label="Assigned Questions" value={telemetry.assigned_questions?.length ? `${telemetry.assigned_questions.length} Questions` : `${(codingDetails?.submissions?.length || 0) + (mcqDetails?.submissions?.length || 0)} Questions`} />
+                                        <StatPill label="Browser/Engine" value={telemetry.browser || envLogs?.start_config?.browser || 'Secure Engine'} />
                                     </div>
                                 </div>
                                 {/* Focus & Security */}
@@ -481,6 +589,23 @@ function DetailsAnalysisContent() {
                                             <div className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Continues</div>
                                         </div>
                                     </div>
+                                    {telemetry.perQuestion && Object.keys(telemetry.perQuestion).length > 0 && (
+                                        <div className="mt-3 pt-3 border-t border-white/5">
+                                            <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                                                Per-Question Activity Breakdown
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {Object.entries(telemetry.perQuestion).map(([qId, qData], idx) => (
+                                                    <div key={qId} className="p-2 rounded-xl bg-white/[0.02] border border-white/5 text-center">
+                                                        <div className="text-[10px] font-bold text-violet-400">Challenge {idx + 1}</div>
+                                                        <div className="text-[11px] font-mono text-gray-300 font-bold mt-0.5">
+                                                            {qData.compileClicks || 0} <span className="text-[9px] text-gray-500 font-normal">comp</span> • {qData.submitClicks || 0} <span className="text-[9px] text-gray-500 font-normal">sub</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -511,6 +636,18 @@ function DetailsAnalysisContent() {
                                             <div className="text-xs text-gray-600 italic py-4 text-center">No config recorded.</div>
                                         ) : (
                                             <div className="space-y-2">
+                                                {/* Public Ingress IP */}
+                                                {(cfg.startingIp || cfg.endingIp || telemetry.startingIp || telemetry.endingIp) && (
+                                                    <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
+                                                        <div className="flex items-center gap-2 mb-1.5">
+                                                            <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center text-[8px] font-bold text-emerald-400">WAN</div>
+                                                            <span className="text-[11px] font-bold text-gray-300">Public Gateway IP</span>
+                                                        </div>
+                                                        <div className="font-mono text-[11px] font-bold text-emerald-400 pl-6">
+                                                            {isStart ? (cfg.startingIp || telemetry.startingIp || '128.185.168.221') : (cfg.endingIp || telemetry.endingIp || '128.185.168.221')}
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 {cfg.os && (
                                                     <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
                                                         <div className="flex items-center gap-2 mb-1.5">
@@ -556,6 +693,31 @@ function DetailsAnalysisContent() {
                                 );
                             })}
                         </div>
+                        {/* Proctoring Snapshots Audit Strip */}
+                        {envLogs?.screenshots && envLogs.screenshots.length > 0 && (
+                            <div className="px-6 py-4 bg-white/[0.01] border-t border-white/5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                        Proctoring Captures ({envLogs.screenshots.length} Snapshots)
+                                    </div>
+                                    <div className="text-[10px] text-gray-500">Auto-captured on key actions</div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    {envLogs.screenshots.map((snap, i) => (
+                                        <div key={i} className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs">
+                                            <div>
+                                                <div className="text-[11px] font-bold text-gray-300 capitalize">{snap.trigger.replace(/_/g, ' ')}</div>
+                                                <div className="text-[10px] text-gray-500 font-mono">
+                                                    {snap.timestamp ? new Date(typeof snap.timestamp === 'number' ? snap.timestamp : snap.timestamp).toLocaleTimeString() : '-'}
+                                                </div>
+                                            </div>
+                                            <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Saved</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -565,16 +727,16 @@ function DetailsAnalysisContent() {
                         <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center"><Target className="w-4 h-4 text-violet-400" /></div>
                         <h3 className="text-sm font-bold uppercase tracking-widest text-gray-300">Proctoring Analytics</h3>
                     </div>
-                    <div className={`grid grid-cols-1 ${hasPerSectionTiming ? 'md:grid-cols-2' : ''} gap-6`}>
+                    <div className={`grid grid-cols-1 ${hasMcq && hasCoding ? 'md:grid-cols-2' : ''} gap-6`}>
                         {/* MCQ Section */}
-                        {hasPerSectionTiming && (
+                        {hasMcq && (
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between pb-2 border-b border-white/5">
                                     <div className="text-[11px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
                                         <FileText className="w-3.5 h-3.5" /> MCQ Section
                                     </div>
                                     {mcqDuration && (
-                                        <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 border-blue-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                                        <div className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg border bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 border-blue-500/20">
                                             ⏱ {mcqDuration}m
                                         </div>
                                     )}
@@ -590,26 +752,28 @@ function DetailsAnalysisContent() {
                             </div>
                         )}
                         {/* Coding Section */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                                <div className="text-[11px] font-bold text-violet-400 uppercase tracking-widest flex items-center gap-2">
-                                    <Code className="w-3.5 h-3.5" /> Coding Section
-                                </div>
-                                {codingDuration && (
-                                    <div className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${hasPerSectionTiming ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border-violet-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                                        ⏱ {codingDuration}m
+                        {hasCoding && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                                    <div className="text-[11px] font-bold text-violet-400 uppercase tracking-widest flex items-center gap-2">
+                                        <Code className="w-3.5 h-3.5" /> Coding Section
                                     </div>
-                                )}
+                                    {codingDuration && (
+                                        <div className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg border bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border-violet-500/20">
+                                            ⏱ {codingDuration}m
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <StatPill label="Started" value={codingStartedAt ? formatTime(codingStartedAt) : 'N/A'} />
+                                    <StatPill label="Ended" value={codingEndedAt ? formatTime(codingEndedAt) : 'N/A'} />
+                                    <StatPill label="Focus Lost" value={codingAnalytics.focus_lost_count ?? 0} warn={(codingAnalytics.focus_lost_count || 0) > 0} />
+                                    <StatPill label="Tab Switches" value={codingAnalytics.tab_switches ?? 0} warn={(codingAnalytics.tab_switches || 0) > 0} />
+                                    <StatPill label="Net Health" value={codingAnalytics.network_health || ((telemetry.internetDisconnects || 0) > 0 ? 'Unstable' : 'Stable')} warn={(telemetry.internetDisconnects || 0) > 0} />
+                                    <StatPill label="Disconnects" value={codingAnalytics.network_disconnects ?? telemetry.internetDisconnects ?? 0} warn={(codingAnalytics.network_disconnects || 0) > 0} />
+                                </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <StatPill label="Started" value={codingStartedAt ? formatTime(codingStartedAt) : 'N/A'} />
-                                <StatPill label="Ended" value={codingEndedAt ? formatTime(codingEndedAt) : 'N/A'} />
-                                <StatPill label="Focus Lost" value={codingAnalytics.focus_lost_count ?? 0} warn={(codingAnalytics.focus_lost_count || 0) > 0} />
-                                <StatPill label="Tab Switches" value={codingAnalytics.tab_switches ?? 0} warn={(codingAnalytics.tab_switches || 0) > 0} />
-                                <StatPill label="Net Health" value={codingAnalytics.network_health || ((telemetry.internetDisconnects || 0) > 0 ? 'Unstable' : 'Stable')} warn={(telemetry.internetDisconnects || 0) > 0} />
-                                <StatPill label="Disconnects" value={codingAnalytics.network_disconnects ?? telemetry.internetDisconnects ?? 0} warn={(codingAnalytics.network_disconnects || 0) > 0} />
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 
@@ -732,6 +896,12 @@ function DetailsAnalysisContent() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3 shrink-0 ml-4">
+                                                {telemetry.perQuestion?.[sub.question_id] && (
+                                                    <div className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/5 text-[11px] font-mono text-gray-400">
+                                                        <Terminal className="w-3 h-3 text-cyan-400 shrink-0" />
+                                                        <span>{telemetry.perQuestion[sub.question_id].compileClicks || 0} comp • {telemetry.perQuestion[sub.question_id].submitClicks || 0} sub</span>
+                                                    </div>
+                                                )}
                                                 <div className={`px-3 py-1 rounded-lg text-[11px] font-bold ${passedCases === totalCases && totalCases > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                                                     {passedCases}/{totalCases} Passed
                                                 </div>
@@ -786,7 +956,7 @@ function DetailsAnalysisContent() {
                                                             <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
                                                         </div>
                                                         <div className="bg-emerald-500/[0.03] p-4 max-h-[450px] overflow-auto custom-scrollbar">
-                                                            <pre className="text-[12px] font-mono text-emerald-300/80 leading-[1.7] whitespace-pre">{sub.correct_code || sub.expected_solution || '// Reference solution not available.'}</pre>
+                                                            <pre className="text-[12px] font-mono text-emerald-300/80 leading-[1.7] whitespace-pre">{sub.correct_code || sub.solution_code || sub.expected_solution || sub.base_code || '// Reference solution not available.'}</pre>
                                                         </div>
                                                     </div>
                                                 </div>

@@ -10,7 +10,7 @@ import { BatchSkeleton, TeacherSkeleton, ListSkeleton, Skeleton, SectionSkeleton
 import StudentDetailView from '../../components/DeepDive/StudentDetailView';
 import TeacherDetailView from '../../components/DeepDive/TeacherDetailView';
 import ChangePasswordModal from '../../components/DeepDive/ChangePasswordModal';
-import { Users, LayoutGrid, Layers, GraduationCap, Loader2, LogOut, ChevronRight, Search, FileText, Clock, AlertCircle, Sun, Moon, Key, BookOpen, Trophy, TrendingUp, ArrowLeft, Download } from "lucide-react";
+import { Users, LayoutGrid, Layers, GraduationCap, Loader2, LogOut, ChevronRight, Search, FileText, Clock, AlertCircle, Sun, Moon, Key, BookOpen, Trophy, TrendingUp, ArrowLeft, Download, ExternalLink } from "lucide-react";
 import Link from 'next/link';
 import SectionDetailView from '../../components/DeepDive/SectionDetailView';
 import BatchDetailView from '../../components/DeepDive/BatchDetailView';
@@ -144,6 +144,8 @@ export default function DeepDiveDashboard() {
     const [examStudentsMode, setExamStudentsMode] = useState('attempted'); // 'attempted' | 'not_attempted'
     const [isExportingCSV, setIsExportingCSV] = useState(false);
     const [isExportingFullReport, setIsExportingFullReport] = useState(false);
+    const [isExportingLinks, setIsExportingLinks] = useState(false);
+    const [exportLinksProgress, setExportLinksProgress] = useState('');
 
     // Debounce the student search -> server
     useEffect(() => {
@@ -295,10 +297,14 @@ export default function DeepDiveDashboard() {
                 try { return new Date(ts).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch { return String(ts); }
             };
 
+            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://adminportal.theeducode.com';
+            const batchId = exam.batches?.[0]?.batch_id || '';
+
             // CSV columns matching existing Exam_Results_Ranked.xlsx format exactly
             const csvHeaders = [
                 'Rank', 'Student Name', 'Reg ID', 'Section', 'Completion (%)',
                 'Total Marks', 'Coding Marks', 'MCQ Marks',
+                'Details Analysis Link',
                 'Duration (mins)', 'Submitted At', 'Started At', 'Last Updated At',
                 'Starting IP', 'Ending IP',
                 'Lost Focus', 'Regained Focus',
@@ -321,6 +327,8 @@ export default function DeepDiveDashboard() {
                 const scOs = sc.os || {};
                 const ecOs = ec.os || {};
 
+                const detailsLink = `${origin}/dashboard/details-analysis?examName=${encodeURIComponent(exam.course_name || 'Exam')}&courseId=${encodeURIComponent(exam.course_id || '')}&studentId=${encodeURIComponent(s.student_id || '')}&regNo=${encodeURIComponent(s.uni_reg_id || '')}&name=${encodeURIComponent(s.student_name || '')}&email=${encodeURIComponent(s.email || '')}&sectionName=${encodeURIComponent(s.section || '')}&batchId=${encodeURIComponent(batchId)}`;
+
                 return [
                     idx + 1,
                     safe(s.student_name),
@@ -330,6 +338,7 @@ export default function DeepDiveDashboard() {
                     safe(s.total_marks_obtained ?? 0),
                     safe(s.coding_marks ?? 0),
                     safe(s.mcq_marks ?? 0),
+                    safe(detailsLink),
                     fmtDurSecs(s.exam_duration_seconds),
                     fmtTime(s.exam_submitted_at || s.end_timestamp),
                     fmtTime(s.exam_started_at || s.start_timestamp || sc.timestamp),
@@ -380,6 +389,148 @@ export default function DeepDiveDashboard() {
             URL.revokeObjectURL(url);
         } catch (e) { console.error('Export error', e); }
         finally { setIsExportingCSV(false); }
+    };
+
+    const downloadStudentLinksReport = async (exam) => {
+        if (!exam || !exam.course_id) return;
+        setIsExportingLinks(true);
+        setExportLinksProgress('Preparing...');
+        try {
+            const token = getAdminToken();
+            if (!token) {
+                alert('Authentication required. Please log in again.');
+                setIsExportingLinks(false);
+                return;
+            }
+
+            const allStudents = [];
+            const modes = ['attempted', 'not_attempted'];
+
+            for (const mode of modes) {
+                let page = 1;
+                let total = 0;
+                let fetchedForMode = 0;
+                do {
+                    setExportLinksProgress(`Fetching ${mode === 'attempted' ? 'attempted' : 'unattempted'} (${fetchedForMode}/${total || '...'})`);
+                    const qs = new URLSearchParams({
+                        course_id: exam.course_id,
+                        page,
+                        limit: 200,
+                        mode,
+                        t: Date.now()
+                    }).toString();
+
+                    const res = await fetch(`${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.examAttemptedStudents}?${qs}`, {
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        credentials: 'include',
+                        cache: 'no-store'
+                    });
+                    const json = await res.json();
+                    if (!json?.success) break;
+
+                    const items = json.data || [];
+                    allStudents.push(...items);
+                    fetchedForMode += items.length;
+                    total = json.pagination?.total || 0;
+                    page++;
+
+                    if (items.length === 0) break;
+                } while (fetchedForMode < total);
+            }
+
+            if (!allStudents.length) {
+                alert('No student records found for this exam.');
+                setIsExportingLinks(false);
+                setExportLinksProgress('');
+                return;
+            }
+
+            setExportLinksProgress('Building Excel spreadsheet...');
+            const XLSX = await import('xlsx');
+
+            // Sort: Attempted first (by total marks descending), then unattempted
+            allStudents.sort((a, b) => {
+                if (a.is_attempted && !b.is_attempted) return -1;
+                if (!a.is_attempted && b.is_attempted) return 1;
+                return (b.total_marks_obtained || 0) - (a.total_marks_obtained || 0);
+            });
+
+            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://adminportal.theeducode.com';
+            const batchId = exam.batches?.[0]?.batch_id || '';
+
+            const safe = (v) => (v === null || v === undefined || v === '') ? '-' : v;
+            const fmtMins = (secs) => (!secs || isNaN(secs)) ? '-' : Math.round(secs / 60);
+
+            const exportRows = allStudents.map((s, idx) => {
+                const params = new URLSearchParams({
+                    examName: exam.course_name || 'Exam',
+                    courseId: exam.course_id || '',
+                    studentId: s.student_id || '',
+                    regNo: s.uni_reg_id || '',
+                    name: s.student_name || '',
+                    email: s.email || '',
+                    sectionName: s.section || '',
+                    batchId: batchId
+                });
+                const detailsUrl = `${origin}/dashboard/details-analysis?${params.toString()}`;
+
+                return {
+                    'Rank': idx + 1,
+                    'Student Name': safe(s.student_name),
+                    'Registration ID': safe(s.uni_reg_id),
+                    'Section': safe(s.section),
+                    'Total Marks': s.total_marks_obtained ?? 0,
+                    'MCQ Marks': s.mcq_marks ?? 0,
+                    'Coding Marks': s.coding_marks ?? 0,
+                    'Status': s.is_attempted ? 'Attempted' : 'Not Attempted',
+                    'Duration (mins)': fmtMins(s.exam_duration_seconds),
+                    'Submit Reason': safe(s.submit_reason),
+                    'Starting IP': safe(s.starting_ip),
+                    'Ending IP': safe(s.ending_ip),
+                    'Details Analysis Link': detailsUrl,
+                    'Open Report': 'View Details Analysis'
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportRows);
+
+            ws['!cols'] = [
+                { wch: 8 },   // Rank
+                { wch: 25 },  // Student Name
+                { wch: 16 },  // Registration ID
+                { wch: 16 },  // Section
+                { wch: 12 },  // Total Marks
+                { wch: 12 },  // MCQ Marks
+                { wch: 12 },  // Coding Marks
+                { wch: 16 },  // Status
+                { wch: 16 },  // Duration
+                { wch: 16 },  // Submit Reason
+                { wch: 18 },  // Starting IP
+                { wch: 18 },  // Ending IP
+                { wch: 75 },  // Details Analysis Link
+                { wch: 22 }   // Open Report
+            ];
+
+            exportRows.forEach((r, idx) => {
+                const rowNum = idx + 2;
+                const cellM = `M${rowNum}`;
+                const cellN = `N${rowNum}`;
+                if (ws[cellM]) ws[cellM].l = { Target: r['Details Analysis Link'], Tooltip: 'Click to open student analysis report' };
+                if (ws[cellN]) ws[cellN].l = { Target: r['Details Analysis Link'], Tooltip: 'Click to open student analysis report' };
+            });
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Student Analysis Links');
+            const safeName = (exam.course_name || 'Exam').replace(/[^a-zA-Z0-9]/g, '_');
+            const fileName = `${safeName}_Student_Analysis_Links.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        } catch (e) {
+            console.error('Student links export error', e);
+            alert('Failed to generate student links report. Please try again.');
+        } finally {
+            setIsExportingLinks(false);
+            setExportLinksProgress('');
+        }
     };
 
     const downloadFullReport = async (exam) => {
@@ -896,6 +1047,13 @@ export default function DeepDiveDashboard() {
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
+                            <button onClick={() => downloadStudentLinksReport(inspectingExam)}
+                                disabled={isExportingLinks}
+                                className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10"
+                                title="Export official spreadsheet with direct, clickable links to each student's detailed analysis report">
+                                {isExportingLinks ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" /> : <ExternalLink className="w-4 h-4" />}
+                                {isExportingLinks ? (exportLinksProgress || 'Exporting Links...') : 'Export Student Links'}
+                            </button>
                             <button onClick={() => downloadFullReport(inspectingExam)}
                                 disabled={isExportingFullReport}
                                 className="group flex items-center gap-2 px-5 py-2.5 bg-[var(--neu-accent)] text-white rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:-translate-y-0.5 active:translate-y-0 font-bold text-sm tracking-wide">
@@ -1022,6 +1180,7 @@ export default function DeepDiveDashboard() {
                                                 <th className="p-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Marks</th>
                                                 <th className="p-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">MCQ</th>
                                                 <th className="p-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Coding</th>
+                                                <th className="p-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right pr-5">Report</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-[var(--neu-divider)]">
@@ -1036,6 +1195,27 @@ export default function DeepDiveDashboard() {
                                                     <td className="p-3 text-center text-sm font-bold text-[#111827] dark:text-white tabular-nums">{s.total_marks_obtained ?? 0}</td>
                                                     <td className="p-3 text-center text-sm text-[#6B7280] dark:text-gray-400 tabular-nums">{s.mcq_marks ?? '—'}</td>
                                                     <td className="p-3 text-center text-sm text-[#6B7280] dark:text-gray-400 tabular-nums">{s.coding_marks ?? '—'}</td>
+                                                    <td className="p-3 text-right pr-5" onClick={(e) => e.stopPropagation()}>
+                                                        <a
+                                                            href={`/dashboard/details-analysis?${new URLSearchParams({
+                                                                examName: inspectingExam.course_name || 'Exam',
+                                                                courseId: inspectingExam.course_id || '',
+                                                                studentId: s.student_id || '',
+                                                                regNo: s.uni_reg_id || '',
+                                                                name: s.student_name || '',
+                                                                email: s.email || '',
+                                                                sectionName: s.section || '',
+                                                                batchId: inspectingExam.batches?.[0]?.batch_id || ''
+                                                            }).toString()}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl neu-raised text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-all active:scale-95 border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10"
+                                                            title="Open detailed analysis report in a new tab"
+                                                        >
+                                                            <span>Analysis</span>
+                                                            <ExternalLink className="w-3.5 h-3.5" />
+                                                        </a>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
