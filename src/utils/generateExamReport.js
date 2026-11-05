@@ -5,6 +5,7 @@ import { EDUCODE_LOGO_BASE64 } from './reportAssets.js';
 export function generateExamReport(ctx) {
     const {
         studentInfo = {}, regNo = '', examName = '', sectionName = '',
+        attemptNumber = 1, isNewest = false, isBest = false,
         mcqDetails = null, codingDetails = null,
         telemetry = {}, envLogs = {},
         mcqAnalytics = {}, codingAnalytics = {},
@@ -703,6 +704,7 @@ export function generateExamReport(ctx) {
                     <table class="info">
                         ${infoRow('Exam Name', examName)}
                         ${infoRow('Assigned Section', sectionName)}
+                        ${infoRow('Attempt Evaluated', `Attempt ${attemptNumber}${isNewest ? ' (Latest)' : ''}${isBest ? ' [Best Score]' : ''}`)}
                         ${infoRow('Started Session', examStartedAt ? formatDate(examStartedAt) : 'N/A')}
                         ${infoRow('Ended / Submitted', examEndedAt ? formatDate(examEndedAt) : 'N/A')}
                         ${infoRow('Total Duration', examDuration ? examDuration + ' minutes' : 'N/A')}

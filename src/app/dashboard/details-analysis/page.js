@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, ArrowLeft, Terminal, AlertCircle, Clock, Globe, ShieldAlert, Monitor, Activity, Shield, Wifi, WifiOff, FileText, CheckCircle, XCircle, Download, Video, Code, ChevronDown, Target } from 'lucide-react';
+import { Loader2, ArrowLeft, Terminal, AlertCircle, Clock, Globe, ShieldAlert, Monitor, Activity, Shield, Wifi, WifiOff, FileText, CheckCircle, XCircle, Download, Video, Code, ChevronDown, Target, Layers, Award } from 'lucide-react';
 import useSWR from 'swr';
 import { getAdminToken } from '@/utils/cookies';
 import { API_CONFIG } from "@/utils/api";
@@ -35,8 +35,8 @@ function DetailsAnalysisContent() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [studentInfo, setStudentInfo] = useState(null);
-    const [mcqDetails, setMcqDetails] = useState(null);
-    const [codingDetails, setCodingDetails] = useState(null);
+    const [attemptsList, setAttemptsList] = useState([]);
+    const [selectedAttemptNumber, setSelectedAttemptNumber] = useState(null);
     const [envLogs, setEnvLogs] = useState({});
     const [expandedQuestion, setExpandedQuestion] = useState(null);
 
@@ -165,46 +165,115 @@ function DetailsAnalysisContent() {
 
             if (envJson?.success) setEnvLogs(envJson.data || {});
 
-            // Merge submissions across ALL sub-units. Attempts are ordered
-            // newest-first, but the newest row can have zero submissions
-            // (auto-submitted retries) — pick the newest attempt that has data.
-            const allSubs = [];
+            // Group and aggregate attempts across all sub-units of the course
+            const attemptsMap = new Map();
             for (const suJson of (subUnitResults || [])) {
                 if (!suJson?.success || !Array.isArray(suJson.data) || suJson.data.length === 0) continue;
-                const bestAttempt = suJson.data.find(a => (a.submissions || []).length > 0) || suJson.data[0];
-                for (const s of (bestAttempt.submissions || [])) {
-                    allSubs.push({ ...s, type: s.question_type, attempt_number: bestAttempt.attempt_count });
+                for (const att of suJson.data) {
+                    const attNum = Number(att.attempt_count || att.attempt || att.overview?.attempt_number || 1);
+                    if (!attemptsMap.has(attNum)) {
+                        attemptsMap.set(attNum, {
+                            attemptNumber: attNum,
+                            submittedAt: att.overview?.submitted_at || null,
+                            totalScore: 0,
+                            maxScore: 0,
+                            percentage: 0,
+                            status: att.overview?.status || 'Completed',
+                            submissions: [],
+                            completionStats: att.completion_stats || null
+                        });
+                    }
+                    const existing = attemptsMap.get(attNum);
+                    existing.totalScore += (att.overview?.total_score || 0);
+                    existing.maxScore += (att.overview?.max_score || 0);
+                    if (att.overview?.submitted_at) {
+                        if (!existing.submittedAt || new Date(att.overview.submitted_at) > new Date(existing.submittedAt)) {
+                            existing.submittedAt = att.overview.submitted_at;
+                        }
+                    }
+                    if (att.overview?.status && att.overview.status.toLowerCase() === 'passed') {
+                        existing.status = 'Passed';
+                    }
+                    for (const s of (att.submissions || [])) {
+                        existing.submissions.push({
+                            ...s,
+                            type: s.question_type,
+                            attempt_number: attNum
+                        });
+                    }
                 }
             }
 
-            const mcqSubs = allSubs.filter(s => s.type === 'mcq');
-            const codingSubs = allSubs.filter(s => s.type === 'coding');
+            // Fallback if no attempts were returned from sub-units
+            if (attemptsMap.size === 0) {
+                attemptsMap.set(1, {
+                    attemptNumber: 1,
+                    submittedAt: studentInfo?.submittedAt || null,
+                    totalScore: totalMarks || 0,
+                    maxScore: 18,
+                    percentage: completionPct || 0,
+                    status: 'Completed',
+                    submissions: [],
+                    completionStats: null
+                });
+            }
 
-            // Per-section timing window from submission timestamps
-            const timeWindow = (subs) => {
-                const ts = subs.map(s => new Date(s.submitted_at).getTime()).filter(t => !isNaN(t));
-                if (ts.length === 0) return { start: null, end: null };
-                return { start: new Date(Math.min(...ts)), end: new Date(Math.max(...ts)) };
-            };
+            for (const att of attemptsMap.values()) {
+                if (att.maxScore > 0) {
+                    att.percentage = Math.round((att.totalScore / att.maxScore) * 100);
+                }
+            }
 
-            setMcqDetails({
-                submissions: mcqSubs,
-                timing: timeWindow(mcqSubs),
-                overview: {
-                    total_score: mcqSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
-                    max_score: mcqSubs.reduce((a, s) => a + (s.max_score || 0), 0)
-                }
-            });
-            
-            setCodingDetails({
-                submissions: codingSubs,
-                timing: timeWindow(codingSubs),
-                overview: {
-                    total_score: codingSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
-                    max_score: codingSubs.reduce((a, s) => a + (s.max_score || 0), 0)
-                }
+            // Sort descending by attempt number: Attempt 2, Attempt 1, etc.
+            const sortedAttempts = Array.from(attemptsMap.values()).sort((a, b) => b.attemptNumber - a.attemptNumber);
+            const highestScore = Math.max(...sortedAttempts.map(a => a.totalScore));
+            const newestNum = sortedAttempts[0].attemptNumber;
+
+            const annotatedAttempts = sortedAttempts.map(att => ({
+                ...att,
+                isNewest: att.attemptNumber === newestNum,
+                isBest: att.totalScore === highestScore && (highestScore > 0 || sortedAttempts.length === 1)
+            }));
+
+            setAttemptsList(annotatedAttempts);
+            // Default scorecard to newest attempt (as requested: "take newest as the scorw card okay")
+            setSelectedAttemptNumber(prev => {
+                if (prev && annotatedAttempts.some(a => a.attemptNumber === prev)) return prev;
+                return newestNum;
             });
         }, [swrData, isValidating, swrError, nameParam, emailParam, regNo, studentId, sectionName, examName]);
+
+    // ── Active Attempt & Submissions ──
+    const activeAttempt = attemptsList.find(a => a.attemptNumber === selectedAttemptNumber) || attemptsList[0] || null;
+    const activeAttemptNumber = activeAttempt?.attemptNumber || 1;
+    const activeSubs = activeAttempt?.submissions || [];
+    const mcqSubs = activeSubs.filter(s => s.type === 'mcq');
+    const codingSubs = activeSubs.filter(s => s.type === 'coding');
+
+    // Per-section timing window from submission timestamps
+    const timeWindow = (subs) => {
+        const ts = subs.map(s => new Date(s.submitted_at).getTime()).filter(t => !isNaN(t));
+        if (ts.length === 0) return { start: null, end: null };
+        return { start: new Date(Math.min(...ts)), end: new Date(Math.max(...ts)) };
+    };
+
+    const mcqDetails = {
+        submissions: mcqSubs,
+        timing: timeWindow(mcqSubs),
+        overview: {
+            total_score: mcqSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
+            max_score: mcqSubs.reduce((a, s) => a + (s.max_score || 0), 0)
+        }
+    };
+
+    const codingDetails = {
+        submissions: codingSubs,
+        timing: timeWindow(codingSubs),
+        overview: {
+            total_score: codingSubs.reduce((a, s) => a + (s.score_obtained || 0), 0),
+            max_score: codingSubs.reduce((a, s) => a + (s.max_score || 0), 0)
+        }
+    };
 
     // ── Derived Data (legacy names preserved) ──
     const telemetry = studentInfo?.telemetry || {};
@@ -212,36 +281,43 @@ function DetailsAnalysisContent() {
     const codingAnalytics = codingDetails?.proctoring_metrics || {};
 
     // ── Detect MCQ & Coding section availability ──
+    // Avoid false-positives from legacy empty mcq_timing logs on coding-only exams
     const hasMcq = Boolean(
         studentInfo?.courseHasMcq ||
-        (mcqDetails?.submissions && mcqDetails.submissions.length > 0) ||
-        envLogs?.mcq_timing ||
+        mcqSubs.length > 0 ||
         (studentInfo?.marksBreakdown?.mcq_marks > 0)
     );
 
     const hasCoding = Boolean(
         studentInfo?.courseHasCoding ||
-        (codingDetails?.submissions && codingDetails.submissions.length > 0) ||
-        envLogs?.coding_timing ||
+        codingSubs.length > 0 ||
         (studentInfo?.marksBreakdown?.coding_marks > 0)
     );
 
-    // ── Authoritative Overall Exam Timestamps ──
+    // ── Timing calculation for active attempt ──
+    const attemptSubTs = activeSubs.map(s => new Date(s.submitted_at).getTime()).filter(t => !isNaN(t));
+    const attemptSubStart = attemptSubTs.length > 0 ? Math.min(...attemptSubTs) : null;
+    const attemptSubEnd = attemptSubTs.length > 0 ? Math.max(...attemptSubTs) : null;
+    const attemptSubmittedAtTs = activeAttempt?.submittedAt ? new Date(activeAttempt.submittedAt).getTime() : null;
+
+    // Filter candidate starts/ends respecting actual course structure
     const candidateStarts = [
         envLogs?.started_at,
-        envLogs?.coding_timing?.startedAt,
-        envLogs?.mcq_timing?.startedAt,
         envLogs?.start_config?.timestamp,
-        telemetry?.startedAt
+        telemetry?.startedAt,
+        hasCoding ? envLogs?.coding_timing?.startedAt : null,
+        hasMcq ? envLogs?.mcq_timing?.startedAt : null,
+        attemptSubStart
     ].filter(Boolean).map(t => new Date(t).getTime()).filter(t => !isNaN(t));
 
     const candidateEnds = [
         envLogs?.ended_at,
-        envLogs?.coding_timing?.lastUpdatedAt,
-        envLogs?.mcq_timing?.lastUpdatedAt,
         envLogs?.end_config?.timestamp,
         telemetry?.lastUpdatedAt,
-        studentInfo?.submittedAt
+        hasCoding ? envLogs?.coding_timing?.lastUpdatedAt : null,
+        hasMcq ? envLogs?.mcq_timing?.lastUpdatedAt : null,
+        attemptSubmittedAtTs,
+        attemptSubEnd
     ].filter(Boolean).map(t => new Date(t).getTime()).filter(t => !isNaN(t));
 
     const minStart = candidateStarts.length > 0 ? Math.min(...candidateStarts) : null;
@@ -251,8 +327,16 @@ function DetailsAnalysisContent() {
     }
     const maxEnd = validEnds.length > 0 ? Math.max(...validEnds) : null;
 
-    let examStartedAt = minStart ? new Date(minStart) : null;
-    let examEndedAt = maxEnd ? new Date(maxEnd) : null;
+    let examStartedAt = null;
+    let examEndedAt = null;
+
+    if (activeAttempt?.isNewest && minStart) {
+        examStartedAt = new Date(minStart);
+        examEndedAt = maxEnd ? new Date(maxEnd) : (attemptSubmittedAtTs ? new Date(attemptSubmittedAtTs) : null);
+    } else {
+        examStartedAt = attemptSubStart ? new Date(attemptSubStart) : null;
+        examEndedAt = attemptSubmittedAtTs ? new Date(attemptSubmittedAtTs) : (attemptSubEnd ? new Date(attemptSubEnd) : null);
+    }
 
     if (examStartedAt && examEndedAt && examStartedAt > examEndedAt) {
         [examStartedAt, examEndedAt] = [examEndedAt, examStartedAt];
@@ -268,20 +352,15 @@ function DetailsAnalysisContent() {
     let mcqDuration = null;
 
     if (hasMcq) {
-        if (envLogs?.mcq_timing?.startedAt) {
-            mcqStartedAt = new Date(envLogs.mcq_timing.startedAt);
-        } else if (mcqDetails?.timing?.start) {
-            mcqStartedAt = mcqDetails.timing.start;
-        } else {
-            mcqStartedAt = examStartedAt;
-        }
-
-        if (envLogs?.mcq_timing?.lastUpdatedAt) {
-            mcqEndedAt = new Date(envLogs.mcq_timing.lastUpdatedAt);
-        } else if (mcqDetails?.timing?.end) {
-            mcqEndedAt = mcqDetails.timing.end;
-        } else {
-            mcqEndedAt = examEndedAt;
+        if (mcqSubs.length > 0) {
+            const mcqTs = mcqSubs.map(s => new Date(s.submitted_at).getTime()).filter(t => !isNaN(t));
+            if (mcqTs.length > 0) {
+                mcqStartedAt = new Date(Math.min(...mcqTs));
+                mcqEndedAt = new Date(Math.max(...mcqTs));
+            }
+        } else if (activeAttempt?.isNewest && envLogs?.mcq_timing) {
+            if (envLogs.mcq_timing.startedAt) mcqStartedAt = new Date(envLogs.mcq_timing.startedAt);
+            if (envLogs.mcq_timing.lastUpdatedAt) mcqEndedAt = new Date(envLogs.mcq_timing.lastUpdatedAt);
         }
 
         if (mcqStartedAt && mcqEndedAt && mcqStartedAt > mcqEndedAt) {
@@ -297,20 +376,15 @@ function DetailsAnalysisContent() {
     let codingDuration = null;
 
     if (hasCoding) {
-        if (envLogs?.coding_timing?.startedAt) {
-            codingStartedAt = new Date(envLogs.coding_timing.startedAt);
-        } else if (codingDetails?.timing?.start) {
-            codingStartedAt = codingDetails.timing.start;
-        } else {
-            codingStartedAt = examStartedAt;
-        }
-
-        if (envLogs?.coding_timing?.lastUpdatedAt) {
-            codingEndedAt = new Date(envLogs.coding_timing.lastUpdatedAt);
-        } else if (codingDetails?.timing?.end) {
-            codingEndedAt = codingDetails.timing.end;
-        } else {
-            codingEndedAt = examEndedAt;
+        if (codingSubs.length > 0) {
+            const codingTs = codingSubs.map(s => new Date(s.submitted_at).getTime()).filter(t => !isNaN(t));
+            if (codingTs.length > 0) {
+                codingStartedAt = new Date(Math.min(...codingTs));
+                codingEndedAt = new Date(Math.max(...codingTs));
+            }
+        } else if (activeAttempt?.isNewest && envLogs?.coding_timing) {
+            if (envLogs.coding_timing.startedAt) codingStartedAt = new Date(envLogs.coding_timing.startedAt);
+            if (envLogs.coding_timing.lastUpdatedAt) codingEndedAt = new Date(envLogs.coding_timing.lastUpdatedAt);
         }
 
         if (codingStartedAt && codingEndedAt && codingStartedAt > codingEndedAt) {
@@ -321,10 +395,10 @@ function DetailsAnalysisContent() {
             ? Math.max(1, Math.round((codingEndedAt - codingStartedAt) / 60000)) : null;
     }
 
-    const overallMcqScore = mcqDetails?.overview?.total_score || 0;
-    const maxMcqScore = mcqDetails?.overview?.max_score || 0;
-    const overallCodingScore = codingDetails?.overview?.total_score || 0;
-    const maxCodingScore = codingDetails?.overview?.max_score || 0;
+    const overallMcqScore = mcqDetails.overview.total_score;
+    const maxMcqScore = mcqDetails.overview.max_score;
+    const overallCodingScore = codingDetails.overview.total_score;
+    const maxCodingScore = codingDetails.overview.max_score;
     const totalScore = overallMcqScore + overallCodingScore;
     const maxTotalScore = maxMcqScore + maxCodingScore;
 
@@ -333,21 +407,21 @@ function DetailsAnalysisContent() {
     const examCodingMarks = studentInfo?.marksBreakdown?.coding_marks || 0;
     const examCompletionPct = studentInfo?.completionPct || 0;
 
-    const displayCodingScore = (codingDetails?.submissions?.length > 0 && overallCodingScore > 0)
-        ? overallCodingScore
-        : (examCodingMarks || overallCodingScore);
-    const displayMcqScore = (mcqDetails?.submissions?.length > 0 && overallMcqScore > 0)
+    const displayTotalScore = activeAttempt ? activeAttempt.totalScore : (totalScore > 0 ? totalScore : examTotalMarks);
+    const displayMaxScore = (activeAttempt && activeAttempt.maxScore > 0)
+        ? activeAttempt.maxScore
+        : (maxTotalScore > 0 ? maxTotalScore : (examTotalMarks > 0 ? examTotalMarks : 18));
+    const finalPercentage = displayMaxScore > 0
+        ? Math.round((displayTotalScore / displayMaxScore) * 100)
+        : (examCompletionPct || 0);
+
+    const displayMcqScore = mcqSubs.length > 0
         ? overallMcqScore
-        : (examMcqMarks || overallMcqScore);
-    const displayTotalScore = totalScore > 0
-        ? totalScore
-        : ((hasMcq ? displayMcqScore : 0) + (hasCoding ? displayCodingScore : 0) || examTotalMarks);
-    const displayMaxScore = maxTotalScore > 0
-        ? maxTotalScore
-        : (examTotalMarks > 0 ? examTotalMarks : (displayTotalScore > 0 ? displayTotalScore : 0));
-    const finalPercentage = maxTotalScore > 0
-        ? Math.round((totalScore / maxTotalScore) * 100)
-        : (displayMaxScore > 0 ? Math.round((displayTotalScore / displayMaxScore) * 100) : examCompletionPct);
+        : (hasMcq ? (activeAttempt && !hasCoding ? displayTotalScore : examMcqMarks) : 0);
+
+    const displayCodingScore = codingSubs.length > 0
+        ? overallCodingScore
+        : (hasCoding ? (activeAttempt && !hasMcq ? displayTotalScore : examCodingMarks) : 0);
 
     const formatTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A';
     const formatDate = (d) => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -361,6 +435,9 @@ function DetailsAnalysisContent() {
 
     const generatePDF = () => generateExamReport({
         studentInfo, regNo, examName, sectionName,
+        attemptNumber: activeAttemptNumber,
+        isNewest: activeAttempt?.isNewest,
+        isBest: activeAttempt?.isBest,
         mcqDetails, codingDetails,
         telemetry, envLogs, mcqAnalytics, codingAnalytics,
         examStartedAt, examEndedAt, examDuration,
@@ -429,7 +506,12 @@ function DetailsAnalysisContent() {
                             Export PDF
                         </button>
                         <div className="px-5 py-2.5 bg-gradient-to-r from-blue-600/20 to-violet-600/20 border border-blue-500/20 rounded-2xl">
-                            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Score</div>
+                            <div className="flex items-center justify-between gap-3 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                <span>Score</span>
+                                {attemptsList.length > 1 && (
+                                    <span className="text-indigo-400 font-bold">Attempt {activeAttemptNumber}</span>
+                                )}
+                            </div>
                             <div className="text-xl font-black bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent leading-tight">
                                 {displayTotalScore}<span className="text-sm font-medium text-gray-500">/{displayMaxScore}</span>
                                 <span className="text-xs font-normal text-gray-500 ml-1.5">({finalPercentage}%)</span>
@@ -440,6 +522,111 @@ function DetailsAnalysisContent() {
             </div>
 
             <div className="max-w-7xl mx-auto p-6 space-y-8">
+
+                {/* ═══ 0. ATTEMPT SELECTOR ═══ */}
+                {attemptsList.length > 0 && (
+                    <div className="bg-gradient-to-br from-[#0D1321] to-[#0A1628] rounded-3xl p-5 border border-white/5 shadow-xl">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                                    <Layers className="w-4 h-4 text-indigo-400" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-200">
+                                            Exam Attempts ({attemptsList.length})
+                                        </h3>
+                                        {attemptsList.length > 1 && (
+                                            <span className="hidden sm:inline-block text-[10px] text-gray-400 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                                                Click an attempt to inspect its scorecard &amp; submissions
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-xs text-gray-400 flex items-center gap-2">
+                                <span>Active Scorecard:</span>
+                                <span className="font-bold text-white bg-white/10 px-2 py-0.5 rounded-lg border border-white/10">
+                                    Attempt {activeAttemptNumber}
+                                </span>
+                                {activeAttempt?.isNewest && (
+                                    <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                                        Newest
+                                    </span>
+                                )}
+                                {activeAttempt?.isBest && (
+                                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                        Best Score
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Attempt Cards Grid */}
+                        <div className={`grid grid-cols-1 ${attemptsList.length > 1 ? 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'sm:grid-cols-1 max-w-md'} gap-3`}>
+                            {attemptsList.map((att) => {
+                                const isSelected = att.attemptNumber === activeAttemptNumber;
+                                return (
+                                    <button
+                                        key={att.attemptNumber}
+                                        onClick={() => {
+                                            setSelectedAttemptNumber(att.attemptNumber);
+                                            setExpandedQuestion(null);
+                                        }}
+                                        className={`text-left p-4 rounded-2xl border transition-all relative overflow-hidden group cursor-pointer ${
+                                            isSelected
+                                                ? 'bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-violet-600/20 border-blue-500/50 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/30'
+                                                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/15'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-sm font-black ${isSelected ? 'text-white' : 'text-gray-300'}`}>
+                                                    Attempt {att.attemptNumber}
+                                                </span>
+                                                {isSelected && (
+                                                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                                                )}
+                                            </div>
+                                            <span className={`text-sm font-mono font-bold ${
+                                                att.totalScore === att.maxScore && att.maxScore > 0
+                                                    ? 'text-emerald-400'
+                                                    : isSelected ? 'text-blue-300' : 'text-gray-400'
+                                            }`}>
+                                                {att.totalScore}/{att.maxScore || 18}
+                                                <span className="text-xs font-normal text-gray-500 ml-1">({att.percentage}%)</span>
+                                            </span>
+                                        </div>
+
+                                        {/* Badges */}
+                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                            {att.isNewest && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wider">
+                                                    <Clock className="w-3 h-3" /> Newest
+                                                </span>
+                                            )}
+                                            {att.isBest && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
+                                                    <Award className="w-3 h-3" /> Best Score
+                                                </span>
+                                            )}
+                                            {att.submissions?.length === 0 && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-white/5 text-gray-500 border border-white/5">
+                                                    0 Submissions
+                                                </span>
+                                            )}
+                                            {att.submittedAt && (
+                                                <span className="text-[10px] text-gray-500 font-mono ml-auto">
+                                                    {new Date(att.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* ═══ 1. STUDENT PROFILE + VIDEO ═══ */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -783,7 +970,12 @@ function DetailsAnalysisContent() {
                         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex items-center justify-between">
                             <h2 className="text-lg font-bold text-white flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center"><FileText className="w-4 h-4" /></div>
-                                MCQ Responses
+                                <span>MCQ Responses</span>
+                                {attemptsList.length > 1 && (
+                                    <span className="text-xs font-semibold text-white/80 bg-white/10 px-2.5 py-0.5 rounded-full">
+                                        Attempt {activeAttemptNumber}
+                                    </span>
+                                )}
                             </h2>
                             <div className="flex items-center gap-3">
                                 <div className="px-4 py-1.5 bg-white/20 backdrop-blur rounded-full text-white text-sm font-bold">
@@ -863,15 +1055,20 @@ function DetailsAnalysisContent() {
                 )}
 
                 {/* ═══ 5. CODING RESPONSES ═══ */}
-                {codingDetails?.submissions?.length > 0 && (
+                {codingDetails?.submissions?.length > 0 ? (
                     <div className="rounded-3xl border border-white/5 overflow-hidden">
                         <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-5 flex items-center justify-between">
                             <h2 className="text-lg font-bold text-white flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center"><Code className="w-4 h-4" /></div>
-                                Coding Responses
+                                <span>Coding Responses</span>
+                                {attemptsList.length > 1 && (
+                                    <span className="text-xs font-semibold text-white/80 bg-white/10 px-2.5 py-0.5 rounded-full">
+                                        Attempt {activeAttemptNumber}
+                                    </span>
+                                )}
                             </h2>
                             <div className="px-4 py-1.5 bg-white/20 backdrop-blur rounded-full text-white text-sm font-bold">
-                                Score: {overallCodingScore || examCodingMarks} / {maxCodingScore || codingDetails.submissions.reduce((s, c) => s + (c.total_question_marks || 0), 0) / 10 || 12}
+                                Score: {displayCodingScore} / {displayMaxScore}
                             </div>
                         </div>
                         <div className="bg-[#0D1321] p-6 space-y-8">
@@ -1052,7 +1249,34 @@ function DetailsAnalysisContent() {
                             })}
                         </div>
                     </div>
-                )}
+                ) : hasCoding ? (
+                    <div className="rounded-3xl border border-white/5 overflow-hidden">
+                        <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-5 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center"><Code className="w-4 h-4" /></div>
+                                <span>Coding Responses</span>
+                                {attemptsList.length > 1 && (
+                                    <span className="text-xs font-semibold text-white/80 bg-white/10 px-2.5 py-0.5 rounded-full">
+                                        Attempt {activeAttemptNumber}
+                                    </span>
+                                )}
+                            </h2>
+                            <div className="px-4 py-1.5 bg-white/20 backdrop-blur rounded-full text-white text-sm font-bold">
+                                Score: {displayCodingScore} / {displayMaxScore}
+                            </div>
+                        </div>
+                        <div className="bg-[#0D1321] p-8 text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-violet-500/10 text-violet-400 flex items-center justify-center mx-auto mb-3">
+                                <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <h3 className="text-base font-bold text-gray-200 mb-1">No Code Submissions for Attempt {activeAttemptNumber}</h3>
+                            <p className="text-xs text-gray-500 max-w-md mx-auto">
+                                This attempt concluded with score {displayCodingScore}/{displayMaxScore} without saved code submissions.
+                                {attemptsList.length > 1 && " You can switch attempts in the Exam Attempts bar above to view code submissions from other attempts."}
+                            </p>
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             {/* Bottom spacer */}
