@@ -60,6 +60,22 @@ export const AuthProvider = ({ children }) => {
             // Don't show loading if it's a background check or we already have a user
             if (!user && !isBackground) setLoading(true);
 
+            // Fast-path: Check if valid teacher session is present
+            if (typeof window !== 'undefined') {
+                const teacherSessionStr = localStorage.getItem('teacher_session');
+                const token = getAdminToken();
+                if (teacherSessionStr && token) {
+                    try {
+                        const parsed = JSON.parse(teacherSessionStr);
+                        if (parsed && (parsed.id || parsed.teacher_id || parsed.name)) {
+                            setUser(parsed);
+                            if (!isBackground) setLoading(false);
+                            return;
+                        }
+                    } catch (_) {}
+                }
+            }
+
             // Use verify endpoint from centralized config
             const url = `${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.me}`;
 
@@ -117,11 +133,42 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
             const isTeacher = role === 'teacher';
-            const url = `${API_CONFIG.baseUrl.admin}${isTeacher ? '/teachers/login' : API_CONFIG.admin.login}`;
-            
-            const bodyPayload = isTeacher 
-              ? { regId: credentials.email, joiningId: credentials.password } 
-              : { email: credentials.email, password: credentials.password };
+
+            if (isTeacher) {
+                const regId = (credentials.uni_reg_id || credentials.regId || credentials.email || '').trim();
+                const pwd = (credentials.password || '').trim();
+
+                if (!regId || !pwd) {
+                    return { success: false, error: 'Registration ID and password are required' };
+                }
+
+                // Call the official Teacher Portal login endpoint
+                const teacherUrl = 'https://teacherportal.theeducode.com/api/proxy/backend/auth/teacher/login';
+                const res = await fetch(teacherUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uni_reg_id: regId, password: pwd })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const token = data.token || data.teacher?.token;
+                    if (token) {
+                        setAdminToken(token);
+                    }
+                    if (data.teacher) {
+                        localStorage.setItem('teacher_session', JSON.stringify(data.teacher));
+                        setUser(data.teacher);
+                    }
+                    return { success: true, token, teacher: data.teacher };
+                } else {
+                    return { success: false, error: data.error || data.message || "Invalid Registration ID or Password" };
+                }
+            }
+
+            // Administrator login
+            const url = `${API_CONFIG.baseUrl.admin}${API_CONFIG.admin.login}`;
+            const bodyPayload = { email: credentials.email, password: credentials.password };
 
             const res = await apiCall(url, {
                 method: "POST",
@@ -130,16 +177,13 @@ export const AuthProvider = ({ children }) => {
 
             const data = await res.json();
 
-            // Check if login was actually successful based on API response
             if (res.ok && data.success) {
-                // Backend now returns token in response body
                 if (data.token) {
                     setAdminToken(data.token);
                 } else {
                     console.error('No token found in login response!');
                 }
 
-                // Refresh user state immediately
                 await checkSession();
                 return { success: true };
             } else {
@@ -172,7 +216,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, checkSession }}>
+        <AuthContext.Provider value={{ user, setUser, loading, login, logout, checkSession }}>
             {children}
         </AuthContext.Provider>
     );

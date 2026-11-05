@@ -10,7 +10,7 @@ import { BatchSkeleton, TeacherSkeleton, ListSkeleton, Skeleton, SectionSkeleton
 import StudentDetailView from '../../components/DeepDive/StudentDetailView';
 import TeacherDetailView from '../../components/DeepDive/TeacherDetailView';
 import ChangePasswordModal from '../../components/DeepDive/ChangePasswordModal';
-import { Users, LayoutGrid, Layers, GraduationCap, Loader2, LogOut, ChevronRight, Search, FileText, Clock, AlertCircle, Sun, Moon, Key, BookOpen, Trophy, TrendingUp, ArrowLeft, Download, ExternalLink } from "lucide-react";
+import { Users, LayoutGrid, Layers, GraduationCap, Loader2, LogOut, ChevronRight, Search, FileText, Clock, AlertCircle, Sun, Moon, Key, BookOpen, Trophy, TrendingUp, ArrowLeft, Download, ExternalLink, BarChart3 } from "lucide-react";
 import Link from 'next/link';
 import SectionDetailView from '../../components/DeepDive/SectionDetailView';
 import BatchDetailView from '../../components/DeepDive/BatchDetailView';
@@ -1047,6 +1047,27 @@ export default function DeepDiveDashboard() {
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => {
+                                    const batchIdVal = inspectingExam.batches?.[0]?.batch_id || inspectingExam.batch_id || (typeof selectedBatch === 'string' ? selectedBatch : selectedBatch?.batch_id) || '';
+                                    const batchNameVal = inspectingExam.batches?.[0]?.batch_name || inspectingExam.batch_name || (typeof selectedBatch === 'object' ? selectedBatch?.batch_name : '') || '';
+                                    const teacherToken = typeof window !== 'undefined' ? (localStorage.getItem('teacher_token') || '') : '';
+                                    const params = new URLSearchParams({
+                                        courseId: inspectingExam.course_id,
+                                        examName: inspectingExam.course_name || 'Exam',
+                                        batchId: batchIdVal,
+                                        batchName: batchNameVal,
+                                        ...(teacherToken ? { token: teacherToken } : {})
+                                    });
+                                    window.open(`/dashboard/reports/placement-scrutiny?${params.toString()}`, '_blank', 'noopener,noreferrer');
+                                }}
+                                className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-2 transition-all active:scale-95 border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 shadow-sm"
+                                title="Open interactive graphical placement readiness & academic scrutiny report in a new tab"
+                            >
+                                <BarChart3 className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" />
+                                <span>Placement & Scrutiny Report</span>
+                                <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                            </button>
                             <button onClick={() => downloadStudentLinksReport(inspectingExam)}
                                 disabled={isExportingLinks}
                                 className="group px-4 py-2.5 rounded-2xl neu-raised text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10"

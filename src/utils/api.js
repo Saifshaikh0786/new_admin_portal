@@ -29,6 +29,7 @@ export const API_CONFIG = {
         liveSummary: '/admin/dashboard/live-summary',
         examsOverview: '/admin/analytics/exams-overview',
         examAttemptedStudents: '/admin/analytics/exam-attempted-students',
+        placementScrutinyReport: '/admin/analytics/placement-scrutiny-report',
 
         getPracticeCoursesByBatch: '/admin/dashboard/get-practice-courses-by-batch',
         getExamCoursesByBatch: '/admin/courses/get-exam-courses-by-batch', // Assuming you'll add this if needed

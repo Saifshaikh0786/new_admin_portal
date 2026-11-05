@@ -47,8 +47,20 @@ function DetailsAnalysisContent() {
         if (!courseId || !studentId) {
             setError("Missing required parameters (courseId, studentId).");
             setLoading(false);
+            return;
         }
-    }, [courseId, studentId]);
+
+        if (typeof window !== "undefined") {
+            const token = getAdminToken();
+            if (!token) {
+                const currentUrl = window.location.pathname + window.location.search;
+                try {
+                    sessionStorage.setItem('post_login_redirect', currentUrl);
+                } catch (_) {}
+                router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+            }
+        }
+    }, [courseId, studentId, router]);
 
     const compositeFetcher = async () => {
             const token = getAdminToken();
@@ -628,65 +640,81 @@ function DetailsAnalysisContent() {
                     </div>
                 )}
 
-                {/* ═══ 1. STUDENT PROFILE + VIDEO ═══ */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* ═══ 1. STUDENT PROFILE (VIDEO TEMPORARILY COMMENTED OUT) ═══ */}
+                <div className="w-full">
                     {/* Profile Card */}
-                    <div className="bg-gradient-to-br from-[#0D1321] to-[#0A1628] rounded-3xl p-6 border border-white/5 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
-                        <div className="relative">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white mb-5 shadow-lg shadow-blue-500/20 text-xl font-black">
-                                {(studentInfo?.name || 'S')[0]}
+                    <div className="bg-gradient-to-br from-[#0D1321] to-[#0A1628] rounded-3xl p-6 sm:p-8 border border-white/5 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+                        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                            {/* Left: Avatar & Identity */}
+                            <div className="flex items-center gap-5">
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-500/25 text-2xl font-black">
+                                    {(studentInfo?.name || 'S')[0]}
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white tracking-tight">{studentInfo?.name || 'Student'}</h2>
+                                    {studentInfo?.email ? (
+                                        <div className="text-xs text-gray-400 mt-0.5">{studentInfo.email}</div>
+                                    ) : null}
+                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <span className="text-[11px] font-mono font-medium text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-lg">
+                                            REG: {studentInfo?.regNo || regNo || '—'}
+                                        </span>
+                                        <span className="text-[11px] font-medium text-slate-300 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-lg">
+                                            Section: {studentInfo?.section || sectionName || '—'}
+                                        </span>
+                                        <span className="text-[11px] font-medium text-slate-300 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-lg">
+                                            {studentInfo?.course || examName || 'Exam'}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                            <h2 className="text-xl font-bold text-white mb-0.5">{studentInfo?.name || 'Student'}</h2>
-                            {studentInfo?.email && <div className="text-xs text-gray-500 mb-3">{studentInfo.email}</div>}
-                            <div className="text-[11px] font-mono text-gray-500 bg-white/5 inline-block px-2.5 py-1 rounded-lg border border-white/5 mb-5">REG: {studentInfo?.regNo}</div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="p-3 bg-white/[0.03] rounded-xl border border-white/5">
-                                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Section</div>
-                                    <div className="text-sm font-bold text-white">{studentInfo?.section}</div>
-                                </div>
-                                <div className="p-3 bg-white/[0.03] rounded-xl border border-white/5">
-                                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Course</div>
-                                    <div className="text-sm font-bold text-white">{studentInfo?.course}</div>
-                                </div>
-                            </div>
+                            {/* Right: Scores & Duration */}
+                            <div className="flex flex-wrap items-center gap-3">
+                                {/* Duration Badge */}
+                                {examStartedAt && (
+                                    <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
+                                            <Clock className="w-4 h-4 text-cyan-400" />
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Duration</div>
+                                            <div className="text-sm font-bold text-white tabular-nums">
+                                                {examDuration}m <span className="text-gray-400 font-normal text-xs">({formatTime(examStartedAt)} → {formatTime(examEndedAt)})</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                            {/* Score Pills */}
-                            <div className={`mt-4 grid ${hasMcq && hasCoding ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
-                                <div className="text-center p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                                    <div className="text-[10px] text-blue-400 font-bold uppercase">Total</div>
-                                    <div className="text-lg font-black text-blue-400">{displayTotalScore}</div>
+                                {/* Total Score */}
+                                <div className="text-center min-w-[90px] py-3 px-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                                    <div className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Total Score</div>
+                                    <div className="text-2xl font-black text-blue-400 tabular-nums">{displayTotalScore}</div>
                                 </div>
+
+                                {/* MCQ Score */}
                                 {hasMcq && (
-                                    <div className="text-center p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                                        <div className="text-[10px] text-emerald-400 font-bold uppercase">MCQ</div>
-                                        <div className="text-lg font-black text-emerald-400">{displayMcqScore}</div>
+                                    <div className="text-center min-w-[80px] py-3 px-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                                        <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">MCQ</div>
+                                        <div className="text-2xl font-black text-emerald-400 tabular-nums">{displayMcqScore}</div>
                                     </div>
                                 )}
+
+                                {/* Coding Score */}
                                 {hasCoding && (
-                                    <div className="text-center p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
-                                        <div className="text-[10px] text-violet-400 font-bold uppercase">Coding</div>
-                                        <div className="text-lg font-black text-violet-400">{displayCodingScore}</div>
+                                    <div className="text-center min-w-[80px] py-3 px-4 rounded-2xl bg-violet-500/10 border border-violet-500/20">
+                                        <div className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Coding</div>
+                                        <div className="text-2xl font-black text-violet-400 tabular-nums">{displayCodingScore}</div>
                                     </div>
                                 )}
                             </div>
-
-                            {/* Timing */}
-                            {examStartedAt && (
-                                <div className="mt-4 p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
-                                    <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[10px] text-gray-500 font-bold uppercase">Duration</div>
-                                        <div className="text-sm font-bold text-white">{examDuration}m <span className="text-gray-500 font-normal text-xs">({formatTime(examStartedAt)} → {formatTime(examEndedAt)})</span></div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
 
-                    {/* Video Player */}
-                    <div className="lg:col-span-2 bg-black rounded-3xl overflow-hidden border border-white/5 shadow-2xl shadow-black/50 relative aspect-video flex items-center justify-center">
+                    {/* ═══ TEMPORARILY COMMENTED OUT VIDEO PLAYER (Uncomment when all students have recording files) ═══ */}
+                    {/*
+                    <div className="mt-6 bg-black rounded-3xl overflow-hidden border border-white/5 shadow-2xl shadow-black/50 relative aspect-video flex items-center justify-center">
                         {videoUrl ? (
                             <video src={videoUrl} controls className="w-full h-full object-contain bg-black">
                                 Your browser does not support the video tag.
@@ -698,6 +726,7 @@ function DetailsAnalysisContent() {
                             </div>
                         )}
                     </div>
+                    */}
                 </div>
 
                 {/* ═══ 2. ACTIVITY TELEMETRY + ENV LOGS ═══ */}

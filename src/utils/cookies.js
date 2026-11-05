@@ -21,51 +21,119 @@ export function getCookie(name) {
 }
 
 /**
- * Store the admin authentication token
+ * Store the admin/teacher authentication token
  * @param {string} token - JWT token to store
  */
 export function setAdminToken(token) {
     if (typeof window === 'undefined') return;
     localStorage.setItem('admin_token', token);
+    localStorage.setItem('teacher_token', token);
 
-    // MICROSOFT EDGE / NEXT.JS MIDDLEWARE SUPPORT
-    // We must set a cookie so the server-side middleware can see the token.
     // Set cookie to expire in 7 days (matches typical JWT validity)
-    // NOTE: HttpOnly cannot be set from JS by design — the backend should
-    //       set this cookie via a Set-Cookie response header for full protection.
     const d = new Date();
     d.setTime(d.getTime() + (7 * 24 * 60 * 60 * 1000));
     const expires = "expires=" + d.toUTCString();
-    document.cookie = "admin_token=" + token + ";" + expires + ";path=/;SameSite=None;Secure";
+
+    // Standard cookie for current host
+    document.cookie = `admin_token=${token};${expires};path=/;SameSite=None;Secure`;
+    document.cookie = `teacher_token=${token};${expires};path=/;SameSite=None;Secure`;
+
+    // Cross-subdomain sharing support for teacherportal.theeducode.com & admin.theeducode.com
+    if (window.location.hostname.includes('theeducode.com')) {
+        document.cookie = `admin_token=${token};${expires};path=/;domain=.theeducode.com;SameSite=None;Secure`;
+        document.cookie = `teacher_token=${token};${expires};path=/;domain=.theeducode.com;SameSite=None;Secure`;
+    }
 }
 
 /**
- * Get the admin authentication token
- * Checks localStorage first, then falls back to cookies
- * @returns {string|null} Admin token or null
+ * Get the authentication token across Admin & Teacher portals
+ * Checks URL SSO params, localStorage, and shared cross-subdomain cookies
+ * @returns {string|null} Authentication token or null
  */
 export function getAdminToken() {
     if (typeof window === 'undefined') return null;
 
-    // Priority 1: Check localStorage (new method)
-    const tokenFromStorage = localStorage.getItem('admin_token');
-    if (tokenFromStorage) {
-        // console.log('Token retrieved from localStorage:', tokenFromStorage); // DEBUG
-        return tokenFromStorage;
+    // Priority 0: URL search param (?token=... or ?sso_token=...) when opened from teacherportal
+    if (typeof window !== 'undefined' && window.location.search) {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlToken = urlParams.get('token') || urlParams.get('sso_token');
+            if (urlToken && urlToken.length > 20) {
+                // Ingest and persist so all subsequent requests and tabs remain authenticated
+                localStorage.setItem('admin_token', urlToken);
+                localStorage.setItem('teacher_token', urlToken);
+                setAdminToken(urlToken);
+
+                // Clean URL from address bar without reloading
+                urlParams.delete('token');
+                urlParams.delete('sso_token');
+                const cleanQuery = urlParams.toString();
+                const cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '');
+                window.history.replaceState({}, document.title, cleanUrl);
+
+                return urlToken;
+            }
+        } catch (_) {}
     }
 
-    // Priority 2: Fall back to cookie (old method)
+    // Priority 1: Direct admin_token in localStorage or cookie
+    const tokenFromStorage = localStorage.getItem('admin_token');
+    if (tokenFromStorage) return tokenFromStorage;
+
     const cookieToken = getCookie('admin_token');
-    // if (cookieToken) console.log('Token retrieved from cookies:', cookieToken); // DEBUG
-    return cookieToken;
+    if (cookieToken) return cookieToken;
+
+    // Priority 2: Teacher token from teacherportal (teacher_token)
+    const teacherTokenStorage = localStorage.getItem('teacher_token');
+    if (teacherTokenStorage) return teacherTokenStorage;
+
+    const teacherTokenCookie = getCookie('teacher_token');
+    if (teacherTokenCookie) return teacherTokenCookie;
+
+    // Priority 3: Teacher session object (from teacherportal.theeducode.com)
+    const teacherSessionStr = localStorage.getItem('teacher_session');
+    if (teacherSessionStr) {
+        try {
+            const parsed = JSON.parse(teacherSessionStr);
+            if (parsed?.token) return parsed.token;
+            if (parsed?.data?.token) return parsed.data.token;
+        } catch (_) {}
+    }
+
+    // Priority 4: University portal token (university_token)
+    const uniTokenStorage = localStorage.getItem('university_token');
+    if (uniTokenStorage) return uniTokenStorage;
+
+    const uniTokenCookie = getCookie('university_token');
+    if (uniTokenCookie) return uniTokenCookie;
+
+    // Priority 5: Generic token fallback
+    const genericToken = localStorage.getItem('token') || getCookie('token');
+    if (genericToken) return genericToken;
+
+    return null;
 }
 
 /**
- * Clear the admin authentication token
+ * Clear the authentication token across all scopes
  */
 export function clearAdminToken() {
     if (typeof window === 'undefined') return;
     localStorage.removeItem('admin_token');
+    localStorage.removeItem('teacher_token');
+    localStorage.removeItem('teacher_session');
+    localStorage.removeItem('university_token');
+    localStorage.removeItem('token');
+
     // Clear the cookie by setting expiry to past date
-    document.cookie = "admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    const past = "expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = `admin_token=; ${past}`;
+    document.cookie = `teacher_token=; ${past}`;
+    document.cookie = `university_token=; ${past}`;
+
+    if (window.location.hostname.includes('theeducode.com')) {
+        document.cookie = `admin_token=; ${past} domain=.theeducode.com;`;
+        document.cookie = `teacher_token=; ${past} domain=.theeducode.com;`;
+        document.cookie = `university_token=; ${past} domain=.theeducode.com;`;
+    }
 }

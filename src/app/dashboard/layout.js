@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }) {
     // { name: "Live Roster", href: "/dashboard/live-roster", icon: Users },
   ];
 
-  if (pathname && (pathname.includes("/details-analysis") || pathname.includes("/question-analysis"))) {
+  if (pathname && (pathname.includes("/details-analysis") || pathname.includes("/question-analysis") || pathname.includes("/reports") || pathname.includes("/placement-scrutiny"))) {
     return (
       <DashboardProvider>
         {children}
