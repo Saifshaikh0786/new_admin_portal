@@ -15,8 +15,8 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { login, user, setUser, loading: authLoading } = useAuth();
 
-  // Mode: 'teacher' or 'admin' (defaults to teacher, or respects ?role=admin)
-  const initialRole = searchParams.get('role') === 'admin' ? 'admin' : 'teacher';
+  // Mode: 'teacher' or 'admin' (defaults to admin for internal admin portal, or respects ?role=teacher)
+  const initialRole = searchParams.get('role') === 'teacher' ? 'teacher' : 'admin';
   const [activeRole, setActiveRole] = useState(initialRole);
 
   // Teacher credentials
@@ -244,6 +244,133 @@ function LoginContent() {
 
   const isTeacher = activeRole === 'teacher';
 
+  // ── ADMINISTRATOR LOGIN (The Real Internal Admin Portal UI/UX) ──
+  if (!isTeacher) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900 font-sans px-4 relative transition-colors duration-300">
+        {/* Segmented Switcher: Teacher vs Admin */}
+        <div className="w-full max-w-md flex rounded-xl bg-slate-200/80 dark:bg-slate-800/80 p-1 mb-6 border border-slate-300 dark:border-slate-700 shadow-inner z-10">
+          <button
+            type="button"
+            onClick={() => { setActiveRole('teacher'); setError(''); }}
+            className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Teacher Portal</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveRole('admin'); setError(''); }}
+            className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-md"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Admin Portal</span>
+          </button>
+        </div>
+
+        <div className="w-full max-w-md neu-raised p-10 rounded-2xl shadow-xl transition-colors z-10">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">TheEduCode Portal</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Sign in to the administration panel</p>
+          </div>
+
+          <form onSubmit={handleAdminSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="adminEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Email Address / Username
+              </label>
+              <input
+                id="adminEmail"
+                type="text"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                required
+                autoComplete="username"
+                placeholder="admin@university.edu"
+                className="block w-full px-4 py-3 neu-inset rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="adminPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="adminPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="block w-full px-4 py-3 pr-10 neu-inset rounded-xl text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-3 rounded-r">
+                <p className="text-red-700 dark:text-red-400 text-sm font-medium">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full flex justify-center items-center py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-blue-500/20"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Logging in...</span>
+                </span>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                type="button"
+                onClick={handleFastDevLogin}
+                disabled={isSubmitting}
+                className="w-full mt-4 flex justify-center items-center py-2 px-4 rounded-xl neu-tile text-[var(--neu-accent)] text-sm font-semibold text-blue-600 dark:text-blue-400 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:outline-none transition-all"
+              >
+                Fast Dev Login (Chanan Singh)
+              </button>
+            )}
+
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => { setActiveRole('teacher'); setError(''); }}
+                className="text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1 font-medium"
+              >
+                <span>Need teacher access?</span>
+                <span className="text-blue-600 dark:text-blue-400 hover:underline font-bold">Switch to Teacher Sign In</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="mt-8 text-center text-xs text-slate-500 z-10">
+          <p className="font-medium text-slate-400">Powered by TheEduCode</p>
+          <p className="text-[11px] mt-0.5 text-slate-600">© 2026 TheEduCode. All rights reserved.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── TEACHER LOGIN (Teacher Verification Access) ──
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0F19] text-white px-4 relative overflow-hidden font-sans">
       {/* Ambient Radial Blur Spheres */}
@@ -259,7 +386,7 @@ function LoginContent() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-white">TheEduCode</h1>
         <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide">
-          {isTeacher ? 'University Teacher Portal' : 'University Administration Portal'}
+          University Teacher Portal
         </p>
       </div>
 
@@ -271,11 +398,7 @@ function LoginContent() {
           <button
             type="button"
             onClick={() => { setActiveRole('teacher'); setError(''); }}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              isTeacher
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
           >
             <GraduationCap className="w-3.5 h-3.5" />
             <span>Teacher Portal</span>
@@ -283,11 +406,7 @@ function LoginContent() {
           <button
             type="button"
             onClick={() => { setActiveRole('admin'); setError(''); }}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              !isTeacher
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white"
           >
             <Shield className="w-3.5 h-3.5" />
             <span>Admin Portal</span>
@@ -298,205 +417,103 @@ function LoginContent() {
         <div className="rounded-2xl bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent border border-indigo-500/20 p-4 text-center mb-5">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold uppercase tracking-wider mb-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            {isTeacher ? 'SYSTEM ACTIVE' : 'ADMIN PRIVILEGES'}
+            SYSTEM ACTIVE
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight">
-            {isTeacher ? 'Teacher Access' : 'Administrator Sign In'}
+            Teacher Access
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            {isTeacher ? 'Please authenticate with your teacher credentials' : 'Enter your university administrator credentials'}
+            Please authenticate to continue
           </p>
         </div>
 
         {/* ── TEACHER FORM ── */}
-        {isTeacher ? (
-          <form onSubmit={handleTeacherSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                REGISTRATION ID
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <User className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  value={regId}
-                  onChange={(e) => setRegId(e.target.value)}
-                  required
-                  autoComplete="username"
-                  placeholder="Enter your registration ID"
-                  className="w-full pl-10 pr-4 py-3 bg-[#0B0F19]/80 border border-slate-700/60 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                />
+        <form onSubmit={handleTeacherSubmit} className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              REGISTRATION ID
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <User className="w-4 h-4" />
               </div>
+              <input
+                type="text"
+                value={regId}
+                onChange={(e) => setRegId(e.target.value)}
+                required
+                autoComplete="username"
+                placeholder="Enter your registration ID"
+                className="w-full pl-10 pr-4 py-3 bg-[#0B0F19]/80 border border-slate-700/60 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+              />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                PASSWORD
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={teacherPassword}
-                  onChange={(e) => setTeacherPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  className="w-full pl-10 pr-10 py-3 bg-[#0B0F19]/80 border border-slate-700/60 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              PASSWORD
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <Lock className="w-4 h-4" />
               </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={teacherPassword}
+                onChange={(e) => setTeacherPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                className="w-full pl-10 pr-10 py-3 bg-[#0B0F19]/80 border border-slate-700/60 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
+          </div>
 
-            {error && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-indigo-500/30 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Authenticating...</span>
+              </>
+            ) : (
+              <>
+                <span>Sign In Securely</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
             )}
+          </button>
 
+          {/* Switch to Admin link */}
+          <div className="pt-2 text-center">
             <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-indigo-500/30 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              type="button"
+              onClick={() => { setActiveRole('admin'); setError(''); }}
+              className="text-xs text-slate-400 hover:text-indigo-400 transition-colors inline-flex items-center gap-1 font-medium"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Authenticating...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In Securely</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
+              <span>Need administrator access?</span>
+              <span className="text-indigo-400 hover:underline font-bold">Switch to Administrator Sign In</span>
             </button>
-
-            {/* Switch to Admin link */}
-            <div className="pt-2 text-center">
-              <button
-                type="button"
-                onClick={() => { setActiveRole('admin'); setError(''); }}
-                className="text-xs text-slate-400 hover:text-indigo-400 transition-colors inline-flex items-center gap-1 font-medium"
-              >
-                <span>Need administrator access?</span>
-                <span className="text-indigo-400 hover:underline font-bold">Switch to Administrator Sign In</span>
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* ── ADMINISTRATOR FORM (The Real Old Admin Login) ── */
-          <form onSubmit={handleAdminSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                EMAIL ADDRESS / USERNAME
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <User className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  required
-                  autoComplete="username"
-                  placeholder="e.g. 29600 or admin@university.edu"
-                  className="w-full pl-10 pr-4 py-3 bg-[#0B0F19]/80 border border-slate-700/60 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                PASSWORD
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-3 bg-[#0B0F19]/80 border border-slate-700/60 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 shadow-lg shadow-purple-500/30 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Signing In as Administrator...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In as Administrator</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-
-            {/* Fast Dev Login */}
-            {process.env.NODE_ENV === 'development' && (
-              <button
-                type="button"
-                onClick={handleFastDevLogin}
-                disabled={isSubmitting}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all flex items-center justify-center gap-2"
-              >
-                <span>⚡ Fast Dev Login (Chanan Singh)</span>
-              </button>
-            )}
-
-            {/* Switch to Teacher link */}
-            <div className="pt-2 text-center">
-              <button
-                type="button"
-                onClick={() => { setActiveRole('teacher'); setError(''); }}
-                className="text-xs text-slate-400 hover:text-indigo-400 transition-colors inline-flex items-center gap-1 font-medium"
-              >
-                <span>Looking for teacher portal?</span>
-                <span className="text-indigo-400 hover:underline font-bold">Switch to Teacher Sign In</span>
-              </button>
-            </div>
-          </form>
-        )}
+          </div>
+        </form>
       </div>
 
       {/* Footer */}

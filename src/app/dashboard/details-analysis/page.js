@@ -758,7 +758,7 @@ function DetailsAnalysisContent() {
                                         <StatPill label="Starting IP" value={telemetry.startingIp} />
                                         <StatPill label="Ending IP" value={telemetry.endingIp} />
                                         <StatPill label="Disconnects" value={telemetry.internetDisconnects} warn={telemetry.internetDisconnects > 0} />
-                                        <StatPill label="Offline" value={`${telemetry.internetOfflineSeconds || 0}s`} warn={telemetry.internetOfflineSeconds > 0} />
+                                        <StatPill label="Offline" value={telemetry.internetOfflineSeconds ? `${Math.round(telemetry.internetOfflineSeconds / 60)} mins` : '0 mins'} warn={telemetry.internetOfflineSeconds > 0} />
                                     </div>
                                 </div>
                                 {/* Client & Security */}
