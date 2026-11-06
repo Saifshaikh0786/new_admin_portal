@@ -39,6 +39,7 @@ function DetailsAnalysisContent() {
     const [selectedAttemptNumber, setSelectedAttemptNumber] = useState(null);
     const [envLogs, setEnvLogs] = useState({});
     const [expandedQuestion, setExpandedQuestion] = useState(null);
+    const [selectedSubmissions, setSelectedSubmissions] = useState({});
 
     // Video URL logic (legacy pattern preserved)
     const videoUrl = regNo ? `${RECORDING_BASE}${regNo}${RECORDING_SUFFIX}` : "";
@@ -1102,9 +1103,44 @@ function DetailsAnalysisContent() {
                         </div>
                         <div className="bg-[#0D1321] p-6 space-y-8">
                             {codingDetails.submissions.filter(s => s.type === 'coding').map((sub, idx) => {
-                                const results = sub.formattedResult || [];
-                                const totalCases = results.length || sub.test_cases?.length || 0;
-                                const passedCases = results.filter(r => Object.values(r)[0]?.testCasePassed).length;
+                                const historyList = Array.isArray(sub.history) && sub.history.length > 0 ? sub.history : [];
+                                const defaultIndex = historyList.length > 0 ? historyList.length - 1 : 0;
+                                const activeHistoryIndex = selectedSubmissions[sub.question_id] !== undefined
+                                    ? selectedSubmissions[sub.question_id]
+                                    : defaultIndex;
+                                const activeAttempt = historyList[activeHistoryIndex] || null;
+
+                                const currentCode = activeAttempt?.code
+                                    || sub.submitted_answer
+                                    || sub.submitted_code
+                                    || (sub.is_unsubmitted
+                                        ? '// Execution terminated with Segmentation Fault or time up.\n// No submission recorded for this question.'
+                                        : '// No code submitted');
+
+                                const results = (activeAttempt?.formattedResult && activeAttempt.formattedResult.length > 0)
+                                    ? activeAttempt.formattedResult
+                                    : (sub.formattedResult || []);
+
+                                const totalCases = activeAttempt?.total_test_cases
+                                    || results.length
+                                    || sub.total_test_cases
+                                    || sub.test_cases?.length
+                                    || 0;
+
+                                const passedCases = activeAttempt?.passed_test_cases !== undefined
+                                    ? activeAttempt.passed_test_cases
+                                    : results.filter(r => Object.values(r)[0]?.testCasePassed).length;
+
+                                const currentScore = activeAttempt?.score_obtained !== undefined
+                                    ? activeAttempt.score_obtained
+                                    : (sub.score_obtained || 0);
+
+                                const displayMax = sub.max_score || (sub.total_question_marks ? (sub.total_question_marks / 10) : 6);
+
+                                const currentStatus = activeAttempt?.status
+                                    || sub.compile_status
+                                    || (sub.is_unsubmitted ? 'Segmentation Fault / No Submission' : 'Submitted');
+
                                 const isExpanded = expandedQuestion === `coding-${idx}`;
 
                                 return (
@@ -1128,11 +1164,23 @@ function DetailsAnalysisContent() {
                                                         <span>{telemetry.perQuestion[sub.question_id].compileClicks || 0} comp • {telemetry.perQuestion[sub.question_id].submitClicks || 0} sub</span>
                                                     </div>
                                                 )}
-                                                <div className={`px-3 py-1 rounded-lg text-[11px] font-bold ${passedCases === totalCases && totalCases > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                                                    {passedCases}/{totalCases} Passed
-                                                </div>
+                                                {historyList.length > 1 && (
+                                                    <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[11px] font-mono font-bold">
+                                                        <Clock className="w-3 h-3 text-violet-400 shrink-0" />
+                                                        <span>{historyList.length} submits</span>
+                                                    </div>
+                                                )}
+                                                {sub.is_unsubmitted ? (
+                                                    <div className="px-3 py-1 rounded-lg text-[11px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                                        Segmentation Fault / Unsubmitted
+                                                    </div>
+                                                ) : (
+                                                    <div className={`px-3 py-1 rounded-lg text-[11px] font-bold ${passedCases === totalCases && totalCases > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                                                        {passedCases}/{totalCases} Passed
+                                                    </div>
+                                                )}
                                                 <div className="text-sm font-bold text-violet-400">
-                                                    {sub.score_obtained || 0}/{(sub.total_question_marks || 60) / 10}
+                                                    {currentScore}/{displayMax}
                                                 </div>
                                                 <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                                             </div>
@@ -1140,11 +1188,89 @@ function DetailsAnalysisContent() {
 
                                         {isExpanded && (
                                             <div className="p-6 space-y-6 bg-[#080D18]">
+                                                {/* Unsubmitted Alert */}
+                                                {sub.is_unsubmitted && (
+                                                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 flex items-center gap-3 text-rose-300">
+                                                        <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                                                        <div className="text-xs leading-relaxed">
+                                                            <span className="font-bold text-rose-200">No Successful Submission Recorded: </span>
+                                                            This question was assigned in the exam. During testing, the student&apos;s code triggered a Segmentation Fault or runtime error before submission could be saved.
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {/* Problem Description */}
                                                 {sub.question_desc && (
                                                     <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5">
                                                         <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Problem Statement</div>
                                                         <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{sub.question_desc}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Submission History Timeline Bar */}
+                                                {historyList.length > 1 && (
+                                                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center shrink-0">
+                                                                <Clock className="w-4 h-4" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-xs font-bold text-gray-200">Submission Timeline</span>
+                                                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-bold font-mono">
+                                                                        {historyList.length} Attempts
+                                                                    </span>
+                                                                    {activeAttempt?.is_latest && (
+                                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
+                                                                            Latest Attempt
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-2">
+                                                                    <span>Viewing Attempt #{activeAttempt?.attempt_index || (activeHistoryIndex + 1)}</span>
+                                                                    {activeAttempt?.timestamp && (
+                                                                        <>
+                                                                            <span>•</span>
+                                                                            <span>{new Date(activeAttempt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                                                                        </>
+                                                                    )}
+                                                                    <span>•</span>
+                                                                    <span className={activeAttempt?.is_correct || activeAttempt?.status === 'Accepted' ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                                                                        {currentStatus}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider hidden sm:inline">Jump to:</span>
+                                                            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full py-1 custom-scrollbar">
+                                                                {historyList.map((h, hIdx) => {
+                                                                    const isSelected = hIdx === activeHistoryIndex;
+                                                                    const isPass = h.is_correct || h.status === 'Accepted';
+                                                                    return (
+                                                                        <button
+                                                                            key={hIdx}
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setSelectedSubmissions(prev => ({ ...prev, [sub.question_id]: hIdx }));
+                                                                            }}
+                                                                            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 border ${
+                                                                                isSelected
+                                                                                    ? 'bg-violet-600 text-white border-violet-400 shadow-lg shadow-violet-500/20 scale-105'
+                                                                                    : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-gray-200'
+                                                                            }`}
+                                                                            title={`Attempt #${h.attempt_index} • ${h.status} • ${h.timestamp ? new Date(h.timestamp).toLocaleTimeString() : ''}`}
+                                                                        >
+                                                                            <span>#{h.attempt_index}</span>
+                                                                            {h.is_latest && <span className="text-[9px] opacity-75 font-sans">(Latest)</span>}
+                                                                            <span className={`w-1.5 h-1.5 rounded-full ${isPass ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 )}
 
@@ -1159,12 +1285,14 @@ function DetailsAnalysisContent() {
                                                                     <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
                                                                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
                                                                 </div>
-                                                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider ml-2">Student&apos;s Code</span>
+                                                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider ml-2">
+                                                                    Student&apos;s Code {historyList.length > 1 ? `(Attempt #${activeAttempt?.attempt_index || (activeHistoryIndex + 1)})` : ''}
+                                                                </span>
                                                             </div>
                                                             <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">C</span>
                                                         </div>
                                                         <div className="bg-[#0d0d1a] p-4 max-h-[450px] overflow-auto custom-scrollbar">
-                                                            <pre className="text-[12px] font-mono text-gray-300 leading-[1.7] whitespace-pre">{sub.submitted_answer || sub.submitted_code || '// No code submitted'}</pre>
+                                                            <pre className="text-[12px] font-mono text-gray-300 leading-[1.7] whitespace-pre">{currentCode}</pre>
                                                         </div>
                                                     </div>
 
@@ -1216,11 +1344,13 @@ function DetailsAnalysisContent() {
                                                     )}
 
                                                     {/* Hidden Test Case Results */}
-                                                    {results.length > 0 && (
+                                                    {results.length > 0 ? (
                                                         <div className="rounded-2xl border border-white/5 overflow-hidden">
                                                             <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
-                                                                <span className="text-[10px] text-violet-400 font-bold uppercase tracking-widest">Hidden Test Results</span>
-                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${passedCases === totalCases ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                                                                <span className="text-[10px] text-violet-400 font-bold uppercase tracking-widest">
+                                                                    Hidden Test Results {historyList.length > 1 ? `(Attempt #${activeAttempt?.attempt_index || (activeHistoryIndex + 1)})` : ''}
+                                                                </span>
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${passedCases === totalCases && totalCases > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                                                                     {passedCases}/{totalCases}
                                                                 </span>
                                                             </div>
@@ -1248,7 +1378,7 @@ function DetailsAnalysisContent() {
                                                                                     </div>
                                                                                     <div>
                                                                                         <div className="text-[9px] text-gray-600 uppercase font-bold mb-0.5">Output</div>
-                                                                                        <div className={`whitespace-pre-wrap ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>{res?.userOutput}</div>
+                                                                                        <div className={`whitespace-pre-wrap ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>{res?.userOutput || '(empty)'}</div>
                                                                                     </div>
                                                                                 </div>
                                                                                 {res?.compilerMessage && (
@@ -1258,6 +1388,18 @@ function DetailsAnalysisContent() {
                                                                         </div>
                                                                     );
                                                                 })}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="rounded-2xl border border-white/5 overflow-hidden flex flex-col items-center justify-center p-8 text-center bg-white/[0.01]">
+                                                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3">
+                                                                <AlertCircle className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="text-xs font-bold text-gray-300">No Hidden Test Results Recorded</div>
+                                                            <div className="text-[11px] text-gray-500 max-w-xs mt-1">
+                                                                {sub.is_unsubmitted
+                                                                    ? 'Submission terminated or failed before reaching evaluation runner.'
+                                                                    : 'No execution output returned for this attempt.'}
                                                             </div>
                                                         </div>
                                                     )}
