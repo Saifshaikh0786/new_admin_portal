@@ -11,7 +11,8 @@ import {
   School, GraduationCap, FileSpreadsheet, Check, ArrowRight,
   TrendingDown, CheckCircle, Info, HelpCircle, Activity,
   FileText, Compass, ListTree, PieChart, Sparkles,
-  User, Lock, Eye, EyeOff, Loader2, AlertCircle
+  User, Lock, Eye, EyeOff, Loader2, AlertCircle,
+  ChevronLeft, ChevronRight, SlidersHorizontal
 } from "lucide-react";
 import { API_CONFIG } from "@/utils/api";
 import { swrFetcher } from "@/utils/fetcher";
@@ -43,18 +44,36 @@ function PlacementScrutinyContent() {
   const [remedialDuration, setRemedialDuration] = useState("4 Hours (Hands-on Coding Lab)");
   const [remedialSuccessMsg, setRemedialSuccessMsg] = useState("");
 
-  // Authentication and Role Detection (Strictly Teacher Verified)
-  const [currentUserRole, setCurrentUserRole] = useState('teacher');
+  // Authentication and Role Detection (Admin or Teacher Verified)
+  const [currentUserRole, setCurrentUserRole] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const adminTok = getAdminToken() || localStorage.getItem('admin_token');
+      if (adminTok) return 'admin';
+    }
+    return 'teacher';
+  });
+
   const [authVerified, setAuthVerified] = useState(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const urlToken = urlParams.get('token') || urlParams.get('sso_token');
+      const adminToken = getAdminToken() || localStorage.getItem('admin_token');
       const teacherToken = localStorage.getItem('teacher_token') || urlToken;
       const teacherSession = localStorage.getItem('teacher_session');
-      return Boolean(teacherToken || teacherSession);
+      return Boolean(adminToken || teacherToken || teacherSession);
     }
     return false;
   });
+
+  // Placement Talent Roster & Shortlist Filter States
+  const [rosterTierFilter, setRosterTierFilter] = useState("ALL"); // ALL, TIER_1, TIER_2, TIER_3
+  const [rosterArchetypeFilter, setRosterArchetypeFilter] = useState("ALL");
+  const [rosterPackageFilter, setRosterPackageFilter] = useState("ALL"); // ALL, SUPER_DREAM, CORE_TECH, MASS_IT
+  const [rosterSectionFilter, setRosterSectionFilter] = useState("ALL");
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [rosterCutoffPct, setRosterCutoffPct] = useState(0);
+  const [rosterPage, setRosterPage] = useState(1);
+  const rosterPerPage = 25;
 
   // Inline Teacher Verification Form State
   const [verifyRegId, setVerifyRegId] = useState('');
@@ -188,6 +207,66 @@ function PlacementScrutinyContent() {
         XLSX.utils.book_append_sheet(wb, wsSec, "Section Rankings");
       }
 
+      // Sheet 6: Corporate Placement Roster
+      if (report.placement_roster?.length) {
+        const rosterRows = report.placement_roster.map((c, idx) => ({
+          "Rank": idx + 1,
+          "Registration Number": c.uni_reg_id,
+          "Candidate Name": c.student_name,
+          "Classroom Section": c.section,
+          "Score Obtained": c.highest_marks,
+          "Max Marks": c.max_marks,
+          "Score Percentage": `${c.score_percent}%`,
+          "Placement Tier": c.tier_label,
+          "Candidate Archetype": c.archetype || "Evaluated",
+          "Questions Attempted": c.questions_attempted,
+          "Questions Fully Solved": c.questions_solved,
+          "Submission Timestamp": c.submitted_at ? new Date(c.submitted_at).toLocaleString() : 'N/A'
+        }));
+        const wsRoster = XLSX.utils.json_to_sheet(rosterRows);
+        XLSX.utils.book_append_sheet(wb, wsRoster, "Corporate Placement Roster");
+      }
+
+      // Sheet 7: Competency Radar Benchmarks
+      if (report.competency_radar?.length) {
+        const compRows = report.competency_radar.map(comp => ({
+          "Competency Dimension": comp.competency,
+          "Cohort Mastery %": `${comp.cohort_score_pct}%`,
+          "Industry Hiring Target %": `${comp.industry_target_pct}%`,
+          "Competency Gap %": `${comp.gap_percent}%`,
+          "Status": comp.status,
+          "Corporate Hiring Impact": comp.hiring_impact
+        }));
+        const wsComp = XLSX.utils.json_to_sheet(compRows);
+        XLSX.utils.book_append_sheet(wb, wsComp, "Competency Benchmarks");
+      }
+
+      // Sheet 8: Speed vs Accuracy Archetypes (Mettl)
+      if (report.speed_accuracy_matrix?.length) {
+        const archRows = report.speed_accuracy_matrix.map(q => ({
+          "Quadrant Profile": q.quadrant,
+          "Candidate Count": q.count,
+          "Cohort Percentage": `${q.pct}%`,
+          "Recruiter Verdict": q.hiring_verdict,
+          "Faculty Remedial Directive": q.pedagogy_directive
+        }));
+        const wsArch = XLSX.utils.json_to_sheet(archRows);
+        XLSX.utils.book_append_sheet(wb, wsArch, "Speed vs Accuracy Matrix");
+      }
+
+      // Sheet 9: NBA / NAAC Accreditation OBE Attainment
+      if (report.accreditation_summary?.course_outcomes?.length) {
+        const obeRows = report.accreditation_summary.course_outcomes.map(co => ({
+          "Course Outcome": co.code,
+          "Competency Statement": co.statement,
+          "Target Attainment %": `${co.target_attainment_pct}%`,
+          "Actual Attained %": `${co.actual_attainment_pct}%`,
+          "Accreditation Status": co.status
+        }));
+        const wsOBE = XLSX.utils.json_to_sheet(obeRows);
+        XLSX.utils.book_append_sheet(wb, wsOBE, "Accreditation OBE Audit");
+      }
+
       const safeName = (report.exam_metadata?.course_name || examNameParam).replace(/[^a-zA-Z0-9]/g, "_");
       XLSX.writeFile(wb, `${safeName}_Academic_Scrutiny_Document.xlsx`);
     } catch (err) {
@@ -195,6 +274,73 @@ function PlacementScrutinyContent() {
       alert("Failed to export Excel report. Please try again.");
     }
   };
+
+  // Dedicated Recruiter Shortlist Excel Exporter
+  const handleExportRecruiterShortlist = async () => {
+    if (!filteredRoster || filteredRoster.length === 0) {
+      alert("No candidates meet the active filters to export.");
+      return;
+    }
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.utils.book_new();
+      const rows = filteredRoster.map((c, idx) => ({
+        "Rank": idx + 1,
+        "Registration Number": c.uni_reg_id,
+        "Candidate Name": c.student_name,
+        "Classroom Section": c.section,
+        "Score Obtained": c.highest_marks,
+        "Max Marks": c.max_marks,
+        "Score Percentage": `${c.score_percent}%`,
+        "Placement Tier": c.tier_label,
+        "Questions Attempted": c.questions_attempted,
+        "Questions Fully Solved": c.questions_solved,
+        "Submission Timestamp": c.submitted_at ? new Date(c.submitted_at).toLocaleString() : 'N/A'
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, "Recruiter Shortlist");
+      const safeName = (report.exam_metadata?.course_name || examNameParam).replace(/[^a-zA-Z0-9]/g, "_");
+      XLSX.writeFile(wb, `${safeName}_Corporate_Shortlist_${rosterTierFilter}.xlsx`);
+    } catch (err) {
+      console.error("Failed to export Recruiter Shortlist:", err);
+      alert("Failed to export Recruiter Shortlist.");
+    }
+  };
+
+  // Available Classroom Sections from Roster
+  const availableSections = useMemo(() => {
+    if (!report?.placement_roster) return [];
+    return [...new Set(report.placement_roster.map(c => c.section).filter(Boolean))].sort();
+  }, [report?.placement_roster]);
+
+  // Filtered Candidate Roster
+  const filteredRoster = useMemo(() => {
+    if (!report?.placement_roster) return [];
+    return report.placement_roster.filter(c => {
+      const matchTier = rosterTierFilter === "ALL" || c.tier === rosterTierFilter;
+      const matchSection = rosterSectionFilter === "ALL" || c.section === rosterSectionFilter;
+      const matchCutoff = (c.score_percent || 0) >= rosterCutoffPct;
+      const matchArchetype = rosterArchetypeFilter === "ALL" || c.archetype === rosterArchetypeFilter;
+      const matchPackage = rosterPackageFilter === "ALL" || 
+        (rosterPackageFilter === "SUPER_DREAM" && (c.score_percent || 0) >= 75) ||
+        (rosterPackageFilter === "CORE_TECH" && (c.score_percent || 0) >= 50 && (c.score_percent || 0) < 75) ||
+        (rosterPackageFilter === "MASS_IT" && (c.score_percent || 0) < 50);
+      const q = rosterSearch.toLowerCase().trim();
+      const matchSearch = !q || 
+        (c.student_name || "").toLowerCase().includes(q) || 
+        (c.uni_reg_id || "").toLowerCase().includes(q);
+      return matchTier && matchSection && matchCutoff && matchArchetype && matchPackage && matchSearch;
+    });
+  }, [report?.placement_roster, rosterTierFilter, rosterSectionFilter, rosterCutoffPct, rosterArchetypeFilter, rosterPackageFilter, rosterSearch]);
+
+  // Paginated Roster with defensive page clamping
+  const totalRosterPages = Math.max(1, Math.ceil(filteredRoster.length / rosterPerPage));
+  const safeRosterPage = Math.min(Math.max(1, rosterPage), totalRosterPages);
+
+  const paginatedRoster = useMemo(() => {
+    const start = (safeRosterPage - 1) * rosterPerPage;
+    return filteredRoster.slice(start, start + rosterPerPage);
+  }, [filteredRoster, safeRosterPage]);
 
   // Filtered Chapters
   const chaptersList = useMemo(() => {
@@ -284,6 +430,54 @@ function PlacementScrutinyContent() {
     return { path, pts, height, width };
   }, [report?.score_distribution_curve]);
 
+  // Generate SVG Coordinates for Industry Competency Radar Chart
+  const radarData = useMemo(() => {
+    const list = report?.competency_radar;
+    if (!list || list.length < 3) return null;
+    const cx = 175;
+    const cy = 175;
+    const r = 110;
+    const n = list.length;
+
+    // Concentric Polygon Rings at 25%, 50%, 75%, 100%
+    const rings = [0.25, 0.50, 0.75, 1.0].map(pct => {
+      const pts = [];
+      for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+        const x = cx + pct * r * Math.cos(angle);
+        const y = cy + pct * r * Math.sin(angle);
+        pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      }
+      return { pct: Math.round(pct * 100), points: pts.join(" ") };
+    });
+
+    // Radial Axis lines & Label Positions
+    const axes = list.map((item, i) => {
+      const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+      const x2 = cx + r * Math.cos(angle);
+      const y2 = cy + r * Math.sin(angle);
+      const lx = cx + (r + 28) * Math.cos(angle);
+      const ly = cy + (r + 14) * Math.sin(angle);
+      return { ...item, angle, x2, y2, lx, ly };
+    });
+
+    // Cohort Actual Polygon
+    const cohortPoints = list.map((item, i) => {
+      const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+      const dist = (Math.min(100, Math.max(5, item.cohort_score_pct)) / 100) * r;
+      return `${(cx + dist * Math.cos(angle)).toFixed(1)},${(cy + dist * Math.sin(angle)).toFixed(1)}`;
+    }).join(" ");
+
+    // Industry Benchmark Target Polygon (70-80%)
+    const targetPoints = list.map((item, i) => {
+      const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+      const dist = (item.industry_target_pct / 100) * r;
+      return `${(cx + dist * Math.cos(angle)).toFixed(1)},${(cy + dist * Math.sin(angle)).toFixed(1)}`;
+    }).join(" ");
+
+    return { cx, cy, r, rings, axes, cohortPoints, targetPoints };
+  }, [report?.competency_radar]);
+
   const openRemedialModal = (item, type = "CHAPTER") => {
     setActiveRemedialItem(item);
     setRemedialType(type);
@@ -304,7 +498,7 @@ function PlacementScrutinyContent() {
     }, 2400);
   };
 
-  // 1. Ingest URL token if arriving via shared authenticated link
+  // 1. Ingest URL token if arriving via shared authenticated link or detect active session
   useEffect(() => {
     if (typeof window === "undefined") return;
     const urlParams = new URLSearchParams(window.location.search);
@@ -322,6 +516,12 @@ function PlacementScrutinyContent() {
       const cleanQuery = urlParams.toString();
       const cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '');
       window.history.replaceState({}, document.title, cleanUrl);
+    } else {
+      const adminTok = getAdminToken() || localStorage.getItem('admin_token');
+      if (adminTok) {
+        setCurrentUserRole('admin');
+        setAuthVerified(true);
+      }
     }
   }, []);
 
@@ -693,23 +893,47 @@ function PlacementScrutinyContent() {
               </p>
             </div>
 
-            {/* Placement Funnel Tiers (Apple Pill Style) */}
+            {/* Placement Funnel Tiers (Interactive Apple Pills) */}
             <div className="flex items-center gap-3 shrink-0">
-              <div className="p-4 rounded-3xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-500/15 border border-emerald-500/30 text-center min-w-[125px] shadow-xs">
-                <div className="text-3xl font-black text-emerald-700 tracking-tight">{tier1Count}</div>
-                <div className="text-xs font-bold text-emerald-900 mt-0.5">Product Ready</div>
+              <button
+                type="button"
+                onClick={() => { setActiveTab("ROSTER"); setRosterTierFilter("TIER_1"); }}
+                className="p-4 rounded-3xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-500/15 border border-emerald-500/30 text-center min-w-[125px] shadow-xs hover:border-emerald-500/60 hover:scale-[1.03] transition-all cursor-pointer group text-left"
+                title="Filter Roster: Tier 1 Placement Ready Candidates"
+              >
+                <div className="text-3xl font-black text-emerald-700 tracking-tight group-hover:text-emerald-800">{tier1Count}</div>
+                <div className="text-xs font-bold text-emerald-900 mt-0.5 flex items-center justify-between">
+                  <span>Product Ready</span>
+                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-700" />
+                </div>
                 <div className="text-[10px] text-emerald-700 font-bold mt-1 bg-emerald-500/15 rounded-full px-2 py-0.5 inline-block">{tier1Pct}% of cohort</div>
-              </div>
-              <div className="p-4 rounded-3xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-blue-500/15 border border-blue-500/30 text-center min-w-[125px] shadow-xs">
-                <div className="text-3xl font-black text-blue-700 tracking-tight">{tier2Count}</div>
-                <div className="text-xs font-bold text-blue-900 mt-0.5">Trainable</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab("ROSTER"); setRosterTierFilter("TIER_2"); }}
+                className="p-4 rounded-3xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-blue-500/15 border border-blue-500/30 text-center min-w-[125px] shadow-xs hover:border-blue-500/60 hover:scale-[1.03] transition-all cursor-pointer group text-left"
+                title="Filter Roster: Tier 2 Trainable Candidates"
+              >
+                <div className="text-3xl font-black text-blue-700 tracking-tight group-hover:text-blue-800">{tier2Count}</div>
+                <div className="text-xs font-bold text-blue-900 mt-0.5 flex items-center justify-between">
+                  <span>Trainable</span>
+                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-700" />
+                </div>
                 <div className="text-[10px] text-blue-700 font-bold mt-1 bg-blue-500/15 rounded-full px-2 py-0.5 inline-block">{placement_funnel?.tier2_trainable?.pct || 0}% of cohort</div>
-              </div>
-              <div className="p-4 rounded-3xl bg-gradient-to-br from-rose-500/10 via-red-500/5 to-rose-500/15 border border-rose-500/30 text-center min-w-[125px] shadow-xs">
-                <div className="text-3xl font-black text-rose-700 tracking-tight">{tier3Count}</div>
-                <div className="text-xs font-bold text-rose-900 mt-0.5">Remedial Focus</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab("ROSTER"); setRosterTierFilter("TIER_3"); }}
+                className="p-4 rounded-3xl bg-gradient-to-br from-rose-500/10 via-red-500/5 to-rose-500/15 border border-rose-500/30 text-center min-w-[125px] shadow-xs hover:border-rose-500/60 hover:scale-[1.03] transition-all cursor-pointer group text-left"
+                title="Filter Roster: Tier 3 Remedial Candidates"
+              >
+                <div className="text-3xl font-black text-rose-700 tracking-tight group-hover:text-rose-800">{tier3Count}</div>
+                <div className="text-xs font-bold text-rose-900 mt-0.5 flex items-center justify-between">
+                  <span>Remedial Focus</span>
+                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-rose-700" />
+                </div>
                 <div className="text-[10px] text-rose-700 font-bold mt-1 bg-rose-500/15 rounded-full px-2 py-0.5 inline-block">{placement_funnel?.tier3_remedial_required?.pct || 0}% of cohort</div>
-              </div>
+              </button>
             </div>
           </div>
 
@@ -761,24 +985,118 @@ function PlacementScrutinyContent() {
               <div className="text-xs text-rose-700/80 font-medium mt-1">Out of {chaptersList.length} curriculum chapters</div>
             </div>
           </div>
+
+          {/* TPO Campus CTC Salary Package Projections (HackerRank & Campus Drive Standards) */}
+          <div className="pt-4 border-t border-neutral-100/90">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-neutral-800">
+                  Campus Placement Salary Projections & Corporate Eligibility
+                </span>
+              </div>
+              <span className="text-[11px] text-neutral-500 font-medium">
+                Calibrated against Tier-1 Product vs Mass IT Service hiring thresholds
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Super Dream */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab("ROSTER"); setRosterPackageFilter("SUPER_DREAM"); setRosterTierFilter("ALL"); }}
+                className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-teal-500/10 border border-emerald-500/30 hover:border-emerald-500/60 hover:scale-[1.01] transition-all text-left group cursor-pointer shadow-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800">
+                    SUPER DREAM COHORT
+                  </span>
+                  <span className="text-xs font-extrabold text-emerald-800">₹10 - ₹42 LPA</span>
+                </div>
+                <div className="text-2xl font-black text-emerald-950 mt-2">
+                  {tier1Count} Candidates <span className="text-xs text-emerald-700 font-semibold">({tier1Pct}%)</span>
+                </div>
+                <p className="text-[11px] text-emerald-900/80 font-medium mt-1">
+                  Google, Microsoft, Amazon, Oracle, Adobe, Atlassian, Flipkart
+                </p>
+                <div className="text-[10px] text-emerald-700 font-bold mt-2 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                  <span>View Super Dream Shortlist</span>
+                  <ArrowRight className="w-3 h-3" />
+                </div>
+              </button>
+
+              {/* Core Tech */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab("ROSTER"); setRosterPackageFilter("CORE_TECH"); setRosterTierFilter("ALL"); }}
+                className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-indigo-500/10 border border-blue-500/30 hover:border-blue-500/60 hover:scale-[1.01] transition-all text-left group cursor-pointer shadow-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-800">
+                    CORE ENGINEERING
+                  </span>
+                  <span className="text-xs font-extrabold text-blue-800">₹6 - ₹10 LPA</span>
+                </div>
+                <div className="text-2xl font-black text-blue-950 mt-2">
+                  {tier2Count} Candidates <span className="text-xs text-blue-700 font-semibold">({placement_funnel?.tier2_trainable?.pct || 0}%)</span>
+                </div>
+                <p className="text-[11px] text-blue-900/80 font-medium mt-1">
+                  Cisco, Deloitte, Cognizant Digital, Accenture Advance, Capgemini
+                </p>
+                <div className="text-[10px] text-blue-700 font-bold mt-2 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                  <span>View Core Tech Shortlist</span>
+                  <ArrowRight className="w-3 h-3" />
+                </div>
+              </button>
+
+              {/* Mass IT Services */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab("ROSTER"); setRosterPackageFilter("MASS_IT"); setRosterTierFilter("ALL"); }}
+                className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-orange-500/10 border border-amber-500/30 hover:border-amber-500/60 hover:scale-[1.01] transition-all text-left group cursor-pointer shadow-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800">
+                    MASS IT & OPERATIONS
+                  </span>
+                  <span className="text-xs font-extrabold text-amber-800">₹3.5 - ₹5.5 LPA</span>
+                </div>
+                <div className="text-2xl font-black text-amber-950 mt-2">
+                  {tier3Count} Candidates <span className="text-xs text-amber-700 font-semibold">({placement_funnel?.tier3_remedial_required?.pct || 0}%)</span>
+                </div>
+                <p className="text-[11px] text-amber-900/80 font-medium mt-1">
+                  TCS Ninja, Infosys Operations, Wipro Elite, Tech Mahindra
+                </p>
+                <div className="text-[10px] text-amber-700 font-bold mt-2 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                  <span>View Services Cohort</span>
+                  <ArrowRight className="w-3 h-3" />
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* 2. Apple Segmented Control Tab Navigation (no-print) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/60 pb-3 no-print">
-          <div className="inline-flex p-1.5 rounded-full bg-neutral-200/70 backdrop-blur-xl border border-white/60 shadow-inner overflow-x-auto">
+          <div className="inline-flex p-1.5 rounded-full bg-neutral-200/70 backdrop-blur-xl border border-white/60 shadow-inner overflow-x-auto max-w-full">
             {[
-              { id: "CHAPTERS", label: "Curriculum Chapters", count: chaptersList.length, color: "text-indigo-600 bg-indigo-50" },
-              { id: "TOPICS", label: "Topic Diagnostics", count: filteredTopics.length, color: "text-blue-600 bg-blue-50" },
-              { id: "QUESTIONS", label: "Question Scrutiny", count: report.questions_deep_dive?.length || 0, color: "text-purple-600 bg-purple-50" },
-              { id: "CURVES", label: "Cohort Curves", color: "text-emerald-600 bg-emerald-50" },
-              { id: "BENCHMARKS", label: "Section Benchmarks", count: report.section_benchmarks?.length || 0, color: "text-amber-600 bg-amber-50" }
+              { id: "ROSTER", label: "Talent Roster", count: filteredRoster.length, color: "text-teal-700 bg-teal-50" },
+              { id: "COMPETENCY", label: "Skills Radar", color: "text-indigo-700 bg-indigo-50" },
+              { id: "ARCHETYPES", label: "Speed vs Accuracy", color: "text-blue-700 bg-blue-50" },
+              { id: "HEATMAP", label: "Section Heatmap", count: report.section_chapter_heatmap?.length || 0, color: "text-amber-700 bg-amber-50" },
+              { id: "ACCREDITATION", label: "Accreditation (OBE)", color: "text-rose-700 bg-rose-50" },
+              { id: "CHAPTERS", label: "Curriculum Chapters", count: chaptersList.length, color: "text-violet-700 bg-violet-50" },
+              { id: "TOPICS", label: "Topic Diagnostics", count: filteredTopics.length, color: "text-cyan-700 bg-cyan-50" },
+              { id: "QUESTIONS", label: "Question Scrutiny", count: report.questions_deep_dive?.length || 0, color: "text-purple-700 bg-purple-50" },
+              { id: "CURVES", label: "Score Curves", color: "text-emerald-700 bg-emerald-50" },
+              { id: "BENCHMARKS", label: "Classroom Rankings", count: report.section_benchmarks?.length || 0, color: "text-orange-700 bg-orange-50" }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                     isActive
                       ? "bg-white text-neutral-900 shadow-md font-extrabold"
                       : "text-neutral-600 hover:text-neutral-900"
@@ -1571,7 +1889,867 @@ function PlacementScrutinyContent() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: COHORT PERFORMANCE CURVES (Smooth Vector Graphs) */}
+        {/* TAB 4: PLACEMENT TALENT ROSTER & CORPORATE SHORTLIST */}
+        {/* ========================================================================= */}
+        {activeTab === "ROSTER" && (
+          <div className="space-y-6">
+            {/* Roster Header & Controls */}
+            <div className="p-6 rounded-3xl bg-white/85 backdrop-blur-2xl border border-white/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] space-y-6 card-print">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-teal-700 bg-teal-50 border border-teal-200/60 px-2.5 py-0.5 rounded-full">
+                      TPO & Corporate Shortlist
+                    </span>
+                    <span className="text-xs text-neutral-400 font-semibold">•</span>
+                    <span className="text-xs text-neutral-500 font-semibold">
+                      {filteredRoster.length} of {report.placement_roster?.length || 0} Candidates Shortlisted
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-extrabold text-neutral-900 tracking-tight mt-1">
+                    Candidate Placement Roster & Technical Standings
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Individual candidate scores, classroom sections, technical thresholds, and direct links to comprehensive telemetry inspection.
+                  </p>
+                </div>
+
+                {/* Export & Actions */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <button
+                    onClick={handleExportRecruiterShortlist}
+                    className="px-4 py-2 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-teal-500/25 transition-all active:scale-95 cursor-pointer"
+                    title="Export currently filtered candidates to Excel for corporate recruiters"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Shortlist ({filteredRoster.length})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters & Cutoff Simulator Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                {/* Search */}
+                <div className="md:col-span-4 relative">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={rosterSearch}
+                    onChange={(e) => { setRosterSearch(e.target.value); setRosterPage(1); }}
+                    placeholder="Search candidate name or reg number..."
+                    className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-neutral-100/80 border border-neutral-200/70 text-xs font-medium text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all"
+                  />
+                  {rosterSearch && (
+                    <button 
+                      onClick={() => { setRosterSearch(""); setRosterPage(1); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Section Filter */}
+                <div className="md:col-span-3">
+                  <select
+                    value={rosterSectionFilter}
+                    onChange={(e) => { setRosterSectionFilter(e.target.value); setRosterPage(1); }}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-100/80 border border-neutral-200/70 text-xs font-semibold text-neutral-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all"
+                  >
+                    <option value="ALL">All Sections ({availableSections.length} sections)</option>
+                    {availableSections.map((sec) => (
+                      <option key={sec} value={sec}>Section {sec}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Custom Eligibility Cutoff Slider */}
+                <div className="md:col-span-5 flex items-center gap-3 p-2.5 rounded-2xl bg-teal-50/60 border border-teal-100">
+                  <SlidersHorizontal className="w-4 h-4 text-teal-600 shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-teal-900">
+                      <span>Recruiter Cutoff: ≥ {rosterCutoffPct}%</span>
+                      <span>{Math.round(((exam_metadata?.max_exam_marks || 18) * rosterCutoffPct) / 100)} marks</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={rosterCutoffPct}
+                      onChange={(e) => { setRosterCutoffPct(Number(e.target.value)); setRosterPage(1); }}
+                      className="w-full accent-teal-600 cursor-pointer h-1.5 bg-neutral-200 rounded-lg"
+                    />
+                  </div>
+                  {rosterCutoffPct > 0 && (
+                    <button
+                      onClick={() => { setRosterCutoffPct(0); setRosterPage(1); }}
+                      className="text-[10px] font-bold text-teal-700 hover:text-teal-900 px-2 py-1 rounded-md bg-teal-200/60 shrink-0"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Enhanced Recruiter & TPO Filter Controls */}
+              <div className="space-y-3 pt-1">
+                {/* 1. Corporate Salary / CTC Brackets */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 mr-1">CTC Bracket:</span>
+                  {[
+                    { id: "ALL", label: "All Packages", color: "text-neutral-700 bg-neutral-100" },
+                    { id: "SUPER_DREAM", label: "Super Dream (₹10-42 LPA)", count: tier1Count, color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+                    { id: "CORE_TECH", label: "Core Tech (₹6-10 LPA)", count: tier2Count, color: "text-blue-700 bg-blue-50 border-blue-200" },
+                    { id: "MASS_IT", label: "Mass IT (₹3.5-5.5 LPA)", count: tier3Count, color: "text-amber-700 bg-amber-50 border-amber-200" }
+                  ].map(p => {
+                    const isSel = rosterPackageFilter === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => { setRosterPackageFilter(p.id); setRosterPage(1); }}
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          isSel 
+                            ? "bg-neutral-900 text-white border-neutral-900 shadow-sm" 
+                            : "bg-white text-neutral-600 border-neutral-200/80 hover:bg-neutral-50"
+                        }`}
+                      >
+                        <span>{p.label}</span>
+                        {p.count !== undefined && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${isSel ? "bg-white/20 text-white" : p.color}`}>
+                            {p.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 2. Candidate Cognitive Archetypes (Mettl Framework) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 mr-1">Candidate Profile:</span>
+                  {[
+                    { id: "ALL", label: "All Profiles" },
+                    { id: "Elite Day-1 Ready", label: "Elite Day-1 Ready" },
+                    { id: "Methodical Engineer", label: "Methodical Engineer" },
+                    { id: "Impulsive / Rushed", label: "Impulsive / Rushed" },
+                    { id: "Remedial Support", label: "Remedial Support" }
+                  ].map(a => {
+                    const isSel = rosterArchetypeFilter === a.id;
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => { setRosterArchetypeFilter(a.id); setRosterPage(1); }}
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          isSel 
+                            ? "bg-teal-700 text-white border-teal-700 shadow-sm" 
+                            : "bg-white text-neutral-600 border-neutral-200/80 hover:bg-neutral-50"
+                        }`}
+                      >
+                        <span>{a.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 3. Readiness Tiers */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-neutral-100">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 mr-1">Readiness Tier:</span>
+                  {[
+                    { id: "ALL", label: "All Candidates", count: report.placement_roster?.length || 0, color: "text-neutral-700 bg-neutral-100" },
+                    { id: "TIER_1", label: "Tier 1: Placement Ready (≥75%)", count: tier1Count, color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+                    { id: "TIER_2", label: "Tier 2: Trainable (50-74%)", count: tier2Count, color: "text-blue-700 bg-blue-50 border-blue-200" },
+                    { id: "TIER_3", label: "Tier 3: Remedial Focus (<50%)", count: tier3Count, color: "text-rose-700 bg-rose-50 border-rose-200" }
+                  ].map(t => {
+                    const isSel = rosterTierFilter === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => { setRosterTierFilter(t.id); setRosterPage(1); }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          isSel 
+                            ? "bg-neutral-900 text-white border-neutral-900 shadow-sm" 
+                            : "bg-white text-neutral-600 border-neutral-200/80 hover:bg-neutral-50"
+                        }`}
+                      >
+                        <span>{t.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${isSel ? "bg-white/20 text-white" : t.color}`}>
+                          {t.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Candidate Table */}
+            <div className="rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] overflow-hidden card-print">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-neutral-50/80 border-b border-neutral-200/60 text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                      <th className="py-3.5 px-5 w-16 text-center">Rank</th>
+                      <th className="py-3.5 px-5">Candidate</th>
+                      <th className="py-3.5 px-5">Section</th>
+                      <th className="py-3.5 px-5">Score & Accuracy</th>
+                      <th className="py-3.5 px-5 text-center">Placement Tier</th>
+                      <th className="py-3.5 px-5 text-center">Questions</th>
+                      <th className="py-3.5 px-5 text-right">Telemetry Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100 text-xs">
+                    {paginatedRoster.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="py-12 text-center text-neutral-400 font-medium">
+                          No candidates match the selected filters or cutoff threshold.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedRoster.map((c, idx) => {
+                        const globalRank = (safeRosterPage - 1) * rosterPerPage + idx + 1;
+                        const isGold = globalRank === 1;
+                        const isSilver = globalRank === 2;
+                        const isBronze = globalRank === 3;
+                        
+                        const studentDetailsUrl = `/dashboard/details-analysis?examName=${encodeURIComponent(exam_metadata?.course_name || examNameParam)}&courseId=${courseId}&studentId=${c.student_id}&regNo=${encodeURIComponent(c.uni_reg_id)}&name=${encodeURIComponent(c.student_name)}&sectionName=${encodeURIComponent(c.section)}&batchId=${batchId}`;
+
+                        return (
+                          <tr key={c.student_id || idx} className="hover:bg-neutral-50/80 transition-colors group">
+                            {/* Rank */}
+                            <td className="py-4 px-5 text-center">
+                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-bold text-xs ${
+                                isGold 
+                                  ? "bg-amber-100 text-amber-900 border border-amber-300 shadow-xs" 
+                                  : isSilver 
+                                  ? "bg-slate-200 text-slate-800 border border-slate-300"
+                                  : isBronze 
+                                  ? "bg-amber-700/10 text-amber-900 border border-amber-600/30"
+                                  : "text-neutral-500 font-medium"
+                              }`}>
+                                #{globalRank}
+                              </span>
+                            </td>
+
+                            {/* Candidate */}
+                            <td className="py-4 px-5">
+                              <div className="font-mono font-bold text-neutral-900 text-xs tracking-tight">
+                                {c.uni_reg_id}
+                              </div>
+                              <div className="text-[11px] text-neutral-500 font-medium truncate max-w-[200px]">
+                                {c.student_name !== c.uni_reg_id ? c.student_name : `Student ${c.uni_reg_id}`}
+                              </div>
+                            </td>
+
+                            {/* Section */}
+                            <td className="py-4 px-5">
+                              <span className="px-2.5 py-1 rounded-xl bg-neutral-100 text-neutral-700 font-semibold text-[11px] border border-neutral-200/60">
+                                {c.section}
+                              </span>
+                            </td>
+
+                            {/* Score & Progress */}
+                            <td className="py-4 px-5">
+                              <div className="flex items-center gap-3">
+                                <div className="min-w-[70px]">
+                                  <span className="font-extrabold text-neutral-900 text-sm">{c.highest_marks}</span>
+                                  <span className="text-[11px] text-neutral-400 font-normal"> / {c.max_marks}</span>
+                                  <span className="ml-1.5 text-[10px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.2 rounded-md">
+                                    {c.score_percent}%
+                                  </span>
+                                </div>
+                                <div className="w-24 h-2 rounded-full bg-neutral-100 overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full ${
+                                      c.tier === "TIER_1" 
+                                        ? "bg-gradient-to-r from-emerald-500 to-teal-500" 
+                                        : c.tier === "TIER_2" 
+                                        ? "bg-gradient-to-r from-blue-500 to-indigo-500" 
+                                        : "bg-gradient-to-r from-rose-400 to-red-500"
+                                    }`}
+                                    style={{ width: `${Math.min(100, c.score_percent)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Placement Tier & Archetype */}
+                            <td className="py-4 px-5 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                  c.tier === "TIER_1"
+                                    ? "bg-emerald-500/10 text-emerald-800 border-emerald-500/20"
+                                    : c.tier === "TIER_2"
+                                    ? "bg-blue-500/10 text-blue-800 border-blue-500/20"
+                                    : "bg-rose-500/10 text-rose-800 border-rose-500/20"
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    c.tier === "TIER_1" ? "bg-emerald-500" : c.tier === "TIER_2" ? "bg-blue-500" : "bg-rose-500"
+                                  }`} />
+                                  <span>{c.tier_label}</span>
+                                </span>
+                                {c.archetype && (
+                                  <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.2 rounded-md ${
+                                    c.archetype === 'Elite Day-1 Ready'
+                                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                      : c.archetype === 'Methodical Engineer'
+                                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                      : c.archetype === 'Impulsive / Rushed'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                      : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  }`}>
+                                    {c.archetype}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Questions */}
+                            <td className="py-4 px-5 text-center">
+                              <span className="text-xs font-semibold text-neutral-700">
+                                <strong className="text-emerald-700 font-bold">{c.questions_solved}</strong> / {c.questions_attempted} solved
+                              </span>
+                            </td>
+
+                            {/* Action */}
+                            <td className="py-4 px-5 text-right">
+                              <a
+                                href={studentDetailsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-900 text-neutral-700 hover:text-white font-bold text-[11px] transition-all shadow-xs group-hover:border-neutral-300"
+                              >
+                                <span>Inspect Analysis</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Bar */}
+              {filteredRoster.length > rosterPerPage && (
+                <div className="p-4 bg-neutral-50/80 border-t border-neutral-200/60 flex items-center justify-between text-xs text-neutral-600">
+                  <div>
+                    Showing <strong className="font-bold text-neutral-900">{(safeRosterPage - 1) * rosterPerPage + 1}</strong> to <strong className="font-bold text-neutral-900">{Math.min(safeRosterPage * rosterPerPage, filteredRoster.length)}</strong> of <strong className="font-bold text-neutral-900">{filteredRoster.length}</strong> candidates
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setRosterPage(p => Math.max(1, p - 1))}
+                      disabled={safeRosterPage === 1}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-neutral-200/80 hover:bg-neutral-100 text-neutral-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Previous</span>
+                    </button>
+                    <span className="px-3 py-1 font-semibold text-neutral-500">
+                      Page {safeRosterPage} of {totalRosterPages}
+                    </span>
+                    <button
+                      onClick={() => setRosterPage(p => Math.min(totalRosterPages, p + 1))}
+                      disabled={safeRosterPage === totalRosterPages}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-neutral-200/80 hover:bg-neutral-100 text-neutral-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                    >
+                      <span>Next</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: INDUSTRY COMPETENCY RADAR (HackerRank Skills Matrix Benchmark) */}
+        {/* ========================================================================= */}
+        {activeTab === "COMPETENCY" && (
+          <div className="space-y-6">
+            <div className="p-8 rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] card-print space-y-8">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2.5 py-0.5 rounded-full">
+                      HackerRank & ABET Competency Radar
+                    </span>
+                    <span className="text-xs text-neutral-400 font-semibold">•</span>
+                    <span className="text-xs text-neutral-500 font-semibold">5 Core Technical Competencies</span>
+                  </div>
+                  <h3 className="text-xl font-extrabold text-neutral-900 tracking-tight mt-1">
+                    Industry Skills Matrix & Technical Competency Benchmark
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Multi-axial radar map calibrating student cohort mastery against Tier-1 Corporate Technical Hiring standards (70% - 80% baseline).
+                  </p>
+                </div>
+
+                {/* Radar Legend */}
+                <div className="flex items-center gap-4 text-xs font-bold shrink-0 bg-neutral-50 px-4 py-2.5 rounded-2xl border border-neutral-200/60">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-indigo-600 shadow-xs" />
+                    <span className="text-indigo-950 font-bold">University Cohort</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-0.5 border-t-2 border-dashed border-rose-500" />
+                    <span className="text-rose-700 font-bold">Corporate Bar (75%)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Spider Chart & Executive Summary Split */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                {/* SVG Radar Chart (Pentagon) */}
+                <div className="lg:col-span-5 flex flex-col items-center justify-center p-4">
+                  {radarData ? (
+                    <svg viewBox="0 0 350 350" className="w-full max-w-[340px] h-auto drop-shadow-sm select-none">
+                      {/* Concentric Grid Rings */}
+                      {radarData.rings.map((ring, idx) => (
+                        <g key={idx}>
+                          <polygon
+                            points={ring.points}
+                            fill="none"
+                            stroke="#E5E7EB"
+                            strokeWidth="1.2"
+                            strokeDasharray={idx === 3 ? "none" : "3 3"}
+                          />
+                          <text x={radarData.cx + 4} y={radarData.cy - (idx + 1) * (radarData.r / 4) + 10} className="text-[9px] fill-neutral-400 font-mono font-semibold">
+                            {ring.pct}%
+                          </text>
+                        </g>
+                      ))}
+
+                      {/* Radial Axis Lines */}
+                      {radarData.axes.map((ax, idx) => (
+                        <g key={idx}>
+                          <line
+                            x1={radarData.cx}
+                            y1={radarData.cy}
+                            x2={ax.x2}
+                            y2={ax.y2}
+                            stroke="#E5E7EB"
+                            strokeWidth="1.2"
+                          />
+                          <text
+                            x={ax.lx}
+                            y={ax.ly}
+                            textAnchor="middle"
+                            className="text-[10px] fill-neutral-700 font-bold tracking-tight"
+                          >
+                            {ax.competency.split(" ")[0]}
+                          </text>
+                        </g>
+                      ))}
+
+                      {/* Industry Benchmark Target Polygon (Red Dashed) */}
+                      <polygon
+                        points={radarData.targetPoints}
+                        fill="rgba(244, 63, 94, 0.05)"
+                        stroke="#F43F5E"
+                        strokeWidth="2"
+                        strokeDasharray="4 4"
+                      />
+
+                      {/* Cohort Actual Polygon (Vibrant Indigo Gradient Fill) */}
+                      <polygon
+                        points={radarData.cohortPoints}
+                        fill="rgba(99, 102, 241, 0.28)"
+                        stroke="#6366F1"
+                        strokeWidth="3"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* Radar Center Hub */}
+                      <circle cx={radarData.cx} cy={radarData.cy} r="3" fill="#6366F1" />
+                    </svg>
+                  ) : (
+                    <div className="py-12 text-center text-xs text-neutral-400">
+                      Evaluating competency dimensions...
+                    </div>
+                  )}
+                  <span className="text-[11px] font-semibold text-neutral-400 mt-2">
+                    Multi-axial skill projection based on {report.executive_summary?.total_questions_tested || 0} evaluated questions
+                  </span>
+                </div>
+
+                {/* Right Side: Key Competency Findings */}
+                <div className="lg:col-span-7 space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                    Technical Competency Diagnostics & Hiring Gap Analysis
+                  </h4>
+                  {(report.competency_radar || []).map((comp, idx) => {
+                    const isDeficit = comp.status === 'CRITICAL_DEFICIT';
+                    const isPartial = comp.status === 'PARTIAL';
+                    return (
+                      <div 
+                        key={comp.id || idx}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isDeficit 
+                            ? 'bg-rose-50/40 border-rose-200/80 hover:bg-rose-50/70' 
+                            : isPartial 
+                            ? 'bg-amber-50/40 border-amber-200/80 hover:bg-amber-50/70' 
+                            : 'bg-emerald-50/40 border-emerald-200/80 hover:bg-emerald-50/70'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-extrabold text-neutral-900">{comp.competency}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isDeficit ? 'bg-rose-100 text-rose-800' : isPartial ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {isDeficit ? `Deficit: -${comp.gap_percent}%` : isPartial ? `Gap: -${comp.gap_percent}%` : 'Benchmark Met'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-extrabold text-neutral-900">{comp.cohort_score_pct}%</span>
+                            <span className="text-[10px] text-neutral-400">/ {comp.industry_target_pct}% Target</span>
+                          </div>
+                        </div>
+
+                        {/* Visual Progress Bar */}
+                        <div className="w-full h-2 rounded-full bg-neutral-200/70 overflow-hidden mt-2 relative">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-700 ${
+                              isDeficit ? 'bg-rose-500' : isPartial ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${comp.cohort_score_pct}%` }}
+                          />
+                          {/* Target Tick */}
+                          <div 
+                            className="absolute top-0 bottom-0 w-0.5 bg-neutral-900 z-10"
+                            style={{ left: `${comp.industry_target_pct}%` }}
+                            title={`Target: ${comp.industry_target_pct}%`}
+                          />
+                        </div>
+
+                        <p className="text-[11px] text-neutral-600 mt-2 leading-relaxed">
+                          <strong className="text-neutral-800 font-semibold">Corporate Impact: </strong>{comp.hiring_impact}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: SPEED VS ACCURACY MATRIX (Mercer | Mettl 4-Quadrant Framework) */}
+        {/* ========================================================================= */}
+        {activeTab === "ARCHETYPES" && (
+          <div className="space-y-6">
+            <div className="p-8 rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] card-print space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-blue-700 bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 rounded-full">
+                      Mercer | Mettl Signature Assessment
+                    </span>
+                    <span className="text-xs text-neutral-400 font-semibold">•</span>
+                    <span className="text-xs text-neutral-500 font-semibold">Cognitive & Execution Archetypes</span>
+                  </div>
+                  <h3 className="text-xl font-extrabold text-neutral-900 tracking-tight mt-1">
+                    Speed vs Accuracy Quadrant & Behavioral Archetypes
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Evaluates student problem-solving approach under timed pressure, distinguishing impulsive guessers from methodical and elite problem-solvers.
+                  </p>
+                </div>
+              </div>
+
+              {/* 2x2 Quadrant Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {(report.speed_accuracy_matrix || []).map((quad, idx) => {
+                  const isQ1 = idx === 0;
+                  const isQ2 = idx === 1;
+                  const isQ3 = idx === 2;
+                  const isQ4 = idx === 3;
+
+                  return (
+                    <div 
+                      key={idx}
+                      className={`p-6 rounded-3xl border transition-all shadow-xs relative overflow-hidden group ${
+                        isQ1 
+                          ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/30' 
+                          : isQ2 
+                          ? 'bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white border-blue-500/30' 
+                          : isQ3 
+                          ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border-amber-500/30' 
+                          : 'bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border-rose-500/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                            isQ1 ? 'bg-emerald-500/20 text-emerald-800' : isQ2 ? 'bg-blue-500/20 text-blue-800' : isQ3 ? 'bg-amber-500/20 text-amber-800' : 'bg-rose-500/20 text-rose-800'
+                          }`}>
+                            {quad.quadrant.split(":")[0]}
+                          </span>
+                          <h4 className="text-base font-extrabold text-neutral-900 tracking-tight mt-1.5">
+                            {quad.quadrant.split(":")[1]?.trim() || quad.quadrant}
+                          </h4>
+                          <p className="text-xs text-neutral-500 font-medium mt-0.5">
+                            {quad.profile}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <div className={`text-3xl font-black ${
+                            isQ1 ? 'text-emerald-700' : isQ2 ? 'text-blue-700' : isQ3 ? 'text-amber-700' : 'text-rose-700'
+                          }`}>
+                            {quad.count}
+                          </div>
+                          <span className="text-[11px] font-bold text-neutral-500">
+                            {quad.pct}% of cohort
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t border-neutral-200/50 space-y-2.5 text-xs">
+                        <div className="p-3 rounded-2xl bg-white/80 border border-neutral-100 shadow-xs">
+                          <strong className="text-neutral-900 font-bold block mb-0.5">Recruiter Verdict:</strong>
+                          <span className="text-neutral-600 leading-relaxed">{quad.hiring_verdict}</span>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-white/80 border border-neutral-100 shadow-xs">
+                          <strong className="text-neutral-900 font-bold block mb-0.5">Faculty Action Directive:</strong>
+                          <span className="text-neutral-600 leading-relaxed">{quad.pedagogy_directive}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab("ROSTER");
+                            setRosterArchetypeFilter(
+                              isQ1 ? "Elite Day-1 Ready" : isQ2 ? "Methodical Engineer" : isQ3 ? "Impulsive / Rushed" : "Remedial Support"
+                            );
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                            isQ1 
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs' 
+                              : isQ2 
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs' 
+                              : isQ3 
+                              ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs' 
+                              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
+                          }`}
+                        >
+                          <span>Inspect {quad.count} Candidates</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: SECTION CHAPTER HEATMAP (Dean's Curricular Matrix) */}
+        {/* ========================================================================= */}
+        {activeTab === "HEATMAP" && (
+          <div className="space-y-6">
+            <div className="p-8 rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] card-print space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full">
+                      Dean Academic Diagnostics
+                    </span>
+                    <span className="text-xs text-neutral-400 font-semibold">•</span>
+                    <span className="text-xs text-neutral-500 font-semibold">Curriculum Cross-Tabulation</span>
+                  </div>
+                  <h3 className="text-xl font-extrabold text-neutral-900 tracking-tight mt-1">
+                    Classroom Section × Curriculum Chapter Heatmap
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Matrix displaying student pass rates by classroom section across individual textbook chapters, pinpointing section-specific syllabus weaknesses.
+                  </p>
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center gap-3 text-xs font-bold shrink-0 bg-neutral-50 px-4 py-2 rounded-2xl border border-neutral-200/60">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-emerald-500" />
+                    <span className="text-neutral-700">Strong (≥70%)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-amber-400" />
+                    <span className="text-neutral-700">Moderate (40-69%)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-rose-500" />
+                    <span className="text-neutral-700">Critical (&lt;40%)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Heatmap Matrix Table */}
+              <div className="overflow-x-auto rounded-2xl border border-neutral-200/80">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-neutral-50/90 border-b border-neutral-200 text-[11px] font-extrabold text-neutral-600 uppercase tracking-wider">
+                      <th className="py-3 px-5">Classroom Section</th>
+                      {chaptersList.map(ch => (
+                        <th key={ch.chapter_name} className="py-3 px-5 text-center min-w-[140px]">
+                          {ch.chapter_name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100 text-xs">
+                    {(report.section_chapter_heatmap || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={chaptersList.length + 1} className="py-10 text-center text-neutral-400">
+                          Cross-tabulating section metrics...
+                        </td>
+                      </tr>
+                    ) : (
+                      (report.section_chapter_heatmap || []).map((secRow, idx) => (
+                        <tr key={secRow.section || idx} className="hover:bg-neutral-50/60 transition-colors">
+                          <td className="py-3.5 px-5 font-mono font-bold text-neutral-900">
+                            Section {secRow.section}
+                          </td>
+                          {chaptersList.map(ch => {
+                            const val = secRow.chapters?.[ch.chapter_name] ?? 0;
+                            const isHigh = val >= 70;
+                            const isMed = val >= 40 && val < 70;
+                            return (
+                              <td key={ch.chapter_name} className="py-3.5 px-5 text-center">
+                                <span className={`inline-flex items-center justify-center px-3 py-1 rounded-xl font-mono font-bold text-xs ${
+                                  isHigh 
+                                    ? 'bg-emerald-500/15 text-emerald-800 border border-emerald-500/30' 
+                                    : isMed 
+                                    ? 'bg-amber-400/20 text-amber-900 border border-amber-400/40' 
+                                    : 'bg-rose-500/15 text-rose-800 border border-rose-500/30'
+                                }`}>
+                                  {val}%
+                                </span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: ACCREDITATION (NBA / NAAC Outcome-Based Education OBE Audit) */}
+        {/* ========================================================================= */}
+        {activeTab === "ACCREDITATION" && (
+          <div className="space-y-6">
+            <div className="p-8 rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] card-print space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-rose-700 bg-rose-50 border border-rose-200/60 px-2.5 py-0.5 rounded-full">
+                      NBA / NAAC Criterion 3 Audit
+                    </span>
+                    <span className="text-xs text-neutral-400 font-semibold">•</span>
+                    <span className="text-xs text-neutral-500 font-semibold">Outcome-Based Education (OBE)</span>
+                  </div>
+                  <h3 className="text-xl font-extrabold text-neutral-900 tracking-tight mt-1">
+                    Course Outcome (CO) Attainment & Remedial Accreditation Dossier
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Formal curriculum audit documentation evaluating CO attainment targets, pedagogical deficiency justifications, and institutional remedial actions.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrint}
+                    className="px-4 py-2 rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Accreditation Dossier</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* OBE Course Outcome Matrix Table */}
+              <div className="overflow-x-auto rounded-2xl border border-neutral-200/80">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-neutral-50/90 border-b border-neutral-200 text-[11px] font-extrabold text-neutral-600 uppercase tracking-wider">
+                      <th className="py-3 px-5 w-20">CO Code</th>
+                      <th className="py-3 px-5">Course Outcome Competency Statement</th>
+                      <th className="py-3 px-5 text-center">Mapped Chapters</th>
+                      <th className="py-3 px-5 text-center">Target</th>
+                      <th className="py-3 px-5 text-center">Attained</th>
+                      <th className="py-3 px-5 text-center">Accreditation Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100 text-xs">
+                    {(report.accreditation_summary?.course_outcomes || []).map((co, idx) => {
+                      const isSub = co.status === 'SUB_THRESHOLD_REMEDIAL';
+                      return (
+                        <tr key={co.code || idx} className="hover:bg-neutral-50/60 transition-colors">
+                          <td className="py-4 px-5 font-mono font-extrabold text-neutral-900">
+                            {co.code}
+                          </td>
+                          <td className="py-4 px-5 font-medium text-neutral-800 max-w-md">
+                            {co.statement}
+                          </td>
+                          <td className="py-4 px-5 text-center font-semibold text-neutral-600">
+                            {(co.mapped_chapters || []).join(", ")}
+                          </td>
+                          <td className="py-4 px-5 text-center font-mono font-bold text-neutral-600">
+                            {co.target_attainment_pct}%
+                          </td>
+                          <td className="py-4 px-5 text-center font-mono font-extrabold text-neutral-900">
+                            <span className={isSub ? 'text-rose-700' : 'text-emerald-700'}>
+                              {co.actual_attainment_pct}%
+                            </span>
+                          </td>
+                          <td className="py-4 px-5 text-center">
+                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold border ${
+                              isSub 
+                                ? 'bg-rose-500/10 text-rose-800 border-rose-500/20' 
+                                : 'bg-emerald-500/10 text-emerald-800 border-emerald-500/20'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isSub ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                              <span>{isSub ? 'Sub-Threshold (Remedial Mandate)' : 'Attainment Satisfied'}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Official Academic Board Verdict */}
+              <div className="p-5 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                    Academic Board & Dean Review Finding
+                  </h4>
+                  <p className="text-xs text-amber-900/90 leading-relaxed font-medium">
+                    {report.accreditation_summary?.overall_obe_verdict || "Remedial Directives mandated to fulfill Criterion 3 compliance."} Department lead is requested to schedule laboratory workshops on pointer dereferencing and memory leak resolution before next audit review.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 5: COHORT PERFORMANCE CURVES (Smooth Vector Graphs) */}
         {/* ========================================================================= */}
         {activeTab === "CURVES" && (
           <div className="p-8 rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] space-y-8 card-print">
